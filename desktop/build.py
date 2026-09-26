@@ -152,13 +152,13 @@ def build(no_zip=False,qa=False,output=None):
         f'/out:{register("Tulpa.Support.exe")}', '/r:System.dll','/r:System.Core.dll','/r:System.Drawing.dll',
         '/r:System.Windows.Forms.dll','/r:System.Web.Extensions.dll',str(ROOT/'desktop/Support.cs')],check=True)
     copy(ROOT/'desktop/ChatWeave.exe.config',executable+'.config')
-    write('开始使用.txt','Tulpa '+VERSION+'\n\n完整解压此文件夹，双击 Tulpa.exe。无需安装 Python、Node 或运行 PowerShell。\n首次进入在「模型设置」填写 API 地址、API Key 和模型名称。\n在「数据与同步」选择本机 QQ / 微信或导入文件。仅支持本机已有且可读取的数据。\n语音模型、OCR、文件解析和 Agent 运行时已随包提供。QQ 发送需要另行登录并配置本机 OneBot 服务，每条发送仍需批准。\n数据和配置保存在本文件夹的 data、imports、.env 等位置，请保留整个文件夹。关闭窗口即退出自带服务；不会关闭 QQ 或微信。\n请放在有写入权限的本地目录，不要直接从 ZIP 内运行。Windows 10/11 x64，.NET Framework 4.8。\n本程序未签名。更新和源码：https://github.com/fumingyang2004/Tulpa 。第三方许可见 THIRD_PARTY.md。\n')
-    copy(ROOT/'THIRD_PARTY.md','THIRD_PARTY.md')
+    write('开始使用.txt','Tulpa '+VERSION+'\n\n完整解压此文件夹，双击 Tulpa.exe。无需安装 Python、Node 或运行 PowerShell。\n首次进入在「模型设置」填写 API 地址、API Key 和模型名称。\n在「数据与同步」选择本机 QQ / 微信或导入文件。仅支持本机已有且可读取的数据。\n语音模型、OCR、文件解析和 Agent 运行时已随包提供。QQ 发送需要另行登录并配置本机 OneBot 服务，每条发送仍需批准。\n数据和配置保存在本文件夹的 data、imports、.env 等位置，请保留整个文件夹。关闭窗口即退出自带服务；不会关闭 QQ 或微信。\n请放在有写入权限的本地目录，不要直接从 ZIP 内运行。Windows 10/11 x64，.NET Framework 4.8。\n本程序未签名。更新和源码：https://github.com/fumingyang2004/Tulpa 。第三方许可见 doc/THIRD_PARTY.md。\n')
     tree(ROOT/'desktop/licenses','licenses')
-    for doc in ('LICENSE','SECURITY.md','CONTRIBUTING.md','README.md','FEATURES.md','DESKTOP.md','RELEASE_0.3.md','SNOWLUMA_SETUP.md',
-                'IMPORTS.md','LIVE_INGESTION.md','VOICE.md','ARTIFACTS.md','INVESTIGATION.md',
-                'REPLY_COPILOT.md','TULPA.md','WORKSPACES.md','GROUP_MANAGEMENT.md','VALIDATION.md'):
-        if (ROOT/doc).exists():copy(ROOT/doc,doc)
+    for name in ('LICENSE','README.md'):
+        copy(ROOT/name,name)
+    docs=subprocess.check_output(['git','ls-files','doc'],cwd=ROOT,text=True).splitlines()
+    for name in docs:
+        if Path(name).suffix=='.md':copy(ROOT/name,name)
     # Only aggregate versions/hashes. Never environment variables or source data.
     import importlib.metadata
     dependencies=sorted([dict(name=d.metadata['Name'],version=d.version) for d in importlib.metadata.distributions() if d.metadata['Name']],key=lambda d:d['name'].lower())

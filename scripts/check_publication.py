@@ -26,7 +26,8 @@ def allowed_path(name, *, archive=False):
         return False
     if p.name == '.env' or (p.name.startswith('.env.') and p.name != '.env.example'):
         return False
-    if p.suffix.lower() in {'.db', '.sqlite', '.sqlite3', '.log', '.dmp', '.bundle', '.pem', '.key', '.bak'}:
+    public_ca = archive and name == 'runtime/Lib/site-packages/certifi/cacert.pem'
+    if p.suffix.lower() in {'.db', '.sqlite', '.sqlite3', '.log', '.dmp', '.bundle', '.pem', '.key', '.bak'} and not public_ca:
         return False
     if archive:
         if 'snowluma' in p.parts or any(part.lower().startswith('snowluma-') for part in p.parts):
@@ -68,11 +69,11 @@ def source_check():
         if file.is_symlink() or file.is_junction():
             errors.append('linked source: ' + name)
         errors.extend(check_text(name, file.read_bytes()))
-    for name in ('README.md', 'LICENSE', 'THIRD_PARTY.md', 'SECURITY.md'):
+    for name in ('README.md', 'LICENSE', 'doc/THIRD_PARTY.md', 'doc/SECURITY.md'):
         if not (ROOT / name).is_file():
             errors.append('missing: ' + name)
     # Document links to source files should work in the public repository.
-    for doc in ROOT.glob('*.md'):
+    for doc in (ROOT / name for name in names if name.endswith('.md') and (ROOT / name).is_file()):
         for link in re.findall(r'\]\(([^)]+)\)', doc.read_text('utf-8')):
             if '://' in link or link.startswith(('#', 'mailto:')):
                 continue
@@ -99,7 +100,7 @@ def archive_check(path):
         head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
         if manifest.get('checkpoint') != head:
             errors.append('archive was not built from current source commit')
-        for required in ('Tulpa.exe', 'Tulpa.Support.exe', 'LICENSE', 'THIRD_PARTY.md', 'web/tulpa-logo.png',
+        for required in ('Tulpa.exe', 'Tulpa.Support.exe', 'LICENSE', 'doc/THIRD_PARTY.md', 'web/tulpa-logo.png',
                          'tools/qq-reader/LICENSE', 'tools/wechat-reader/LICENSE'):
             if 'Tulpa/' + required not in expected:
                 errors.append('missing package file: ' + required)
@@ -107,6 +108,10 @@ def archive_check(path):
             rel = name.removeprefix('Tulpa/')
             if not allowed_path(rel, archive=True):
                 errors.append('private archive path: ' + rel)
+            if rel == 'runtime/Lib/site-packages/certifi/cacert.pem':
+                ca = z.read(name).decode('ascii')
+                if '-----BEGIN CERTIFICATE-----' not in ca or 'PRIVATE KEY' in ca:
+                    errors.append('invalid public CA certificate bundle')
             # Audit our files; third-party distributions retain their original
             # test fixtures, licenses and source URLs (not our personal data).
             if not rel.startswith(('runtime/', '_internal/', 'tools/')):

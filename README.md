@@ -4,7 +4,7 @@
 
 **在本机查询 QQ / 微信聊天，整理资料、持续调查，并起草符合当前语境的回复。**
 
-[下载 Windows 版](https://github.com/fumingyang2004/Tulpa/releases/latest) · [功能清单](FEATURES.md) · [OneBot 配置教程](SNOWLUMA_SETUP.md) · [参与开发](CONTRIBUTING.md)
+[下载 Windows 版](https://github.com/fumingyang2004/Tulpa/releases/latest) · [功能清单](doc/FEATURES.md) · [OneBot 配置教程](doc/SNOWLUMA_SETUP.md) · [参与开发](doc/CONTRIBUTING.md)
 
 Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本机，Agent 在你选择的平台、会话和时间范围内检索，按需读取图片、语音和文件。桌面版解压即用；浏览器入口保留用于开发与测试。
 
@@ -32,7 +32,7 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 | 证据集合 | 组织消息、媒体、文件片段及群资料的引用，保留来源 |
 | QQ 扩展 | 连接 OneBot 后按需读公告、精华和群文件；批准回复发送；按账号权限管理群 |
 
-完整行为和限制见 [FEATURES.md](FEATURES.md)。
+完整行为和限制见 [FEATURES.md](doc/FEATURES.md)。
 
 ## 发送和群管理
 
@@ -40,7 +40,7 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 
 群管理默认每项操作询问，也可为当前普通对话明确选择“默认允许”或“默认拒绝”。权限检查、目标确认及操作记录始终保留。工作区和关注卡不会在后台执行群管理写操作。
 
-这些扩展需要独立运行的本机 OneBot HTTP 服务。Tulpa 不附带 SnowLuma，不代填账号或 Token；按 [从零取得 URL 和 Token](SNOWLUMA_SETUP.md) 操作。
+这些扩展需要独立运行的本机 OneBot HTTP 服务。Tulpa 不附带 SnowLuma，不代填账号或 Token；按 [从零取得 URL 和 Token](doc/SNOWLUMA_SETUP.md) 操作。
 
 ## 数据与模型调用
 
@@ -50,7 +50,7 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 - API Key / OneBot Token 保存在本机配置中，请勿共享整个使用过的程序目录。提交问题时先移除聊天内容、账号、密钥和个人路径。
 - 检索结果只覆盖已经取得的本地资料。引用有效不保证模型解释正确；未通过引用检查的文字会标注原因。
 
-升级前退出程序并备份。将新版本程序文件合并到原目录时，保留自己的 `data/`、`imports/` 和 `.env`。不要让两个版本同时使用同一数据目录。更多说明见 [DESKTOP.md](DESKTOP.md)。
+升级前退出程序并备份。将新版本程序文件合并到原目录时，保留自己的 `data/`、`imports/` 和 `.env`。不要让两个版本同时使用同一数据目录。更多说明见 [DESKTOP.md](doc/DESKTOP.md)。
 
 ## 从源码运行
 
@@ -63,20 +63,20 @@ cd Tulpa
 .\start.ps1
 ```
 
-打开 <http://127.0.0.1:7860/?desktop=1>，在界面中配置模型。首次 `setup.ps1` 会联网安装固定依赖和读取模块。图片 / 语音的开发依赖及桌面构建步骤见 [DESKTOP.md](DESKTOP.md)。不需要把个人 `.env` 或数据库提交到 Git。
+打开 <http://127.0.0.1:7860/?desktop=1>，在界面中配置模型。首次 `setup.ps1` 会联网安装固定依赖和读取模块。图片 / 语音的开发依赖及桌面构建步骤见 [DESKTOP.md](doc/DESKTOP.md)。不需要把个人 `.env` 或数据库提交到 Git。
 
 ## 文档
 
 | 主题 | 文档 |
 | --- | --- |
-| 功能与边界 | [功能清单](FEATURES.md) |
-| 桌面运行、开发与打包 | [DESKTOP.md](DESKTOP.md) |
-| 数据读取、进度和诊断 | [导入](IMPORTS.md)、[实时摄取](LIVE_INGESTION.md) |
-| 查询与多模态资料 | [调查和证据](INVESTIGATION.md)、[文件](ARTIFACTS.md)、[语音](VOICE.md) |
-| 持续工作 | [工作区](WORKSPACES.md)、[行为记忆](TULPA.md) |
-| QQ 扩展 | [回复助手](REPLY_COPILOT.md)、[群管理](GROUP_MANAGEMENT.md)、[OneBot 教程](SNOWLUMA_SETUP.md) |
-| 开发与验证 | [贡献指南](CONTRIBUTING.md)、[验证说明](VALIDATION.md)、[安全报告](SECURITY.md) |
+| 功能与边界 | [功能清单](doc/FEATURES.md) |
+| 桌面运行、开发与打包 | [DESKTOP.md](doc/DESKTOP.md) |
+| 数据读取、进度和诊断 | [导入](doc/IMPORTS.md)、[实时摄取](doc/LIVE_INGESTION.md) |
+| 查询与多模态资料 | [调查和证据](doc/INVESTIGATION.md)、[文件](doc/ARTIFACTS.md)、[语音](doc/VOICE.md) |
+| 持续工作 | [工作区](doc/WORKSPACES.md)、[行为记忆](doc/TULPA.md) |
+| QQ 扩展 | [回复助手](doc/REPLY_COPILOT.md)、[群管理](doc/GROUP_MANAGEMENT.md)、[OneBot 教程](doc/SNOWLUMA_SETUP.md) |
+| 开发与验证 | [贡献指南](doc/CONTRIBUTING.md)、[验证说明](doc/VALIDATION.md)、[安全报告](doc/SECURITY.md) |
 
 ## 开源许可
 
-Tulpa 自有代码采用 [MIT License](LICENSE)。第三方组件、模型和客户端遵循各自许可证，详见 [THIRD_PARTY.md](THIRD_PARTY.md)。本项目不是腾讯官方产品，与 QQ、微信及所用模型服务商没有隶属关系。
+Tulpa 自有代码采用 [MIT License](LICENSE)。第三方组件、模型和客户端遵循各自许可证，详见 [THIRD_PARTY.md](doc/THIRD_PARTY.md)。本项目不是腾讯官方产品，与 QQ、微信及所用模型服务商没有隶属关系。

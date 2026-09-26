@@ -253,7 +253,7 @@ Tulpa 是 Windows 桌面应用，支持导入和查询 QQ / 微信聊天、理�
 
 | 文档 | 内容 |
 | --- | --- |
-| [README.md](README.md) | 项目入口、开发运行与总体说明 |
+| [README.md](../README.md) | 项目入口、开发运行与总体说明 |
 | [DESKTOP.md](DESKTOP.md) | 桌面运行、配置、打包和升级 |
 | [IMPORTS.md](IMPORTS.md) | 分批导入、进度与诊断 |
 | [LIVE_INGESTION.md](LIVE_INGESTION.md) | 实时读取、刷新和媒体恢复 |
