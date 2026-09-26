@@ -158,7 +158,8 @@ def build(no_zip=False,qa=False,output=None):
         copy(ROOT/name,name)
     docs=subprocess.check_output(['git','ls-files','doc'],cwd=ROOT,text=True).splitlines()
     for name in docs:
-        if Path(name).suffix=='.md':copy(ROOT/name,name)
+        if Path(name).suffix=='.md' or (name.startswith('doc/assets/') and Path(name).suffix=='.png'):
+            copy(ROOT/name,name)
     # Only aggregate versions/hashes. Never environment variables or source data.
     import importlib.metadata
     dependencies=sorted([dict(name=d.metadata['Name'],version=d.version) for d in importlib.metadata.distributions() if d.metadata['Name']],key=lambda d:d['name'].lower())

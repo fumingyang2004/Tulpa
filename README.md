@@ -1,4 +1,4 @@
-<p align="center"><img src="web/tulpa-logo.png" width="88" alt="Tulpa Logo"></p>
+![Tulpa](doc/assets/title.png)
 
 # Tulpa
 
