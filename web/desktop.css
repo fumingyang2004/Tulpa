@@ -1,0 +1,230 @@
+/* Shared editorial presentation. Reference palette: #faf9f5 / #f0eee6.
+   System fonts and application behavior stay unchanged. Rounded controls are
+   transparent on their parent surface, or ink-filled for primary/selected use. */
+:root,:root[data-desktop] {
+  color-scheme:light;
+  --bg:#faf9f5;--sidebar:#f0eee6;--panel:#faf9f5;--input:transparent;
+  --surface:#f0eee6;--text:#33332e;--muted:#73726c;--ink:#171714;
+  --line:#dedbd2;--border:var(--line);--hover:transparent;
+  --accent:#171714;--accent-hover:#30302b;--user:transparent;
+  --selected:#171714;--selected-border:#171714;
+  --danger:#a14038;--warning:#846123;--success:#4d7055;
+  --rail:236px;--watch-border:var(--line);
+  --font-ui:'Segoe UI','Microsoft YaHei UI',system-ui,sans-serif;
+  font:14px/1.6 var(--font-ui);letter-spacing:normal;background:var(--bg);color:var(--text);
+}
+html,html body {height:100%;overflow:hidden;background:var(--bg)}
+html * {scrollbar-color:#c6c3ba transparent;scrollbar-width:thin}
+html ::selection {background:#dfddd4;color:var(--ink)}
+html button,html input,html select,html textarea {font-family:var(--font-ui);letter-spacing:normal}
+button {transition:color .15s ease,border-color .15s ease,background-color .15s ease}
+html button:hover:not(:disabled) {background-color:transparent;color:var(--ink)}
+html button:focus-visible,html a:focus-visible,html summary:focus-visible {outline:2px solid var(--ink);outline-offset:3px}
+html .muted {color:var(--text)}
+h1,h2,h3,h4 {color:var(--ink)}
+html #sidebar {padding:20px 12px 0;background:var(--sidebar);border-color:var(--line)}
+.sidebar-head {padding:0 6px 25px 8px}
+html .brand {display:flex;align-items:center;gap:10px;font-size:22px;font-weight:700;letter-spacing:-.4px;color:var(--ink)}
+.brand img {width:32px;height:32px;object-fit:contain;background:#000;border-radius:7px;filter:none;flex-shrink:0}
+html .nav-button {padding:9px 12px;border-radius:7px;font-size:14px;gap:12px}
+.nav-button svg {width:18px;height:18px;color:currentColor;opacity:.7}
+html .nav-button:hover:not(:disabled),html .history-item:hover {color:var(--ink);text-decoration:underline;text-underline-offset:4px}
+html #new-chat {background:var(--ink);color:#fff;border:1px solid var(--ink);box-shadow:none;margin-bottom:10px;font-weight:600;text-decoration:none}
+html #new-chat:hover:not(:disabled) {background:var(--accent-hover);color:#fff}
+html #new-chat svg {opacity:1;color:inherit}
+.history-label {font-size:11px;padding:26px 12px 9px;color:var(--muted);letter-spacing:.02em}
+html .history-item {padding:9px 12px;border-radius:7px;font-size:13px;color:var(--text)}
+.history-delete {opacity:0;color:var(--muted)}
+.history-row:hover .history-delete,.history-delete:focus-visible {opacity:1}
+.sidebar-bottom {padding:12px 0;border-color:var(--line)}
+.desktop-settings-button {width:100%;display:flex;align-items:center;gap:12px;padding:9px 12px;color:var(--text);font-size:12px;border-radius:7px}
+.desktop-settings-button svg {width:17px;height:17px;color:var(--muted)}
+.desktop-settings-button span:last-child {margin-left:auto;font-size:10px;color:var(--muted)}
+.live-summary {font-size:10px;color:var(--muted)}
+html .live-summary.disconnected {color:var(--warning)}
+html .workspace {background:var(--bg)}
+html .topbar {height:64px;flex-basis:64px;padding:0 28px;background:var(--bg);border-color:var(--line);backdrop-filter:none}
+.topbar h1 {font-size:14px;font-weight:600;color:var(--ink)}
+.header-icon {color:var(--muted)}
+.desktop-local-badge {display:flex;align-items:center;gap:7px;margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap}
+.desktop-local-badge::before {content:'';height:5px;width:5px;background:var(--success);border-radius:50%}
+#header-range {margin-left:12px;border:1px solid var(--line);background:transparent}
+html .chat-width {width:min(880px,calc(100% - 80px))}
+#welcome {width:min(880px,calc(100% - 80px));margin:0 auto;min-height:100%;align-items:flex-start;text-align:left;padding:48px 0 64px}
+#welcome::before {content:none}
+.welcome-symbol {display:none}
+.desktop-eyebrow {color:var(--muted);font-size:11px;letter-spacing:.1em;margin-bottom:18px}
+html #welcome h2 {font:700 clamp(28px,3.1vw,44px)/1.3 var(--font-ui);letter-spacing:-.6px;color:var(--ink);margin:0 0 20px;max-width:800px}
+#welcome>p {font-size:15px;line-height:1.8;color:var(--muted);max-width:650px}
+html .suggestions {counter-reset:prompt;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;width:100%;margin-top:46px}
+html .suggestions button {display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-width:0;padding:14px 0 16px;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent;box-shadow:none;color:var(--ink);text-align:left;font-size:14px;font-weight:600}
+.suggestions button::before {counter-increment:prompt;content:counter(prompt,decimal-leading-zero);font-size:11px;font-weight:400;color:var(--muted)}
+.suggestions button svg {display:none}
+html .suggestions button:hover:not(:disabled) {border-top-color:var(--ink);text-decoration:underline;text-underline-offset:5px}
+.composer-dock {padding:16px 0 14px;background:var(--bg)}
+html #composer {border-radius:12px;background:transparent;border:1px solid #c9c6bc;box-shadow:none;padding:16px 18px 12px}
+html #composer:focus-within {border-color:var(--ink);box-shadow:none}
+html #question {background:transparent;min-height:58px;color:var(--ink)}
+#question::placeholder {color:var(--muted)}
+.composer-toolbar {padding-top:8px}
+.composer-note {color:var(--muted);font-size:10px;margin-top:10px}
+html .composer-chip,html .range-chip {background:transparent;color:var(--muted);border:1px solid transparent;border-radius:7px}
+html .composer-chip:hover:not(:disabled),html .range-chip:hover:not(:disabled) {border-color:var(--line)}
+#model-label {color:var(--muted)}
+html .primary-button,html .send-button,html #reply-approve:not(:disabled) {background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:none;border-radius:8px}
+html .primary-button:hover:not(:disabled),html .send-button:hover:not(:disabled),html #reply-approve:hover:not(:disabled) {background:var(--accent-hover);color:#fff}
+html .send-button {width:36px;height:36px}
+html .send-button:disabled {background:var(--ink);color:#fff;opacity:.25}
+html .quiet-button {background:transparent;color:var(--text);border:1px solid var(--line);border-radius:7px}
+html .quiet-button:hover:not(:disabled) {background:transparent;color:var(--ink);border-color:var(--ink)}
+html .user-bubble,html .ws-chat-user>p {background:transparent;border:1px solid var(--line);border-radius:12px;padding:14px 20px;box-shadow:none;color:var(--ink)}
+html .assistant-content,html .ws-chat-answer,html .user-bubble,html .ws-chat-user>p,
+html .original-bubble p,html .chat-bubble,html .ws-finding>p,html .ws-preview,html #question,html #reply-text {font-family:var(--font-ui);font-size:16px;line-height:1.8;letter-spacing:normal;word-spacing:normal;color:var(--ink)}
+.assistant-content p,.ws-chat-answer>p {margin:0 0 1em}
+html .source-button {color:var(--muted);background:transparent}
+html .source-button:hover {color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+html .citation-group,html .answer-note,html .turn-activity,html .ws-chat-answer>details,
+html .ws-proposal-inline,html .withheld-claims,html .original-bubble figcaption,html .chat-bubble figcaption,
+html .source-message>div,html .watch-run-stamp {font-family:var(--font-ui);line-height:1.6;color:var(--muted)}
+html .citation-group>summary {background:transparent;border-color:var(--line);border-radius:6px;color:var(--muted)}
+html .citation-source {border-color:var(--line)}
+html .citation-group .source-message>p,html .citation-group .source-message>pre {font:14px/1.8 var(--font-ui);color:var(--ink)}
+html .turn-activity pre,html .read-progress {font-family:var(--font-ui);background:transparent;border:1px solid var(--line);color:var(--text);border-radius:7px}
+html .withheld-item {background:transparent;border-color:var(--line);border-radius:8px}
+html .popup-menu,html .intensity-popover,html .reply-context-menu {background:var(--bg);border-color:var(--line);border-radius:10px;box-shadow:0 10px 35px #17171412}
+html .reply-context-menu button:hover {background:var(--ink);color:#fff;border-radius:5px}
+html .intensity-heading output,html #intensity-label,html .intensity-stops button[aria-pressed=true] {color:var(--ink)}
+html #intensity-slider {background:linear-gradient(to right,var(--ink) var(--intensity-fill,66.67%),var(--line) var(--intensity-fill,66.67%))}
+html #intensity-slider::-webkit-slider-thumb {background:var(--ink);box-shadow:none}
+html #intensity-slider::-moz-range-thumb {background:var(--ink)}
+html dialog,html .artifact-dialog,html #tulpa-dialog {background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:12px;box-shadow:0 20px 70px #1717141a}
+html dialog::backdrop,html .artifact-dialog::backdrop,html #tulpa-dialog::backdrop,html .scrim {background:#17171455;backdrop-filter:none}
+html .dialog-head {background:var(--bg)}
+html .dialog-head h2,.artifact-heading h2 {font-size:23px;font-weight:700;color:var(--ink)}
+html input:not([type=checkbox]):not([type=radio]):not([type=range]),html select,html textarea,
+html .artifact-filters input,html .artifact-filters select,html .tulpa-detail textarea,html .tulpa-directory input,html .chat-picker select {background:transparent;border:1px solid var(--line);color:var(--text);border-radius:7px}
+html #question {border:0;border-radius:0}
+html input:focus,html select:focus,html textarea:focus {border-color:var(--ink)}
+html input::placeholder,html textarea::placeholder {color:var(--muted)}
+html option,html .artifact-filters option {background:var(--bg);color:var(--text)}
+html input[type=checkbox],html input[type=radio],html input[type=range],html progress {accent-color:var(--ink)}
+html .dialog-intro,html .field-hint,html #data-status,html .read-window-summary {color:var(--muted);line-height:1.65}
+html #data-dialog {width:min(940px,calc(100vw - 40px));padding:0 30px 30px}
+#data-dialog>.dialog-head {position:sticky;top:0;z-index:2;margin:0 -30px 24px;padding:22px 30px;border-bottom:1px solid var(--line)}
+#data-status:has(.data-card) {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px}
+#data-status>:not(.data-card) {grid-column:1/-1}
+#data-status>p {margin:6px 0}
+html .data-card {border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 0 16px;margin-bottom:18px;background:transparent}
+html .read-settings {margin-top:30px;border:0;border-radius:0;padding:0}
+.read-settings>legend {font-size:16px;font-weight:650;color:var(--ink);margin-bottom:20px}
+#client-scope-controls {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 28px}
+#client-scope-controls>.field-hint,#client-scope-controls>button {grid-column:1/-1;margin:0}
+#client-scope-controls>button {justify-self:start}
+html .scope-platform {border:0;border-top:1px solid var(--line);border-radius:0;padding:20px 0;margin:0 0 6px;background:transparent}
+.read-platform-head {margin-bottom:20px}
+#data-dialog>.optional-field,#data-dialog>.import-section {border-top:1px solid var(--line);padding-top:20px;margin-top:24px}
+html .artifact-row,html .artifact-detail {border-color:var(--line);background:transparent}
+html .artifact-detail {border-radius:8px}
+html #toast {background:var(--ink);color:#fff;border-color:var(--ink);border-radius:8px;box-shadow:0 6px 20px #17171412}
+html .chat-drawer {height:94dvh;width:min(1380px,96vw);border-radius:12px}
+html .chat-directory {background:var(--sidebar);border-color:var(--line)}
+html .chat-timeline,html .chat-conversation-head,html .chat-paging {background:var(--bg);border-color:var(--line)}
+html .chat-conversation-card {background:transparent;border-radius:7px;border-color:transparent;padding:13px 11px}
+html .chat-conversation-card:hover {background:transparent;border-color:#bbb8ae}
+html .chat-card-platform {color:var(--muted)}
+html .chat-bubble,html .original-bubble,html .self .original-bubble,html .chat-row.self .chat-bubble {background:transparent;border:1px solid var(--line);border-radius:10px;box-shadow:none;color:var(--ink)}
+html .original-message.anchored,html .chat-row.anchor {background:transparent;border-color:var(--ink);border-radius:10px}
+html .chat-reply,html .chat-quote,html .reply-quote,html .reply-body blockquote {background:transparent;color:var(--muted);border-color:var(--line);border-radius:0}
+html .media-unavailable {border-color:var(--line);color:var(--muted)}
+html .original-message .sender-line,html .original-bubble figcaption,html .evidence-media figcaption,html .image-dialog p,html .open-chat {color:var(--muted)}
+html .chat-new-bar button,html #jump-bottom {background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:none}
+html .reply-panel {background:var(--bg);border-color:var(--line);box-shadow:none}
+html .reply-head,html .reply-footer {background:var(--bg);border-color:var(--line)}
+.reply-head {padding-top:16px;padding-bottom:16px}
+.reply-head h3 {font-size:18px;font-weight:700;color:var(--ink)}
+html #reply-text {background:transparent;border-color:var(--line);border-radius:8px}
+html .chat-reply-receipts {border-color:var(--line);background:transparent}
+html .chat-reply-receipts summary {color:var(--muted)}
+html .image-dialog>.close-dialog {background:var(--ink);color:#fff}
+html .ws-ide-header {padding:26px 30px;border-color:var(--line)}
+.ws-ide-header h2 {font-size:25px;font-weight:700}
+.ws-ide-header .ws-goal {font-size:13px;line-height:1.7;margin-top:9px}
+html .ws-explorer {background:var(--bg);border-color:var(--line);padding-top:26px}
+html .ws-main {padding-top:22px}
+html .ws-output,html .ws-material,html .ws-state-card,html .ws-card {background:transparent;border-color:var(--line);border-radius:0;box-shadow:none}
+html .ws-output {padding:22px 0;border:0;border-top:1px solid var(--line)}
+html .ws-badge,html .ws-pending,html .ws-proposal-inline {background:transparent;border-color:var(--line);color:var(--text);border-radius:7px}
+html .ws-output-summary,html .ws-material-reason {color:var(--text)}
+html .ws-section-heading h3 {font-weight:650;color:var(--ink)}
+html .ws-question,html .ws-finding {border-color:var(--line)}
+html .ws-question>button,html .ws-change>strong,html .ws-live {color:var(--text)}
+html .ws-diff,html .ws-preview pre,html .ws-task pre,html .ws-preview,html .ws-progress {background:transparent;border:1px solid var(--line);color:var(--text);border-radius:7px}
+html .ws-tree-item:hover {background:transparent;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+html .ws-diff,html .ws-editor,html code {font-family:Consolas,monospace}
+html .ws-diff-added {background:transparent;color:var(--success)}
+html .ws-diff-removed {background:transparent;color:var(--danger)}
+html .watch-sidebar-item.active,html .watch-sidebar-item:hover {background:transparent}
+html .watch-status {color:var(--muted)}
+html .watch-refresh-note {background:transparent;border-color:var(--line)}
+html .ws-warning,html .watch-error,html .watch-uncertainty,html .watch-refresh-note,html .artifact-result {color:var(--warning)}
+html .danger-button,html .history-delete:hover:not(:disabled),html .watch-delete,html .desktop-config .config-error,html .tulpa-error {color:var(--danger)}
+html #reply-reject:not(:disabled):hover {background:transparent;color:var(--danger);border-color:var(--danger)}
+.desktop-config {width:min(570px,calc(100vw - 32px));padding:0;max-height:90dvh}
+.desktop-config[open] {display:flex;flex-direction:column}
+.desktop-config .dialog-head {padding:23px 26px 18px;border-bottom:1px solid var(--line);margin:0;flex-shrink:0}
+.desktop-config h2 {margin:0}
+.desktop-config form {overflow:auto;padding:22px 26px 26px}
+.desktop-config .config-intro {color:var(--muted);font-size:13px;margin:0 0 22px;line-height:1.7}
+.desktop-config label {display:block;margin:17px 0 7px;font-size:13px;font-weight:550;color:var(--text)}
+.desktop-config input {width:100%;padding:11px 13px;outline:none}
+.desktop-config small {color:var(--muted);display:block;font-size:11px;margin-top:6px}
+.desktop-config details {margin-top:23px;color:var(--muted);font-size:12px}
+.desktop-config .config-foot {display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:24px}
+.desktop-config .config-error {font-size:12px;white-space:pre-wrap}
+.desktop-storage {font-size:11px;overflow-wrap:anywhere;color:var(--muted);border-top:1px solid var(--line);padding-top:16px;margin-top:22px}
+html .desktop-ready {color:var(--success)}
+html .tulpa-status,html .tulpa-empty,html .tulpa-intro,html .tulpa-card small {color:var(--muted)}
+html .tulpa-detail pre {background:transparent;border:1px solid var(--line);border-radius:7px}
+
+/* Group-operation approval stays directly above the ordinary chat composer. */
+html .group-admin-panel{max-height:min(330px,42vh);overflow:auto;margin-bottom:12px;overscroll-behavior:contain}
+html .group-admin-card{padding:16px 20px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin:0 0 8px}
+html .group-admin-head{display:flex;align-items:center;justify-content:space-between;gap:14px;font-size:13px}
+html .group-admin-head span,html .group-admin-card small{color:var(--muted);font-size:12px}
+html .group-admin-summary{font-size:15px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0}
+html .group-admin-actions{display:flex;gap:10px;margin-top:14px}
+html .group-admin-actions button{min-width:88px;border-radius:8px;padding:8px 20px}
+html .group-admin-actions .primary-button{background:#171715;border:1px solid #171715;color:#fff}
+html .group-admin-actions .quiet-button{background:transparent;border:1px solid var(--line);color:var(--text)}
+html .group-admin-policy{display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:12px;color:var(--muted)}
+html .group-admin-policy select{width:auto;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);font:inherit}
+html .group-admin-policy-note{color:var(--muted);font-size:11px;line-height:1.6;margin-top:4px;margin-bottom:0}
+html .group-admin-history{font-size:12px;color:var(--muted);padding:6px 2px}
+html .group-admin-history summary{cursor:pointer}
+html .group-admin-history-row{padding:8px 0;border-bottom:1px solid var(--line)}
+html .group-admin-history-row p{margin:0 0 5px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)}
+html .composer-footer{flex-wrap:wrap}
+html .chat-answer .unverified-claim{border:0;padding:0;margin:0 0 24px;background:transparent;box-shadow:none}
+html .chat-answer .unverified-note{font-size:12px;color:var(--muted);line-height:1.7;margin:8px 0 0}
+html .tulpa-detail progress {accent-color:var(--ink)}
+/* One filled treatment for primary actions and selected rounded controls. */
+html .history-item.active,html .watch-shortcut.active,html .watch-sidebar-item.active,
+html .chat-conversation-card[aria-current=true],html .ws-resource.active,html .tulpa-card.selected,
+html .range-chip.filtered,html .composer-chip[aria-expanded=true],html .vision-toggle[aria-checked=true],
+html .tulpa-nav>[aria-checked=true] {background:var(--ink);color:#fff;border-color:var(--ink);text-decoration:none}
+html :is(.history-item.active,.watch-shortcut.active,.watch-sidebar-item.active,.chat-conversation-card[aria-current=true],.ws-resource.active,.tulpa-card.selected,.range-chip.filtered,.composer-chip[aria-expanded=true],.vision-toggle[aria-checked=true],.tulpa-nav>[aria-checked=true]):hover:not(:disabled) {background:var(--ink);color:#fff;border-color:var(--ink);text-decoration:none}
+html .chat-conversation-card[aria-current=true] :is(time,.chat-card-preview,.chat-card-platform),
+html .tulpa-card.selected small,html .watch-sidebar-item.active .watch-status {color:#d4d3ce}
+html .vision-toggle[aria-checked=true] .vision-dot {background:#fff}
+@media(max-width:1000px) {.desktop-local-badge{display:none}html .suggestions{gap:16px}}
+@media(max-width:760px) {
+  html #sidebar{width:min(284px,85vw)}html .topbar{padding:0 18px;height:58px;flex-basis:58px}
+  html .chat-width,#welcome{width:calc(100% - 36px)}#welcome{padding:32px 0 40px}
+  html #welcome h2{font-size:30px;line-height:1.4}html .suggestions{gap:12px;margin-top:30px}
+  html .suggestions button{font-size:12px}html #composer{padding:12px;border-radius:10px}
+  html #data-dialog{padding:0 20px 24px;width:calc(100vw - 24px)}#data-dialog>.dialog-head{margin:0 -20px 20px;padding:18px 20px}
+  #client-scope-controls{grid-template-columns:minmax(0,1fr);gap:14px}#data-status:has(.data-card){gap:16px}
+  html .ws-ide-header{padding:20px}.ws-ide-header h2{font-size:22px}
+}
+@media(max-height:720px) {html #sidebar{padding-top:12px}.sidebar-head{padding-bottom:16px}html .nav-button{padding-top:8px;padding-bottom:8px}.history-label{padding-top:16px}#welcome{padding-top:28px;padding-bottom:28px}html .suggestions{margin-top:26px}}
+@media(prefers-reduced-motion:reduce) {button{transition:none}}

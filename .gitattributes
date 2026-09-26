@@ -1,0 +1,2 @@
+# Preserve upstream license/build-notice formatting.
+desktop/licenses/* -whitespace

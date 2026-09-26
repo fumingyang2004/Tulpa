@@ -1,0 +1,5 @@
+# Optional local document parsing; no Torch/VLM/model download.
+docling-slim[convert-core,format-office]==2.129.0
+docling-core==2.98.0
+pypdfium2==5.13.0
+pypdf==6.19.0

@@ -1,0 +1,3 @@
+# Optional local native voice decoder. ASR binary/model: scripts/setup_voice.py
+pysilk-mod==1.6.4
+opencc-python-reimplemented==0.1.7

@@ -1,0 +1,5 @@
+-r requirements.txt
+cryptography==50.0.1
+zstandard==0.25.0
+pycryptodome==3.23.0
+numpy==2.5.3

@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Tulpa</title>
+  <link rel="icon" type="image/png" href="/ui/tulpa-logo.png">
+  <link rel="stylesheet" href="/ui/app.css">
+  <script src="/ui/app.js" defer></script>
+  <script src="/ui/chat.js" defer></script>
+  <script src="/ui/reply.js" defer></script>
+  <script src="/ui/group-admin.js" defer></script>
+  <script src="/ui/watch.js" defer></script>
+  <script src="/ui/data.js" defer></script>
+  <script src="/ui/live.js" defer></script>
+  <script src="/ui/artifacts.js" defer></script>
+  <script src="/ui/voice.js" defer></script>
+  <script src="/ui/collections.js" defer></script>
+  <script src="/ui/workspaces.js" defer></script>
+  <link rel="stylesheet" href="/ui/tulpa.css">
+  <link rel="stylesheet" href="/ui/desktop.css">
+  <script src="/ui/tulpa.js" defer></script>
+</head>
+<body>
+  <svg class="icon-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M15 3l6 6M10 14l-1 4 4-1L22 8a2 2 0 0 0-6-6Z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-data" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/></symbol>
+    <symbol id="i-workspace" viewBox="0 0 24 24"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"/></symbol>
+    <symbol id="i-watch" viewBox="0 0 24 24"><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16l-6-4Z"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M3 7h6m4 0h8M3 17h10m4 0h4"/><circle cx="11" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14m-6-6 6 6 6-6"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 17V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H9l-5 4Z"/><path d="M8 8h8M8 12h5"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5.6 7a7 7 0 0 1 11.6-2L20 8M4 16l2.8 3A7 7 0 0 0 18.4 17"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  </svg>
+
+  <div class="shell">
+    <button id="sidebar-scrim" class="scrim" aria-label="关闭侧栏" hidden></button>
+    <aside id="sidebar" aria-label="历史对话">
+      <div class="sidebar-head"><span class="brand"><img src="/ui/tulpa-logo.png" alt="" width="32" height="32"><span>Tulpa</span></span><button class="icon-button" id="close-sidebar" aria-label="收起侧栏" title="收起侧栏"><svg><use href="#i-panel"/></svg></button></div>
+      <button id="new-chat" class="nav-button"><svg><use href="#i-edit"/></svg>新对话</button>
+      <button id="search-history" class="nav-button muted"><svg><use href="#i-search"/></svg>搜索对话</button>
+      <button id="browse-chats" class="nav-button muted"><svg><use href="#i-chat"/></svg>浏览聊天记录</button>
+      <button id="open-artifacts" class="nav-button muted"><svg><use href="#i-data"/></svg>文件 / 资料</button>
+      <button id="open-collections" class="nav-button muted"><svg><use href="#i-data"/></svg>证据集合</button>
+      <div class="tulpa-nav"><button id="open-tulpa" class="nav-button muted"><svg><use href="#i-chat"/></svg>记忆</button><button id="tulpa-switch" role="switch" aria-checked="false" aria-label="Tulpa 行为记忆" disabled>…</button></div>
+      <details id="workspace-sidebar-section" open><summary class="nav-button muted"><svg aria-hidden="true"><use href="#i-workspace"/></svg>工作区</summary>
+        <button id="new-workspace" class="nav-button">＋ 新建工作区</button><div id="workspace-list"></div>
+      </details>
+      <section class="watch-sidebar-section" aria-label="关注卡">
+        <div class="watch-sidebar-heading">
+          <button id="toggle-watches" class="nav-button muted" aria-expanded="false" aria-controls="watch-sidebar" title="展开关注卡"><svg aria-hidden="true"><use href="#i-watch"/></svg>关注卡 <span id="watch-count"></span></button>
+          <button id="open-watches" class="icon-button" aria-label="管理关注卡" title="管理关注卡"><svg><use href="#i-more"/></svg></button>
+        </div>
+        <div id="watch-sidebar" class="watch-sidebar" hidden></div>
+      </section>
+      <input id="history-search" type="search" placeholder="搜索历史标题…" aria-label="搜索历史标题" hidden>
+      <div class="history-label">最近</div>
+      <nav id="history-list" aria-label="最近对话"><p class="empty-note">正在加载…</p></nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-data-actions">
+          <button id="open-data" class="nav-button" title="查看聊天数据与同步设置" aria-describedby="data-summary"><svg><use href="#i-data"/></svg>数据与同步<span id="data-summary" class="sr-only">QQ · 微信</span></button>
+          <button id="sync-messages" class="icon-button" aria-label="刷新消息" title="刷新 QQ / 微信消息"><svg><use href="#i-refresh"/></svg></button>
+        </div>
+        <button id="live-summary" class="live-summary" title="打开实时摄取设置">正在连接实时状态…</button>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <button id="open-sidebar" class="icon-button" aria-label="展开侧栏" title="展开侧栏" hidden><svg><use href="#i-panel"/></svg></button>
+        <svg class="header-icon"><use href="#i-chat"/></svg><h1 id="thread-title">新对话</h1>
+        <button id="header-range" class="icon-button" aria-label="设置搜索范围" title="设置搜索范围"><svg><use href="#i-sliders"/></svg></button>
+        <button id="watch-current" class="source-button" title="从当前对话创建关注卡">关注此事</button>
+      </header>
+      <section id="watch-threadbar" class="watch-threadbar" aria-label="关注设置" hidden>
+        <div class="watch-thread-info"><span id="watch-thread-scope"></span><span id="watch-thread-schedule"></span></div>
+        <div class="watch-thread-actions"><button id="watch-check-now" class="quiet-button">立即更新</button><button id="watch-edit" class="quiet-button">群聊与频率</button><button id="watch-pause" class="quiet-button">暂停</button><button id="watch-delete-current" class="quiet-button">删除</button></div>
+      </section>
+      <section id="messages-scroll" aria-label="对话内容">
+        <section id="workspace-page" class="chat-width" hidden aria-label="工作区"></section>
+        <div class="chat-width watch-older-wrap"><button id="watch-older" class="source-button" hidden>查看更早记录</button></div>
+        <div id="welcome">
+          <div class="welcome-symbol"><img src="/ui/tulpa-logo.png" alt="" width="32" height="32"></div>
+          <h2>想从聊天里找到什么？</h2>
+          <p>从 QQ 和微信的原话里，找到答案。</p>
+          <div class="suggestions">
+            <button data-prompt="What did I miss? / 我错过了什么？">我错过了什么？</button>
+            <button data-prompt="我最近答应别人做过什么？">我答应过什么？</button>
+            <button data-prompt="总结过去一周的聊天，列出值得关注的事情。">总结最近一周</button>
+          </div>
+        </div>
+        <div id="messages" class="chat-width" aria-label="聊天记录" aria-busy="false"></div>
+      </section>
+      <div class="jump-wrap"><button id="jump-bottom" class="icon-button" aria-label="回到最新消息" title="回到最新消息" hidden><svg><use href="#i-down"/></svg></button></div>
+      <footer class="composer-dock">
+        <section id="group-admin-panel" class="chat-width group-admin-panel" aria-label="群管理审批" aria-live="polite" hidden></section>
+        <form id="composer" class="chat-width">
+          <label class="sr-only" for="question">输入问题</label>
+          <textarea id="question" rows="2" placeholder="随心输入，问问聊天里的事…" maxlength="6000" disabled></textarea>
+          <section id="intensity-popover" class="intensity-popover" aria-labelledby="intensity-title" hidden>
+            <div class="intensity-popover-head"><strong id="intensity-title">分析强度</strong><button type="button" id="close-intensity" class="icon-button" aria-label="收起分析强度">×</button></div>
+            <div class="intensity-control">
+            <div class="intensity-heading"><label for="intensity-slider">本次使用</label><output id="intensity-label" for="intensity-slider">深入</output></div>
+            <div class="intensity-track"><input id="intensity-slider" type="range" min="0" max="3" step="1" value="2" aria-describedby="intensity-description intensity-budget" disabled><div id="intensity-stops" class="intensity-stops"></div></div>
+            <details class="intensity-info"><summary id="intensity-summary">正在加载档位…</summary><p id="intensity-description"></p><p id="intensity-budget"></p><p>对下一次提问生效；上限不必用满，档位越高可能越慢、用量越大。</p></details>
+            </div>
+          </section>
+          <div class="composer-toolbar">
+            <div class="composer-options">
+              <button type="button" id="more-options" class="icon-button" aria-label="更多选项" title="更多选项" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
+              <div id="composer-menu" class="popup-menu" hidden>
+                <button type="button" id="menu-range"><svg><use href="#i-sliders"/></svg>搜索范围</button>
+                <button type="button" id="menu-data"><svg><use href="#i-data"/></svg>聊天数据与导入</button>
+                <a href="/legacy" target="_blank" rel="noopener">高级工具 ↗</a>
+              </div>
+              <button type="button" id="range-chip" class="range-chip" title="搜索所有已导入的 QQ 和微信记录">全部聊天</button>
+            </div>
+            <div class="send-options">
+              <button type="button" id="toggle-intensity" class="composer-chip" aria-controls="intensity-popover" aria-expanded="false" title="调整分析强度" disabled><span id="intensity-chip-label">深入</span><span aria-hidden="true">⌄</span></button>
+              <button type="button" id="vision-toggle" class="composer-chip vision-toggle" role="switch" aria-checked="false" aria-describedby="composer-privacy" title="关闭：本地 OCR。开启：DeepSeek 按需识图，将指定图片发送给 API。" disabled><span class="vision-dot" aria-hidden="true"></span><span id="vision-label">识图关</span></button>
+              <span id="model-label">DeepSeek</span>
+              <button type="submit" id="send-button" class="send-button" aria-label="发送" title="发送（Enter）" disabled><svg><use href="#i-up"/></svg></button>
+              <button type="button" id="stop-button" class="send-button" aria-label="停止回答" title="停止回答" hidden><svg><use href="#i-stop"/></svg></button>
+            </div>
+          </div>
+        </form>
+        <div class="composer-footer chat-width">
+          <button type="button" id="reasoning-toggle" class="reasoning-toggle" role="switch" aria-checked="true" title="显示接口实际返回的思考内容；仅控制显示，不改变分析强度。"><span class="reasoning-check" aria-hidden="true">✓</span>显示思考过程</button>
+          <label id="group-admin-policy-control" class="group-admin-policy" hidden>群管理审批<select id="group-admin-policy" aria-label="本对话群管理审批模式"><option value="ask">每次询问</option><option value="allow">默认允许</option><option value="deny">默认拒绝</option></select></label>
+          <p id="composer-privacy" class="composer-note">识图关闭：本地 OCR，不上传图片；相关文字片段会发送给 API。</p>
+        </div>
+        <p id="group-admin-policy-note" class="chat-width group-admin-policy-note" hidden></p>
+      </footer>
+    </main>
+  </div>
+
+  <dialog id="watches-dialog" aria-labelledby="watches-title">
+    <div class="dialog-head"><h2 id="watches-title">关注中</h2><button type="button" class="icon-button close-dialog" aria-label="关闭">×</button></div>
+    <p class="dialog-intro">每件事都有自己的对话。打开查看进展、继续追问，或修改关注群聊与检查频率。</p>
+    <button id="watch-new" class="primary-button">新建关注卡</button>
+    <p id="watch-job-status" role="status"></p>
+    <details><summary>查看操作过程</summary><pre id="watch-job-events" class="watch-progress"></pre></details>
+    <div id="watch-list"></div>
+  </dialog>
+
+  <dialog id="watch-create-dialog" aria-labelledby="watch-create-title">
+    <form id="watch-form">
+      <div class="dialog-head"><h2 id="watch-create-title">新建关注卡</h2><button type="button" class="icon-button close-dialog" aria-label="关闭">×</button></div>
+      <label class="field-label" for="watch-title">标题</label><input id="watch-title" maxlength="100" required placeholder="例如：智能物联网课程报告">
+      <label class="field-label" for="watch-query">定期询问的问题</label><textarea id="watch-query" rows="4" maxlength="1600" required placeholder="例如：计算机应用数学有没有新的小测安排？"></textarea>
+      <fieldset class="platforms"><legend>平台</legend><label><input type="checkbox" id="watch-qq" checked>QQ</label><label><input type="checkbox" id="watch-wechat" checked>微信</label></fieldset>
+      <label class="field-label" for="watch-conversation-search">会话范围 <span>不选则为以上平台的全部已导入会话</span></label>
+      <input id="watch-conversation-search" type="search" placeholder="搜索群或联系人…">
+      <div id="watch-conversations" class="conversation-options"></div>
+      <p id="watch-selection-summary" class="field-hint"></p><button type="button" id="watch-clear-selection" class="source-button">清空会话选择</button>
+      <div class="watch-settings-grid">
+        <label>按时间更新<select id="watch-frequency"><option value="0">关闭定时</option><option value="60">每小时</option><option value="360">每 6 小时</option><option value="720">每 12 小时</option><option value="1440">每天</option><option value="4320">每 3 天</option><option value="10080">每周（每 7 天）</option><option value="custom">自定义间隔</option></select></label>
+        <label id="watch-custom-frequency" hidden>间隔（分钟）<input id="watch-custom-minutes" type="number" min="30" max="10080" step="1" value="1440"></label>
+        <label>回答时的分析强度<select id="watch-profile"><option value="quick">快速</option><option value="standard">标准</option><option value="deep">深入</option><option value="thorough">充分</option></select></label>
+      </div>
+      <label class="sticker-option"><input type="checkbox" id="watch-count-enabled">按新增消息数量自动更新</label>
+      <label id="watch-count-field" hidden>累计新消息（条）<input id="watch-message-threshold" type="number" min="1" max="100000" step="1" value="100"></label>
+      <p class="field-hint">只累计本卡范围内新入库的消息，数量仅用于触发提问。可与定时更新同时开启，任一条件满足就问一次；都关闭则仅手动。数量每 15 秒更新，首次查询成功后开始计数。</p>
+      <label class="sticker-option"><input type="checkbox" id="watch-stickers">本卡检查前刷新时读取表情包（含定时和消息数触发）</label>
+      <p class="dialog-intro">到时间或累计指定数量的新消息时，自动就关注的问题问一次 Agent，回答回到这段对话。和普通聊天一样，按需搜索相关消息；不会逐条审计所有新消息。定时更新即使没有新消息也会重新查询，使用所选分析强度的预算。设置在重启后保留，电脑和本机服务须运行。</p>
+      <p id="watch-edit-notice" class="field-hint">创建后先查询一次。修改问题或群聊后，旧对话保留；后续提问使用新的设置。</p>
+      <button id="watch-submit" class="primary-button" type="submit">创建并查询</button>
+    </form>
+  </dialog>
+
+  <dialog id="range-dialog" aria-labelledby="range-title">
+    <form id="range-form">
+      <div class="dialog-head"><h2 id="range-title">搜索范围</h2><button type="button" class="icon-button close-dialog" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div>
+      <p class="dialog-intro">通常直接在问题里说出联系人和时间即可。</p>
+      <fieldset class="platforms"><legend>平台</legend><label><input type="checkbox" name="platform" value="qq" checked>QQ</label><label><input type="checkbox" name="platform" value="wechat" checked>微信</label></fieldset>
+      <label class="field-label" for="conversation-search">联系人或群聊 <span>不选则搜索全部</span></label>
+      <input type="search" id="conversation-search" placeholder="搜索名称…">
+      <div id="conversation-options" class="conversation-options"></div>
+      <div class="date-fields"><label>开始日期<input type="date" id="start-date"></label><label>结束日期<input type="date" id="end-date"></label></div>
+      <p class="field-hint">北京时间；结束日期包含当天。留空时按问题判断。</p>
+      <details class="optional-field"><summary>关键词提示（可选）</summary><input type="text" id="keywords" placeholder="例如：毕业设计 合同 修改"></details>
+      <div class="dialog-actions"><button type="button" id="reset-range" class="quiet-button">重置为全部</button><button type="submit" class="primary-button">应用</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="data-dialog" aria-labelledby="data-title">
+    <div class="dialog-head"><h2 id="data-title">聊天数据与同步</h2><button class="icon-button close-dialog" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div>
+    <div id="data-status"></div>
+    <p id="sync-summary" class="field-hint" aria-live="polite">尚未增量刷新</p>
+    <p class="field-hint">时间是最新一条已导入消息的时间。保持 QQ、微信登录后，可手动读取新记录。</p>
+    <fieldset class="read-settings"><legend>下一次从客户端读取</legend>
+      <div id="client-scope-controls">
+        <section class="scope-platform" aria-label="QQ 读取设置">
+          <div class="read-platform-head"><label><input id="read-enable-qq" type="checkbox" checked>QQ</label><select id="read-mode-qq" aria-label="QQ 会话范围"><option value="all">全部会话</option><option value="selected">指定会话</option></select></div>
+          <div id="read-pick-qq" hidden><input id="read-search-qq" type="search" placeholder="搜索 QQ 好友或群"><div id="read-options-qq" class="conversation-options"></div></div>
+          <div class="date-fields"><label>开始日期<input id="read-qq-start" type="date" aria-label="QQ 开始日期"></label><label>截止日期<input id="read-qq-end" type="date" aria-label="QQ 截止日期"></label></div>
+          <label class="sticker-option"><input id="read-all-qq" type="checkbox">读取所选日期范围内全部消息</label>
+          <div class="read-count-field"><label for="read-qq-per-chat">每会话条数上限</label><input id="read-qq-per-chat" type="number" min="1" max="10000" step="1" value="500" required disabled><span>文本、非文本各自的上限</span></div>
+        </section>
+        <section class="scope-platform" aria-label="微信读取设置">
+          <div class="read-platform-head"><label><input id="read-enable-wechat" type="checkbox" checked>微信</label><select id="read-mode-wechat" aria-label="微信会话范围"><option value="all">全部会话</option><option value="selected">指定会话</option></select></div>
+          <div id="read-pick-wechat" hidden><input id="read-search-wechat" type="search" placeholder="搜索微信好友或群"><div id="read-options-wechat" class="conversation-options"></div></div>
+          <div class="date-fields"><label>开始日期<input id="read-wechat-start" type="date" aria-label="微信开始日期"></label><label>截止日期<input id="read-wechat-end" type="date" aria-label="微信截止日期"></label></div>
+          <label class="sticker-option"><input id="read-all-wechat" type="checkbox">读取所选日期范围内全部消息</label>
+          <div class="read-count-field"><label for="read-wechat-per-chat">每会话条数上限</label><input id="read-wechat-per-chat" type="number" min="1" max="10000" step="1" value="500" required disabled><span>含不支持类型的原始消息</span></div>
+        </section>
+        <p class="field-hint">北京时间，截止日期包含当天。开始留空表示不限开始时间，截止留空表示至今。未勾选“全部消息”时，每会话读取范围内最新的 1–10000 条。大范围会自动分批完成，无须手动拆分日期；时间取决于本机数据量与媒体缓存。</p>
+        <button id="read-catalog" class="quiet-button" type="button">从客户端更新会话列表</button>
+        <p class="field-hint">找不到好友或群时更新列表；此操作不导入正文。</p>
+      </div>
+      <p id="read-window-summary" class="read-window-summary" aria-live="polite" hidden></p>
+    </fieldset>
+    <label class="sticker-option"><input id="load-stickers" type="checkbox">手动读取 / 刷新时加载表情包 <span>含 GIF / 动态图片</span></label>
+    <p class="field-hint">勾选后点击“按以上设置读取”，会同时补载选定会话、日期范围内已导入的表情包；这一步不受“每会话条数上限”限制，也不会多导入历史。取消时，本次读取的表情包只保留 [动画表情]，普通静态图片照常加载。仅恢复本机仍可获取的媒体；增量“刷新消息”只处理新增记录。</p>
+    <button id="read-latest" class="primary-button">按以上设置读取</button>
+    <p class="field-hint">这里的平台和会话选择用于本次历史读取，以及后续手动与定时“刷新消息”；不会关闭或缩小实时监听。日期和条数仅用于本次补读。扩大会话范围时须在这里补读，之前跳过的历史不会自动补回。其他已导入记录保留。</p>
+    <section id="import-meter" class="import-meter" hidden aria-label="导入进度">
+      <div class="import-meter-head"><strong id="import-meter-title">正在准备</strong><button id="import-stop" type="button" class="quiet-button">停止导入</button></div>
+      <progress id="import-progress-bar" aria-label="当前平台读取进度"></progress>
+      <p id="import-meter-detail" class="field-hint" aria-live="polite"></p>
+      <p class="field-hint">已完成批次会保存。停止或退出后，按相同设置读取可继续；读取途中中断时会重新核对源数据并去重。后台诊断位于 reports/private/imports。</p>
+    </section>
+    <details class="import-section"><summary>查看读取过程</summary><pre id="read-progress" class="read-progress" role="status" hidden></pre></details>
+    <p id="import-resume-note" class="field-hint" hidden></p>
+    <details class="import-section"><summary>从导出文件导入</summary><p class="field-hint">将 JSON / JSONL 文件放入程序目录下的 imports 文件夹。</p>
+      <p class="field-hint">仅导入文件中已有的记录，不受上方日期与条数设置影响，也不会补读客户端历史。单文件上限 100 MB；若文件本身已被截断，需要重新导出。</p>
+      <form id="import-form"><label class="field-label" for="import-path">项目内文件或目录</label><input id="import-path" value="imports" required><button class="quiet-button" type="submit">导入记录</button></form>
+      <pre id="import-result" class="read-progress" role="status" hidden></pre>
+    </details>
+    <details id="media-refresh-section" class="import-section"><summary>刷新已备份聊天的图片 / 表情</summary>
+      <p class="field-hint">按会话和日期重试缺失媒体，可用时将缩略图升级为原图。只检查本机缓存，不重新导入聊天、不移动同步进度、不调用 AI；客户端尚未缓存的图片仍会显示不可用。</p>
+      <label class="field-label" for="media-refresh-platform">平台</label><select id="media-refresh-platform"><option value="qq">QQ</option><option value="wechat">微信</option></select>
+      <label class="field-label" for="media-refresh-mode">聊天范围</label><select id="media-refresh-mode"><option value="selected">指定会话</option><option value="all">该平台全部已导入会话</option></select>
+      <div id="media-refresh-picker"><input id="media-refresh-search" type="search" placeholder="查找群聊或好友"><div id="media-refresh-options" class="conversation-options"></div></div>
+      <div class="date-fields"><label>开始日期<input id="media-refresh-start" type="date" required></label><label>结束日期（含当天）<input id="media-refresh-end" type="date" required></label></div>
+      <label class="sticker-option"><input id="media-refresh-stickers" type="checkbox">本次也恢复表情包（默认关闭）</label>
+      <p class="field-hint">关闭时不主动恢复已省略的表情；开启时需原始归档仍保留媒体信息。更改这里不会改变实时或定时刷新的表情设置。</p>
+      <button id="media-refresh-run" type="button" class="quiet-button">刷新所选范围的媒体</button>
+      <p id="media-refresh-result" class="field-hint" aria-live="polite"></p>
+    </details>
+    <details id="delete-section" class="import-section"><summary>删除已导入聊天记录 · 释放空间</summary>
+      <p class="field-hint">仅删除本项目记录，不改 QQ / 微信客户端。会清理对应来源归档及不再被其他消息使用的媒体，并压缩数据库；删除不可撤销，之后可从仍存在的源数据重新导入。</p>
+      <label class="field-label" for="delete-platform">平台</label><select id="delete-platform"><option value="qq">QQ</option><option value="wechat">微信</option></select>
+      <p class="field-hint">会话可选：不勾选表示所选平台的全部会话，仍受下方日期范围限制。搜索框只过滤列表，不限制删除范围。</p>
+      <input id="delete-search" type="search" placeholder="查找会话以缩小范围（可选）"><div id="delete-options" class="conversation-options"></div>
+      <div class="date-fields"><label>开始日期<input id="delete-start" type="date" required></label><label>结束日期（含当天）<input id="delete-end" type="date" required></label></div>
+      <p class="field-hint">须填写开始和截止日期。客户端快照缓存、imports 原文件、备份和报告、历史 AI 答案仍会保留，因此这不是彻底擦除个人数据。旧证据链接在原文删除后将不可用。</p>
+      <button id="delete-preview" type="button" class="quiet-button">预览删除范围</button><p id="delete-summary" class="field-hint" aria-live="polite"></p>
+      <button id="delete-confirm" type="button" class="quiet-button danger-button" disabled>确认删除</button>
+    </details>
+    <details id="voice-settings" class="import-section"><summary>原生语音 · 本地转写</summary>
+      <label class="field-label" for="voice-strategy">转写时机</label>
+      <select id="voice-strategy"><option value="lazy">按需（默认）· Agent 或点击时转写</option><option value="new">后台转写新入库语音</option><option value="manual-backfill">只手动补转写 · 仍可单条按需查看</option></select>
+      <button id="voice-save" class="quiet-button" type="button">保存语音设置</button>
+      <p class="field-hint">音频只在本机解码和转写。选择“后台转写新入库语音”后，仅处理今后实时摄取或增量刷新新增的语音，不批量转写历史。切换策略不会取消已排队的任务。</p>
+      <p id="voice-status" class="field-hint" aria-live="polite"></p>
+      <label class="field-label" for="voice-platform">发现 / 补转写平台</label><select id="voice-platform"><option value="qq">QQ</option><option value="wechat">微信</option></select>
+      <p class="field-hint">使用上方对应平台的会话选择和起止日期（须填写，最多一年）。发现仅扫描最近一次读取快照的语音元数据，不移动同步进度；新历史先用上方“按以上设置读取”。</p>
+      <button id="voice-discover" class="quiet-button" type="button">仅发现范围内历史语音</button>
+      <button id="voice-backfill" class="quiet-button" type="button">发现并补转写（最多 100 条）</button>
+      <p class="field-hint">补转写单线程排队，可继续聊天。每条默认最多 180 秒、16 MiB。模型、时长和 CPU 线程数可在 .env 的 VOICE_* 配置中调整。</p>
+    </details>
+    <p class="dialog-footnote">读取和导入均在本机进行，不调用云端 API。</p>
+    <details class="import-section"><summary>仅自动同步消息（不检查关注卡）</summary><label class="field-label" for="auto-refresh">全局数据刷新</label><select id="auto-refresh"><option value="0">关闭</option><option value="5">每 5 分钟</option><option value="15">每 15 分钟</option><option value="30">每 30 分钟</option><option value="60">每小时</option><option value="360">每 6 小时</option><option value="720">每 12 小时</option><option value="1440">每天</option><option value="4320">每 3 天</option><option value="10080">每周</option></select>
+      <label class="sticker-option"><input id="auto-refresh-stickers" type="checkbox">自动刷新时读取表情包</label>
+      <p class="field-hint">表情包默认不读取，与手动导入、实时摄取和各张关注卡的开关独立；关闭时保留 [动画表情]，已缓存文件不删除。只更新数据库，不调用模型；重启后自动刷新关闭。刷新期间可继续对话，本轮使用提问时已入库的消息。关注卡有各自独立、可保存的检查频率。</p></details>
+    <details id="live-settings-panel" class="import-section"><summary>实时摄取</summary>
+      <div class="date-fields"><label>QQ<select id="live-qq"><option value="database">数据库监听</option><option value="off">关闭</option></select></label><label>微信<select id="live-wechat"><option value="database">数据库监听</option><option value="off">关闭</option></select></label></div>
+      <label class="checkbox-field"><input id="live-stickers" type="checkbox">实时载入表情包</label>
+      <p class="field-hint">实时监听独立于上方的历史导入选择。启用后读取该平台本机可识别会话的新增消息；临时只导入某个好友或只勾选 QQ，不会暂停其他会话或微信监听。关闭监听请在这里选择“关闭”并保存。</p>
+      <p class="field-hint">表情包默认关闭，实时设置在重启后保留。新消息直接进入本机数据库，不逐条调用 AI。已移除启动、定期和故障时的自动补同步；读取受限或需补漏时，请手动刷新，或开启上方独立的自动刷新。旧版本曾因导入范围跳过的历史仍需按会话、日期补读。</p>
+      <div id="live-detail" class="field-hint" aria-live="polite"></div><button id="live-save" class="quiet-button">保存实时设置</button>
+    </details>
+    <details class="import-section"><summary>同步进度修复</summary><p class="field-hint">仅在数据库被替换、清理导致游标失效时使用：先按上方范围补读历史，再重新接续。不会删除已导入消息；新的增量起点为最近一次成功导入的快照，更早遗漏的历史必须另行补读。此操作也会重建实时游标。</p><button id="reconnect-qq" class="quiet-button">重新接续 QQ</button><button id="reconnect-wechat" class="quiet-button">重新接续微信</button></details>
+  </dialog>
+
+  <dialog id="evidence-dialog" class="wide-dialog" aria-labelledby="evidence-title">
+    <div class="dialog-head"><h2 id="evidence-title">本轮原文与来源</h2><button class="icon-button close-dialog" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div>
+    <div id="all-evidence"></div>
+  </dialog>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="chat-dialog" class="chat-drawer" aria-labelledby="chat-browser-title">
+    <div class="dialog-head"><h2 id="chat-browser-title">聊天记录</h2><span id="chat-live-status" class="chat-platform" role="status">自动更新本地消息</span><button class="icon-button close-dialog" aria-label="关闭聊天窗口"><svg><use href="#i-close"/></svg></button></div>
+    <div class="chat-browser-layout">
+      <aside class="chat-directory" aria-label="聊天会话">
+        <div class="chat-picker"><input id="chat-search" type="search" placeholder="搜索联系人或群名…" aria-label="搜索聊天会话"><select id="chat-platform-filter" aria-label="筛选聊天平台"><option value="">全部平台</option><option value="qq">QQ</option><option value="wechat">微信</option></select></div>
+        <div id="chat-conversations" class="chat-conversations" aria-label="会话列表"></div>
+        <p id="chat-list-note" class="field-hint"></p><button id="chat-more-conversations" class="source-button" hidden>更多会话</button>
+      </aside>
+      <section class="chat-conversation-pane" aria-labelledby="chat-view-title">
+        <header class="chat-conversation-head"><span id="chat-platform" class="chat-platform">原始聊天记录</span><h3 id="chat-view-title">选择一个会话</h3><p id="chat-location" class="field-hint">显示本机已导入的消息和媒体</p></header>
+        <div id="chat-timeline" class="chat-timeline" aria-label="原始聊天消息"><p class="empty-note">选择左侧会话，或从回答中的证据打开。</p></div>
+        <details id="chat-reply-receipts" class="chat-reply-receipts" hidden><summary>本工具发送回执</summary><p class="field-hint">回执与客户端原始记录分开保存；协议发送可能不出现在桌面 QQ 的本地记录中。</p><div id="chat-reply-receipt-list"></div></details>
+        <div class="chat-new-bar"><button id="chat-latest" class="quiet-button" hidden>回到最新</button></div>
+        <div class="chat-paging"><button id="chat-earlier" class="quiet-button" disabled>更早的消息</button><button id="chat-anchor" class="quiet-button" disabled>回到证据</button><button id="chat-later" class="quiet-button" disabled>更新的消息</button></div>
+        <section id="reply-panel" class="reply-panel" aria-labelledby="reply-title" hidden>
+          <header class="reply-head"><h3 id="reply-title">帮我回复</h3><button id="reply-close" class="icon-button" aria-label="收起回复面板（保留草稿）"><svg><use href="#i-close"/></svg></button></header>
+          <div class="reply-body">
+            <p id="reply-target" class="field-hint"></p><blockquote id="reply-source"></blockquote>
+            <label id="reply-editor-label" class="field-label" for="reply-text">回复要求（可留空）</label>
+            <textarea id="reply-text" rows="3" maxlength="1000" placeholder="例如：帮我婉拒、调侃一下、不要太正式"></textarea>
+            <div class="reply-actions">
+              <label>思考强度 <select id="reply-profile"><option value="quick">快速</option><option value="standard" selected>标准</option><option value="deep">深入</option><option value="thorough">充分</option></select></label>
+              <label>图片 <select id="reply-vision"><option value="ocr">本地 OCR</option><option id="reply-native-option" value="native">原生识图</option></select></label>
+              <button id="reply-generate" class="quiet-button">生成回复</button><button id="reply-stop" class="quiet-button" hidden>停止生成</button>
+              <button id="reply-adjust" class="source-button" hidden>调整要求</button><button id="reply-back" class="source-button" hidden>返回草稿</button><button id="reply-copy" class="source-button" hidden>复制</button><button id="reply-new" class="source-button" hidden>再写一条</button>
+            </div>
+            <p id="reply-notes" class="field-hint"></p>
+            <details id="reply-references"><summary>本轮读取的上下文与过程</summary><p id="reply-basis"></p><div id="reply-evidence" class="reply-actions"></div><div id="reply-history"></div></details>
+            <label class="checkbox-field"><input id="reply-quote" type="checkbox">引用原消息</label>
+          </div>
+          <div class="reply-review"><p id="reply-status" role="status" aria-live="polite"></p><p id="reply-address" class="field-hint"></p><p id="reply-sender" class="field-hint"></p></div>
+          <footer class="reply-footer"><button id="reply-approve" class="quiet-button" disabled>批准</button><button id="reply-reject" class="quiet-button">拒绝</button></footer>
+        </section>
+      </section>
+    </div>
+  </dialog>
+  <dialog id="image-dialog" class="image-dialog" aria-label="原图预览"><button class="icon-button close-dialog" aria-label="关闭原图"><svg><use href="#i-close"/></svg></button><img id="image-preview" alt="聊天原图"><p>原始媒体保存在本机 · GIF 会自动播放</p></dialog>
+</body>
+</html>

@@ -1,0 +1,49 @@
+name: Windows validation
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  isolated-checks:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: '1'
+      GRADIO_ANALYTICS_ENABLED: 'False'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: 'requirements*.txt'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies and read-only modules
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .tmp,data,imports | Out-Null
+          python -m pip install -r requirements-readers.txt -r requirements-artifacts.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+          python scripts/install_readers.py
+          if ($LASTEXITCODE -ne 0) { throw 'Reader installation failed' }
+      - name: Public source and isolated backend checks
+        shell: pwsh
+        run: |
+          $checks = @('check_publication.py','check_desktop.py','check_chat_browser.py','check_reply_history.py','check_reply_copilot.py','check_group_admin.py','check_workspace_ide.py','check_tulpa.py','check_tulpa_api.py','check_withheld_claims.py','agent_smoke.py')
+          foreach ($check in $checks) {
+            python "scripts/$check"
+            if ($LASTEXITCODE -ne 0) { throw "$check failed" }
+          }
+      - name: Frontend interaction fixtures
+        shell: pwsh
+        run: |
+          $checks = @('check_chat_browser_ui.cjs','check_reply_ui.cjs','check_workspace_ui.cjs','check_refresh_ui.cjs')
+          foreach ($check in $checks) {
+            node "scripts/$check"
+            if ($LASTEXITCODE -ne 0) { throw "$check failed" }
+          }

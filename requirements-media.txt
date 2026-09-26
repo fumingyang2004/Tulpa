@@ -1,0 +1,5 @@
+-r requirements-readers.txt
+Pillow==12.3.0
+rapidocr==3.9.2
+onnxruntime==1.30.0
+imageio-ffmpeg==0.6.0
