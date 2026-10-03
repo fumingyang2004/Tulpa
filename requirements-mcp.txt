@@ -1,0 +1,17 @@
+# MCP desktop edition: no Gradio, DeepSeek SDK or bundled Agent runtime.
+fastapi==0.141.1
+uvicorn==0.53.0
+httpx==0.28.1
+jieba==0.42.1
+python-dotenv==1.2.3
+apsw==3.53.4.0
+mcp==1.26.0
+jsonschema==4.26.0
+cryptography==50.0.1
+zstandard==0.25.0
+pycryptodome==3.23.0
+Pillow==12.3.0
+imageio-ffmpeg==0.6.0
+pysilk-mod==1.6.4
+opencc-python-reimplemented==0.1.7
+pypdf==6.19.0

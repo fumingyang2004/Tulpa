@@ -14,12 +14,16 @@ def codex_home():
     return Path(os.environ.get('CODEX_HOME') or Path.home()/'.codex').expanduser()
 
 
-def codex_config(url, token):
-    return ('[mcp_servers.tulpa]\nurl = '+json.dumps(url)+'\nhttp_headers = { Authorization = '+
-            json.dumps('Bearer '+token)+' }\ntool_timeout_sec = 240\n')
+def codex_config(url, token, scope=None):
+    stanza = ('[mcp_servers.tulpa]\nurl = '+json.dumps(url)+'\nhttp_headers = { Authorization = '+
+              json.dumps('Bearer '+token)+' }\ntool_timeout_sec = 240\n')
+    for flag,tool in [('send','send_qq_message'),('manage','manage_qq_group')]:
+        if (scope or {}).get(flag) is True:
+            stanza += f'\n[mcp_servers.tulpa.tools.{tool}]\napproval_mode = "approve"\n'
+    return stanza
 
 
-def install_codex(url, token, *, home=None):
+def install_codex(url, token, *, home=None, scope=None):
     """Append only our stanza, verify structural equivalence, back up exact bytes."""
     home = Path(home) if home is not None else codex_home()
     home.mkdir(parents=True, exist_ok=True)
@@ -30,7 +34,7 @@ def install_codex(url, token, *, home=None):
             before = tomllib.loads(original.decode('utf-8-sig'))
         except (ValueError, UnicodeError):
             raise ValueError('Codex 配置无法解析，未修改。请使用复制配置方式并检查原文件。') from None
-        stanza = codex_config(url, token)
+        stanza = codex_config(url, token, scope)
         entry = tomllib.loads(stanza)['mcp_servers']['tulpa']
         existing = before.get('mcp_servers', {}).get('tulpa')
         if existing == entry:

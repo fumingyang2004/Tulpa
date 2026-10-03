@@ -130,7 +130,15 @@ sealed class DesktopWindow:Form {
             if((string)statusData["app"]!="ChatWeave" && (string)statusData["app"]!="Tulpa")throw new Exception("目标服务不是兼容的 Tulpa 工作台。");
             hint.Text="正在载入界面…";CenterSplash();
             string browser=Path.Combine(Program.Root,"_internal","WebView2");
+#if MCP_ONLY
+            if(!File.Exists(Path.Combine(browser,"msedgewebview2.exe"))){
+                browser=null;
+                try{CoreWebView2Environment.GetAvailableBrowserVersionString();}
+                catch(Exception){throw new Exception("轻量版使用系统 Microsoft Edge WebView2。请安装 Microsoft 官方 WebView2 Evergreen Runtime 后重新打开。下载：https://developer.microsoft.com/microsoft-edge/webview2/");}
+            }
+#else
             if(!File.Exists(Path.Combine(browser,"msedgewebview2.exe")))throw new Exception("缺少随包提供的界面运行组件，请完整解压 ZIP。");
+#endif
             var options=new CoreWebView2EnvironmentOptions();
 #if QA
             // Test build only: exercise the actual WebView2 DOM/rendering with

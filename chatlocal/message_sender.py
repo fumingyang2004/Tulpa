@@ -51,7 +51,8 @@ class QQSender:
         if action not in (allowed|({'send_group_msg','send_private_msg'} if sending else set())):raise SendError('接口不在发送适配器白名单中。')
         try:
             with httpx.Client(timeout=httpx.Timeout(20,connect=4),trust_env=False,follow_redirects=False,transport=self.transport) as client:
-                r=client.post(self.url+'/'+action,json=payload,headers={'Authorization':'Bearer '+self.config['REPLY_ONEBOT_TOKEN']})
+                token=self.config['REPLY_ONEBOT_TOKEN']
+                r=client.post(self.url+'/'+action,json=payload,headers={'Authorization':'Bearer '+token} if token else {})
                 r.raise_for_status()
                 if len(r.content)>2*1024*1024:raise ValueError('large')
                 value=r.json()

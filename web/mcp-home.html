@@ -1,0 +1,28 @@
+<!doctype html><html lang="zh-CN" data-desktop="true"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">
+<title>Tulpa MCP</title><link rel="icon" href="/ui/tulpa-logo.png">
+<link rel="stylesheet" href="/ui/app.css"><link rel="stylesheet" href="/ui/desktop.css"><link rel="stylesheet" href="/ui/mcp.css"><link rel="stylesheet" href="/ui/mcp-home.css">
+<script src="/ui/mcp-home.js" defer></script><script src="/ui/chat.js" defer></script><script src="/ui/data.js" defer></script><script src="/ui/live.js" defer></script><script src="/ui/voice.js" defer></script><script src="/ui/artifacts.js" defer></script><script src="/ui/mcp.js" defer></script>
+</head><body>
+<!-- shared-forms -->
+<div class="shell">
+<aside id="sidebar"><div class="sidebar-head"><span class="brand"><img src="/ui/tulpa-logo.png" width="32" height="32" alt=""><span>Tulpa <small>MCP</small></span></span></div>
+<button id="open-data" class="nav-button"><svg><use href="#i-data"/></svg>数据与同步</button>
+<button id="browse-chats" class="nav-button"><svg><use href="#i-chat"/></svg>浏览聊天记录</button>
+<button id="open-artifacts" class="nav-button"><svg><use href="#i-workspace"/></svg>文件 / 资料</button>
+<button id="open-mcp" class="nav-button"><svg><use href="#i-sliders"/></svg>连接外部 Agent</button>
+<button id="open-onebot" class="nav-button"><svg><use href="#i-sliders"/></svg>OneBot 设置</button>
+<div class="sidebar-bottom"><button id="live-summary" class="live-summary" type="button">读取实时状态…</button><p class="field-hint" id="lite-version">本机资料服务</p></div>
+</aside>
+<main id="lite-main"><header><span class="desktop-eyebrow">TULPA / MCP SERVICE</span><h1>让你的 Agent，读懂真实交流。</h1><p>资料留在本机，任务交给你选择的 Agent。</p></header>
+<section class="lite-status"><h2>本机服务</h2><p id="lite-service" role="status">正在连接…</p><p id="lite-data"></p><button id="home-connect" class="primary-button">连接 Agent</button><button id="home-import">导入聊天</button></section>
+<section class="lite-guide"><h2>从这里开始</h2><ol><li><strong>导入资料</strong><p>登录 QQ / 微信，选择账号和会话。开启实时读取后，新消息继续入库。</p></li><li><strong>授权连接</strong><p>为每个 Agent 选择范围和权限，复制 MCP 地址与 Token。</p></li><li><strong>在 Agent 中工作</strong><p>支持 Codex、DeepSeek Harness 等 Streamable HTTP MCP 客户端，无需给 Tulpa 配置模型。</p></li></ol></section>
+<section><h2>可选组件</h2><strong>本地语音转写</strong><p class="field-hint">主包不带语音模型。需要时下载约 181 MB，之后可离线使用；不上传语音。Office 原文件下载后由外部 Agent 自行读取。</p><p id="voice-component-status" role="status">正在检查…</p><progress id="voice-component-progress" max="100" value="0" hidden></progress><button id="voice-component-install">一键安装语音模型</button><button id="voice-component-cancel" hidden>取消下载</button></section>
+<section><h2>操作记录</h2><p class="field-hint">发送与群管理默认关闭。在连接权限中勾选后直接执行，不再逐项审批。可随时撤销连接。</p><div id="lite-operations">暂无操作。</div></section>
+<p id="lite-error" role="alert"></p></main></div>
+<dialog id="lite-onebot" class="desktop-config"><div class="dialog-head"><h2>OneBot 与后台服务</h2><button class="close-dialog icon-button" aria-label="关闭设置">×</button></div><div class="desktop-config-body">
+<p>连接你已启动的本机 OneBot 服务。聊天查询不依赖 OneBot；当前群资料、发送和管理需要它。</p>
+<form id="lite-onebot-form"><label>本机 OneBot 地址<input id="lite-onebot-url" type="url" placeholder="http://127.0.0.1:3000"></label><label>访问 Token<input id="lite-onebot-token" type="password" autocomplete="new-password" placeholder="留空保留已存 Token"></label><button type="submit">保存并检测</button><button id="lite-onebot-test" type="button">检测连接</button></form>
+<p id="lite-onebot-result" role="status"></p><label id="lite-background-label"><input id="lite-background" type="checkbox">关闭窗口后留在托盘，继续服务</label><p><a href="/api/desktop/diagnostics" download="Tulpa-diagnostics.json">导出运行诊断</a></p></div></dialog>
+<div id="toast" role="status" hidden></div>
+</body></html>

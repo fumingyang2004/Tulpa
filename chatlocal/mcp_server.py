@@ -24,6 +24,7 @@ class MCPService:
     def __init__(self, access):
         self.access = access
         self.tools = MCPTools(access)
+        self.tools.actions.recover()
         self.server = self.thread = self.listener = None
         self.error = ''
         self.source_base = ''
@@ -49,8 +50,8 @@ class MCPService:
             rows = await anyio.to_thread.run_sync(self.tools.schemas, grant)
             self.access.authorize(token)
             return [types.Tool(name=s['name'], description=s['description'], inputSchema=s['parameters'],
-                    annotations=types.ToolAnnotations(readOnlyHint=s['name'] not in ('prepare_file', 'transcribe_voice', 'read_qq_group', 'get_group_knowledge'),
-                        destructiveHint=False, openWorldHint=False)) for s in rows]
+                    annotations=types.ToolAnnotations(readOnlyHint=s['name'] not in ('prepare_file', 'download_file', 'transcribe_voice', 'read_qq_group', 'get_group_knowledge','send_qq_message','manage_qq_group'),
+                        destructiveHint=s['name']=='manage_qq_group', openWorldHint=s['name'] in ('send_qq_message','manage_qq_group'))) for s in rows]
 
         @protocol.call_tool(validate_input=False)
         async def call_tool(name, arguments):

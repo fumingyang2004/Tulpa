@@ -43,7 +43,8 @@ class OneBot:
             except OneBotError as exc:raise ArtifactError(str(exc)) from None
         try:
             with httpx.Client(timeout=20,trust_env=False) as client:
-                response=client.post(self.url+'/'+action,json=payload,headers={'Authorization':'Bearer '+self.config['ARTIFACT_ONEBOT_TOKEN']})
+                token=self.config['ARTIFACT_ONEBOT_TOKEN']
+                response=client.post(self.url+'/'+action,json=payload,headers={'Authorization':'Bearer '+token} if token else {})
                 response.raise_for_status()
                 if len(response.content)>8*1024*1024:raise ArtifactError('目录响应超过8 MiB上限。')
                 result=response.json()

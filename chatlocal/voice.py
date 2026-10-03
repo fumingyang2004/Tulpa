@@ -211,7 +211,9 @@ class VoiceService:
         if action=='prepare':
             with self.store.connect() as db:db.execute("UPDATE voice_sources SET status=CASE WHEN transcript IS NULL THEN 'prepared' ELSE 'ready' END,error=NULL WHERE message_id=?",(mid,))
             return
-        if not cfg['model'].is_file() or not cfg['executable'].is_file():raise VoiceError('本地 ASR 尚未安装；运行 scripts/setup_voice.py 并安装 requirements-voice.txt。')
+        if not cfg['model'].is_file() or not cfg['executable'].is_file():
+            if (ROOT/'mcp-edition.json').is_file():raise VoiceError('语音组件未就绪。请在 Tulpa 首页「可选组件」一键安装本地语音模型，安装后重试。')
+            raise VoiceError('本地 ASR 尚未安装；运行 scripts/setup_voice.py 并安装 requirements-voice.txt。')
         fingerprint=profile(cfg)
         with self.store.connect() as db:cached=db.execute('SELECT * FROM voice_transcripts WHERE audio_sha256=? AND profile=?',(row['audio_sha256'],fingerprint)).fetchone()
         if cached:text,language=cached['transcript'],cached['language']

@@ -1,0 +1,9 @@
+body{overflow:hidden}#lite-main{overflow:auto;padding:56px clamp(24px,6vw,96px);max-width:1200px;width:100%}
+#lite-main h1{font-size:clamp(24px,3vw,38px);line-height:1.35;margin:20px 0}#lite-main h2{font-size:20px;margin:0 0 16px}
+#lite-main header{padding-bottom:32px}#lite-main header p{color:#65635d}
+#lite-main section{padding:28px 0;border-top:1px solid #d8d5cd}.lite-status button{margin-right:12px}
+.lite-guide ol{padding-left:22px;display:grid;gap:18px}.lite-guide li p{margin:8px 0;color:#65635d;line-height:1.7}
+#lite-operations article{padding:18px 0;border-top:1px solid #dedbd4}#lite-operations pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.7}
+#lite-onebot-form label{display:block;margin:16px 0}#lite-onebot-form input{width:100%;margin-top:8px}#lite-onebot-form button{margin-right:10px}
+.brand small{font-size:12px;font-weight:400;color:#777}.sidebar-bottom{margin-top:auto}.shell>aside{display:flex;flex-direction:column}
+@media(max-width:760px){.shell{display:flex;flex-direction:column}html #sidebar{position:static;transform:none;width:100%;flex:0 0 auto;height:auto;border-bottom:1px solid #ddd;flex-direction:row;flex-wrap:wrap;padding:12px}.sidebar-head{width:100%}#sidebar .nav-button{width:auto;padding:8px}#sidebar .sidebar-bottom{display:none}#lite-main{padding:24px;flex:1;min-height:0}}

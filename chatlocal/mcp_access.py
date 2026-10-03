@@ -71,7 +71,7 @@ class MCPAccess:
         return {p: bound_account(self.store, p) or '' for p in platforms}
 
     def create(self, body):
-        fields = {'name', 'platforms', 'conversations', 'all_conversations', 'start', 'end', 'media', 'prepare', 'voice', 'onebot'}
+        fields = {'name', 'platforms', 'conversations', 'all_conversations', 'start', 'end', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage'}
         if not isinstance(body, dict) or set(body) - fields:
             raise ValueError('连接配置字段无效。')
         name = body.get('name', '')
@@ -93,7 +93,7 @@ class MCPAccess:
             selection = json.dumps(pair, ensure_ascii=False)
             if selection not in selections:
                 selections.append(selection)
-        for flag in ('all_conversations', 'media', 'prepare', 'voice', 'onebot'):
+        for flag in ('all_conversations', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage'):
             if flag in body and type(body[flag]) is not bool:
                 raise ValueError('权限开关必须为布尔值。')
         if body.get('all_conversations'):
@@ -117,7 +117,9 @@ class MCPAccess:
         if start is not None and end is not None and start >= end:
             raise ValueError('开始日期不能晚于截止日期。')
         scope = dict(platforms=sorted(set(platforms)), conversations=selections, **dates,
-                     **{k: body.get(k, False) for k in ('media', 'prepare', 'voice', 'onebot')})
+                     **{k: body.get(k, False) for k in ('media', 'prepare', 'voice', 'onebot', 'send', 'manage')})
+        if (scope['send'] or scope['manage']) and 'qq' not in platforms:
+            raise ValueError('发送和群管理需要选择 QQ 平台。')
         token = secrets.token_urlsafe(32)
         gid = uuid.uuid4().hex
         with self.connect() as db:
@@ -136,6 +138,18 @@ class MCPAccess:
             row = db.execute('SELECT * FROM grants WHERE token_hash=? AND revoked=0', (self.digest(token),)).fetchone()
         if not row:
             raise AccessDenied('连接凭据无效或已撤销。')
+        return self.validate_grant(row)
+
+    def by_id(self, gid):
+        if not self.settings()['enabled']:
+            raise AccessDenied('MCP 服务已停用。')
+        with self.connect() as db:
+            row = db.execute('SELECT * FROM grants WHERE id=? AND revoked=0', (gid,)).fetchone()
+        if not row:
+            raise AccessDenied('连接凭据无效或已撤销。')
+        return self.validate_grant(row)
+
+    def validate_grant(self, row):
         grant = dict(row)
         grant['scope'] = json.loads(grant['scope'])
         try:
@@ -167,9 +181,10 @@ class MCPAccess:
         # Per-page processing limits, not an artificial task-wide message cap.
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
-            limit = {'prepare_file': 12, 'transcribe_voice': 12, 'read_image': 60}.get(tool)
-            if limit and db.execute('SELECT count(*) FROM calls WHERE grant_id=? AND tool=? AND at>?',
-                                    (gid, tool, time.time()-3600)).fetchone()[0] >= limit:
+            limit = {'prepare_file': 12, 'download_file': 12, 'transcribe_voice': 12, 'read_image': 60}.get(tool)
+            group = ('prepare_file','download_file') if tool in ('prepare_file','download_file') else (tool,)
+            if limit and db.execute('SELECT count(*) FROM calls WHERE grant_id=? AND tool IN ('+','.join('?' for _ in group)+') AND at>?',
+                                    (gid, *group, time.time()-3600)).fetchone()[0] >= limit:
                 raise RateLimited('本连接已达到该按需处理工具的每小时上限；请稍后继续。')
             if db.execute('SELECT count(*) FROM calls WHERE grant_id=? AND at>?', (gid, time.time()-60)).fetchone()[0] >= 120:
                 raise RateLimited('本连接请求过于频繁，请稍后继续。')

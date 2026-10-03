@@ -102,16 +102,21 @@ def install_mcp_routes(app, store=None):
         if grant['id']!=gid:raise HTTPException(403)
         if not service.status()['running']:raise HTTPException(400,'请先启动本机 MCP 服务。')
         from .mcp_connect import install_codex
-        try:return install_codex(service.status()['url'],body['token'])
+        try:return install_codex(service.status()['url'],body['token'],scope=grant['scope'])
         except ValueError as exc:raise HTTPException(409,str(exc)) from None
         except OSError:raise HTTPException(400,'无法写入本机 Codex 配置，请使用复制配置方式。') from None
 
     @app.post('/api/mcp/connections/{gid}/revoke')
     def revoke(gid: str, request: Request, body: dict):
         local(request, True)
-        access.revoke(gid)
+        service.tools.actions.revoke(gid)
         service.cancel(gid)
         return dict(revoked=True)
+
+    @app.get('/api/mcp/operations')
+    def operations(request: Request):
+        local(request)
+        return dict(operations=service.tools.actions.list())
 
     @app.get('/api/mcp/conversations')
     def conversations(request: Request, query: str='', offset: int=0):

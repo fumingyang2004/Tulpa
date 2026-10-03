@@ -15,7 +15,10 @@ sys.path.insert(0,str(ROOT));os.chdir(ROOT)
 def main():
     import uvicorn
     from fastapi import Request,HTTPException
-    from app import create_app
+    if (ROOT/'mcp-edition.json').is_file():
+        from app_mcp import create_app
+    else:
+        from app import create_app
     token=os.environ.get('CHATWEAVE_SESSION_TOKEN','')
     if len(token)<32:raise SystemExit('Desktop session token missing')
     ready=(ROOT/'.tmp'/sys.argv[1]).resolve()

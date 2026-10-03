@@ -180,7 +180,7 @@ class Artifacts:
             return [account_root/'nt_data/File'] if platform=='qq' else [account_root/'msg/file']
         except (OSError,KeyError,ValueError):return []
 
-    def local_candidate(self,row):
+    def local_candidate(self,row,*,binary=False):
         meta=json.loads(row['metadata_json']);roots=[p.resolve() for p in self._roots(row['platform'])]
         candidates=[]
         # Directory searches stay in client attachment roots. An exact native
@@ -189,7 +189,7 @@ class Artifacts:
         raw=meta.get('local_path','').replace('::NTOSFull::','')
         if raw and not raw.startswith(('\\\\','//')):
             path=Path(raw).resolve()
-            native=(row['platform']=='qq' and row['extension'] in SUPPORTED and bool(meta.get('md5')) and
+            native=(row['platform']=='qq' and (binary or row['extension'] in SUPPORTED) and bool(meta.get('md5')) and
                     row['size'] is not None and path.name==row['filename'] and not path.is_relative_to(ROOT))
             if (any(path.is_relative_to(root) for root in roots) or native) and path.is_file():candidates.append(path)
         for root in roots:
@@ -229,17 +229,17 @@ class Artifacts:
         if not path.is_relative_to(self.root.resolve()):raise ArtifactError('缓存路径无效。')
         return path
 
-    def materialize(self,sid,*,confirmed=False):
+    def materialize(self,sid,*,confirmed=False,binary=False,remote=True):
         with _lock:
             row=self.get(sid)
-            if row['extension'] not in SUPPORTED:raise ArtifactError('V1仅登记此类型，不下载、执行或解压。')
+            if not binary and row['extension'] not in SUPPORTED:raise ArtifactError('V1仅登记此类型，不下载、执行或解压。')
             cap=MAX_CONFIRMED_BYTES if confirmed else MAX_BYTES
             if row['size'] is not None and row['size']>cap:raise ArtifactError('文件超过32 MiB默认限制；可在文件页确认扩大至100 MiB。')
             path=self.cache_path(row)
             if row['local_path'] and path.is_file():
                 with self.store.connect() as db:db.execute('UPDATE artifacts SET last_accessed_at=? WHERE sha256=?',(time.time(),row['sha256']))
                 return row
-            source=self.local_candidate(row)
+            source=self.local_candidate(row,binary=binary)
             temp=self.root/(uuid.uuid4().hex+'.part')
             try:
                 if source:
@@ -254,11 +254,12 @@ class Artifacts:
                     after=source.stat()
                     if (before.st_size,before.st_mtime_ns)!=(after.st_size,after.st_mtime_ns):raise ArtifactError('客户端附件仍在写入，请稍后重试。')
                 elif row['source_type']=='qq_group_file':
+                    if not remote:raise ArtifactError('此连接未开启 OneBot 群资料读取权限，不能从 QQ 下载。')
                     from .artifact_onebot import OneBot
                     OneBot().download(row,temp,cap)
                 else:
                     with self.store.connect() as db:db.execute("UPDATE artifact_sources SET availability='MISSING' WHERE id=?",(sid,))
-                    raise ArtifactError('知道文件曾发送过，但本机未找到可核验的本体。请在客户端下载后重试。')
+                    raise ArtifactError('此项是聊天附件记录，本机未找到本体。QQ 群文件可先用 read_qq_group(view="files") 找到目录中的文件编号，再下载；历史附件与群文件目录不自动等同。其他来源请在客户端下载后重试。')
                 if row['size'] is not None and temp.stat().st_size!=row['size']:raise ArtifactError('文件大小与来源不一致，未缓存。')
                 meta=json.loads(row['metadata_json'])
                 if meta.get('md5'):
@@ -279,12 +280,12 @@ class Artifacts:
                 return self.get(sid)
             finally:temp.unlink(missing_ok=True)
 
-    def prepare(self,sid,*,confirmed=False):
+    def prepare(self,sid,*,confirmed=False,remote=True):
         from .store import tokens
         with _lock:
             row=self.get(sid)
             if row['parse_status'] in ('PARSED','PARTIAL','NO_TEXT'):return self.public(row)
-            row=self.materialize(sid,confirmed=confirmed)
+            row=self.materialize(sid,confirmed=confirmed,remote=remote)
             # Another source may already have parsed the same SHA256.
             if row['parse_status'] in ('PARSED','PARTIAL','NO_TEXT'):return self.public(row)
             output=self.root/(uuid.uuid4().hex+'.parse.json')

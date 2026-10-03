@@ -84,7 +84,7 @@ function createChatMessage(message) {
   if(message.content){const text=document.createElement('p');text.textContent=message.content;bubble.append(text);}
   if(message.voice)bubble.append(renderVoice(message.id,message.voice));
   const saveSource=(type,id,label)=>{const b=document.createElement('button');b.className='collect-evidence source-button';b.dataset.sourceType=type;b.dataset.sourceId=id;b.textContent=label;return b;};
-  bubble.append(saveSource(message.voice?'voice':'message',String(message.id),'保存证据'));
+  if(!window.TULPA_MCP_ONLY)bubble.append(saveSource(message.voice?'voice':'message',String(message.id),'保存证据'));
   for(const item of message.media) {
     if(!item.available){const missing=document.createElement('p');missing.className='media-unavailable';missing.textContent=item.reason;bubble.append(missing);continue;}
     const figure=document.createElement('figure'),img=document.createElement('img'),caption=document.createElement('figcaption');
@@ -92,7 +92,7 @@ function createChatMessage(message) {
     if(item.width>0&&item.height>0){const scale=Math.min(1,300/item.width,360/item.height);img.width=Math.round(item.width*scale);img.height=Math.round(item.height*scale);img.style.width=`${img.width}px`;img.style.aspectRatio=`${item.width} / ${item.height}`;}
     img.onclick=()=>showImage(item.url);img.onerror=()=>{img.hidden=true;caption.textContent='媒体不可用 · 缓存文件可能已缺失';};
     img.onload=()=>{if(article.isConnected&&chatFollowing&&!chatPage?.has_after)$('chat-timeline').scrollTop=$('chat-timeline').scrollHeight;};
-    caption.textContent=(item.thumbnail?'缩略图 · ':'')+(item.animated?'GIF / 动态图片 · 点击放大':'点击查看原图');figure.append(img,caption,saveSource('media',`${message.id}:${item.index}`,'保存这张图'));bubble.append(figure);
+    caption.textContent=(item.thumbnail?'缩略图 · ':'')+(item.animated?'GIF / 动态图片 · 点击放大':'点击查看原图');figure.append(img,caption);if(!window.TULPA_MCP_ONLY)figure.append(saveSource('media',`${message.id}:${item.index}`,'保存这张图'));bubble.append(figure);
   }
   for(const file of message.files||[]){const button=document.createElement('button');button.className='source-button open-artifact';button.dataset.sourceId=file.id;button.textContent='文件 · '+file.filename;bubble.append(button);}
   if(typeof openReply==='function'){

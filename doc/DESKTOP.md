@@ -54,4 +54,6 @@ OCR 初始化只下载固定依赖版本的默认模型。构建会校验三份 
 
 ## 发布验证
 
+0.5.0 起可用 `python desktop/build.py --mcp-only` 构建独立轻量版，输出 `release/0.5.0-mcp/Tulpa/` 与 `release/Tulpa-MCP-0.5.0-win-x64.zip`。轻量版使用系统 WebView2，移除内置 Harness、Gradio、OCR 和 Office 解析依赖；语音模型按需安装。使用与验收见 [MCP_LITE.md](MCP_LITE.md)。
+
 按 [VALIDATION.md](VALIDATION.md) 运行隔离回归，并在空白目录启动实际 EXE。检查首次配置、Logo、数据入口、关闭后的服务回收及压缩包哈希。一次本机启动成功不代表所有 QQ / 微信版本均兼容。

@@ -1,6 +1,6 @@
 # 外部 Agent / MCP
 
-0.4.0 起内置于 Windows 桌面包，也保留源码运行方式。
+0.4.0 起内置于 Windows 桌面包；0.5.0 增加 [独立轻量版](MCP_LITE.md) 与按连接持续授权的 QQ 写操作，也保留源码运行方式。
 
 Tulpa 可以作为本机资料服务，让 Codex 或其他支持 **Streamable HTTP MCP + Bearer Token** 的客户端直接查询已导入的 QQ / 微信资料。外部 Agent 自己决定如何调查、写报告或修改它的工作目录；Tulpa 提供检索、上下文和来源，不再调用一个内部模型替它回答。
 
@@ -10,7 +10,7 @@ Tulpa 可以作为本机资料服务，让 Codex 或其他支持 **Streamable HT
 2. 先登录 QQ / 微信，在 **数据与同步** 选择账号并导入资料。可以先导入少量近期消息，不需要等整个历史读完。来源账号确定后再授权，避免首次导入改变来源让旧凭据失效。
 3. 打开 **外部 Agent / MCP**。无需先启用、再保存服务设置，后面的创建按钮会一并完成。默认地址 `http://127.0.0.1:18777/mcp`；遇到端口冲突，点击旁边的 **修改服务端口**，在高级设置中调整。
 4. 填写连接名称，明确选择平台、会话和日期。不选会话不会默认授权全部；只有勾选“全部会话”才包含未来入库的会话。截止日期留空才包含未来消息。
-5. 按需要开放图片、文件下载解析、本地转写和 OneBot 群资料。它们默认关闭。OneBot 在 **模型与连接 → QQ 扩展 / OneBot** 配置并检测，MCP 直接复用，无需再次填写。SnowLuma 等服务仍需独立运行；未配置 OneBot 不影响本地聊天查询。
+5. 按需要开放图片、文件下载解析、本地转写和 OneBot 群资料。发送、群管理是其下方的独立权限，勾选后直接执行，无需逐项审批；所有可选权限默认关闭。OneBot 在 **模型与连接 → QQ 扩展 / OneBot** 配置并检测，MCP 直接复用，无需再次填写。SnowLuma 等服务仍需独立运行；未配置 OneBot 不影响本地聊天查询。
 6. 点击 **创建连接凭据**，再点击 **检测连接与工具**。如果尚未开启服务，此处显示 **开启服务并创建连接**，可直接完成这两步；端口冲突等原因显示在按钮旁，已填写的范围会保留。检测实际执行 MCP 初始化、工具列表和资料状态读取，不调用模型。
 7. Codex 用户可以审阅显示的配置，再点击 **写入本机 Codex 配置**。程序使用 `CODEX_HOME` 或用户目录下 `.codex/config.toml`，备份原文件并保留其他条目；已有不同的 `tulpa` 连接时拒绝覆盖。之后在 Codex 的 MCP 设置中重新连接，必要时重启 Codex。也可复制配置自行安装。
 8. 其他客户端选择 **Streamable HTTP**，填写显示的 MCP 地址，并设置 `Authorization: Bearer <显示的 MCP Token>`。这是 Tulpa 的访问凭据，不能用 OneBot Token 替代。连接凭据只显示一次；丢失后撤销重建。
@@ -51,11 +51,12 @@ tool_timeout_sec = 240
 | 会话、人物与本人账号 | `list_conversations`、`find_people`、`get_my_identity`、`read_person_messages`、`find_mentions` |
 | 消息与上下文 | `search_messages`、`get_context`、`read_conversation`、`read_overview`、`get_messages_since`、`read_message` |
 | 结构化调查 | `query_communication_db`、`get_interaction_threads` |
-| 文件 | `search_files`、`search_file_content`、`read_file_chunks`；可选 `prepare_file` |
+| 文件 | `search_files`、`search_file_content`、`read_file_chunks`；可选 `download_file` 下载原文件交给外部 Agent、`prepare_file` 提取文字 |
 | 图片和语音 | `get_media`；可选 `read_image`、`transcribe_voice` |
 | OneBot QQ 资料 | 有权限且连接可用时出现 `get_group_knowledge`、`read_qq_group` |
+| QQ 直接操作 | 可选 `send_qq_message`、`manage_qq_group`；`get_qq_operation` 查询回执 |
 
-这些工具复用 Tulpa 的检索、受限 SQL、人物解析与文件系统。普通聊天工具、发送工具、群管理工具、模型审批和工作区写入工具没有注册到 MCP。
+这些工具复用 Tulpa 的检索、受限 SQL、人物解析与文件系统。发送和群管理仅对界面勾选授权的连接开放，调用即执行；没有模型审批或权限修改工具，也没有工作区写入工具。完整规则见 [轻量版与持续授权](MCP_LITE.md#勾选就是持续授权)。
 
 工具直接返回结构化资料，不要求外部模型生成 Tulpa 的 `claims` 格式。`sources` 标注消息、文件片段、统计回执等身份；公告正文在 `entries` 中。消息和文件的本机链接可跳回 Tulpa。启动后尚未打开过 MCP 设置时，来源网址可能为空，引用编号仍可用于继续查询。
 
@@ -80,13 +81,13 @@ MCP 不会为了普通文本调查请求 Tulpa 的模型。外部 Agent 获取�
 
 服务随现有 Tulpa 应用启动，默认关闭，只绑定 `127.0.0.1`，与网页使用不同端口。校验 Host、Origin、Bearer Token 和请求大小；不开放网络地址、任意路径或 Shell 参数。设置 API 只供本机 UI 使用，不作为模型工具。
 
-`data/mcp-access.sqlite3` 保存配置、Token 哈希、授权范围和访问记录；正文和明文 Token 不进入审计。数据库属于本机私人数据，不进入 Git 或发布包。访问记录包含工具、时间、耗时和返回的消息数量。
+`data/mcp-access.sqlite3` 保存配置、Token 哈希、授权范围和访问记录；普通读取日志不保存聊天正文和明文 Token；写操作另外保存目标、实际文字、状态及发送回执。数据库属于本机私人数据，不进入 Git 或发布包。访问记录包含工具、时间、耗时和返回的消息数量。
 
 每个 Tulpa 数据目录独立授权。开发目录和 release 目录的聊天、连接和配置不会自动互通；两个实例同时使用 MCP 时必须选择不同端口。
 
 这是 **MCP 接口的访问控制**，不是对整台电脑的操作系统沙箱。拥有同一 Windows 用户文件读取权限的外部 Agent，可能通过它自己的文件/Shell 工具读取本机文件；若要形成更强隔离，仍需在外部客户端或系统层限制那些能力。
 
-没有自动回复、发送、群管理、原始聊天改写，也没有外部 Agent 自己批准或扩张范围的工具。此阶段不更改 Tulpa 原有关注卡与工作区调度。
+Tulpa 不主动自动回复、不改写原始聊天，也没有外部 Agent 自己批准或扩张范围的工具。写操作由持有已授权连接的外部 Agent 发起，本机立即执行并记录。此阶段不更改 Tulpa 原有关注卡与工作区调度。
 
 ## 验证与当前限制
 

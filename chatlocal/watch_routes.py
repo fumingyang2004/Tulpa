@@ -5,15 +5,17 @@ import uuid
 import json
 from fastapi import HTTPException,Request
 from .store import Store
-from .watches import Watches
 from .sync import sync_messages,status,ingestion_lock
 from .agent_tools import LABELS
 from .render import message_html
 from .watch_view import entry_view
 
 
-def install_watch_routes(app,store=None):
-    store=store or Store();watches=Watches(store)
+def install_watch_routes(app,store=None,*,data_only=False):
+    store=store or Store()
+    if not data_only:
+        from .watches import Watches
+        watches=Watches(store)
     jobs={};cancellations={};guard=threading.RLock();schedule=dict(minutes=0,next_at=None,load_stickers=False)
     stopped=threading.Event()
 
@@ -83,6 +85,68 @@ def install_watch_routes(app,store=None):
     install_data_routes(app,store,start,idle,same_origin)
     from .live import install_live_routes
     live=install_live_routes(app,store,same_origin)
+
+    if data_only:
+        @app.get('/api/refresh-status')
+        def data_refresh_status(request:Request):
+            same_origin(request)
+            with guard:running=[{k:j[k] for k in ('id','kind','card_id','status','trigger')} for j in running_jobs()]
+            return dict(platforms=status(store),auto_refresh=dict(schedule),running_jobs=running,running_job=running[0]['id'] if running else None)
+
+        @app.get('/api/watch-jobs/{job_id}')
+        def data_job(request:Request,job_id:str):
+            same_origin(request)
+            with guard:
+                if job_id not in jobs:raise HTTPException(404,'任务不存在，已入库内容仍保留。')
+                return dict(jobs[job_id])
+
+        @app.post('/api/watch-jobs/{job_id}/stop')
+        def data_stop(request:Request,job_id:str):
+            same_origin(request)
+            with guard:
+                if job_id in cancellations:cancellations[job_id].set()
+            return dict(ok=True)
+
+        @app.post('/api/sync')
+        def data_sync(request:Request,body:dict):
+            same_origin(request);cancelled=threading.Event()
+            try:return start(lambda progress:sync_messages(store,body.get('platforms'),load_stickers=body.get('load_stickers',False),progress=progress,cancelled=cancelled),cancelled=cancelled)
+            except ValueError as exc:raise HTTPException(409,str(exc)) from None
+
+        @app.post('/api/auto-refresh')
+        def data_schedule(request:Request,body:dict):
+            same_origin(request);minutes=body.get('minutes')
+            if type(minutes) is not int or minutes not in (0,5,15,30,60,360,720,1440,4320,10080) or type(body.get('load_stickers',False)) is not bool:raise HTTPException(400,'自动刷新设置无效')
+            schedule.update(minutes=minutes,next_at=time.time()+minutes*60 if minutes else None,load_stickers=body.get('load_stickers',False))
+            return schedule
+
+        @app.post('/api/sync/reconnect')
+        def data_reconnect(request:Request,body:dict):
+            same_origin(request);platform=body.get('platform')
+            if platform not in ('qq','wechat'):raise HTTPException(400,'无效平台')
+            with ingestion_lock(),store.connect() as db:
+                db.execute("UPDATE sync_state SET checkpoint='{}',status='never',detail='等待接续已有快照' WHERE platform=?",(platform,))
+                db.execute("UPDATE live_state SET checkpoint='{}' WHERE platform=?",(platform,))
+            return dict(ok=True)
+
+        def data_timer():
+            while not stopped.wait(5):
+                try:
+                    with guard:
+                        if schedule['next_at'] and time.time()>=schedule['next_at']:
+                            stickers=schedule['load_stickers']
+                            start(lambda progress:sync_messages(store,load_stickers=stickers,progress=progress),trigger='scheduled')
+                            schedule['next_at']=time.time()+schedule['minutes']*60
+                except ValueError:continue
+
+        @app.on_event('startup')
+        def data_startup():
+            with store.connect() as db:db.execute("UPDATE sync_state SET status='error',detail='上次读取中断，进度保留' WHERE status='running'")
+            live.start();threading.Thread(target=data_timer,daemon=True,name='data-refresh-timer').start()
+
+        @app.on_event('shutdown')
+        def data_shutdown():stopped.set();live.close()
+        return
 
     def start_check(card_id,body=None,*,refresh=True,trigger='manual'):
         body=body or {};card=watches.get(card_id);cancelled=threading.Event()

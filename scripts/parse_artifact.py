@@ -59,6 +59,8 @@ def parse(path,extension):
         parser='pypdf 6.19.0'
         note.append('原生文本提取；未运行OCR，复杂表格/多栏的阅读顺序需核对原文件。')
         if empty:note.append(f'{empty}页没有原生文字，可能是扫描/图片页。');partial=True
+    elif extension in ('docx','pptx','xlsx') and (ROOT/'mcp-edition.json').is_file():
+        raise ValueError('MCP 轻量版不内置 Office 解析。请用 download_file 取得本地原文件，再由外部 Agent 读取。')
     elif extension in ('docx','pptx','xlsx'):
         # Direct Docling backends avoid initializing PDF layout/VLM pipelines.
         from io import BytesIO

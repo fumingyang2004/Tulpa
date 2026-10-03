@@ -34,8 +34,8 @@ async function pollLive() {
     const upper=Math.max(...data.platforms.map(p=>p.last_id||0));
     if(upper>liveLastId && state.ready && !state.busy && !state.loading && Date.now()-liveRefreshAt>5000) {
       liveRefreshAt=Date.now();
-      const refreshed=await call('refresh',[]);setData(refreshed[0],refreshed[1]);
-      await loadWatches();
+      if(window.TULPA_MCP_ONLY){await refreshHome();}
+      else{const refreshed=await call('refresh',[]);setData(refreshed[0],refreshed[1]);await loadWatches();}
       liveLastId=upper;
       // Timestamp means the visible UI has refreshed its local data, not that
       // the user opened/read every newly arrived message bubble.

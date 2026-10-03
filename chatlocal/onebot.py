@@ -55,7 +55,7 @@ class Client:
             with httpx.Client(timeout=httpx.Timeout(self.timeout, connect=3),
                               transport=self.transport, trust_env=False, follow_redirects=False) as client:
                 with client.stream('POST', self.url + '/' + action, json=payload,
-                                   headers={'Authorization': 'Bearer ' + self.token}) as response:
+                                   headers={'Authorization': 'Bearer ' + self.token} if self.token else {}) as response:
                     response.raise_for_status()
                     raw = bytearray()
                     for chunk in response.iter_bytes():
