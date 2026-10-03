@@ -3,6 +3,7 @@
 .mcp-dialog>.dialog-head{position:sticky;top:0;z-index:2;background:var(--panel);padding:14px 24px;margin:0;border-bottom:1px solid var(--line)}
 .mcp-body{padding:8px 24px 24px}.mcp-body p{font-size:14px;line-height:1.65}.mcp-muted{color:var(--muted)}
 .mcp-body h3{margin-top:24px;font-size:16px}.mcp-body input:not([type=checkbox]),.mcp-body textarea{display:block;width:100%;margin:6px 0 14px;padding:9px;border:1px solid var(--line);border-radius:6px;background:transparent;color:inherit;box-sizing:border-box}
+.mcp-step{border-bottom:1px solid var(--line);padding-bottom:20px}.mcp-background{display:flex;gap:8px;align-items:center;margin:16px 0}.mcp-warning{color:var(--warning)}.mcp-body [hidden]{display:none!important}
 .mcp-body input[type=checkbox]{width:16px;height:16px;flex-shrink:0;accent-color:var(--accent)}
 .mcp-body fieldset{border:1px solid var(--line);margin:16px 0;padding:12px;min-width:0}.mcp-body fieldset>label{display:flex;gap:8px;align-items:center;margin:8px 0}
 .mcp-body button{padding:7px 12px;border:1px solid var(--line);border-radius:6px;color:inherit;background:transparent;cursor:pointer}

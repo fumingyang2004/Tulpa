@@ -173,7 +173,14 @@ html #reply-reject:not(:disabled):hover {background:transparent;color:var(--dang
 .desktop-config[open] {display:flex;flex-direction:column}
 .desktop-config .dialog-head {padding:23px 26px 18px;border-bottom:1px solid var(--line);margin:0;flex-shrink:0}
 .desktop-config h2 {margin:0}
-.desktop-config form {overflow:auto;padding:22px 26px 26px}
+.desktop-config-body {overflow:auto;padding:22px 26px 26px}
+.desktop-config form {padding:8px 0 12px}
+.desktop-config .desktop-settings-nav {display:flex;gap:10px;flex-wrap:wrap}
+.desktop-config .desktop-mode {display:block;text-align:left;width:100%;padding:18px;margin:12px 0;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--text)}
+.desktop-mode strong,.desktop-mode span {display:block}.desktop-mode span{font-size:13px;color:var(--muted);margin-top:8px}
+.desktop-config .desktop-check {display:flex;align-items:center;gap:10px;margin-top:24px;font-weight:400}
+.desktop-config .desktop-check input {width:16px;height:16px;accent-color:var(--accent)}
+.desktop-config [hidden] {display:none!important}
 .desktop-config .config-intro {color:var(--muted);font-size:13px;margin:0 0 22px;line-height:1.7}
 .desktop-config label {display:block;margin:17px 0 7px;font-size:13px;font-weight:550;color:var(--text)}
 .desktop-config input {width:100%;padding:11px 13px;outline:none}

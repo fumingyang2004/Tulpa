@@ -49,8 +49,9 @@ def save_product_settings(body,root=ROOT):
     with _settings_lock:
         path=root/'.env'
         existing=dotenv_values(path)
-        if not update.get('API_KEY',os.environ.get('API_KEY',existing.get('API_KEY') or '')):
+        if set(update) & {'API_BASE','API_KEY','MODEL'} and not update.get('API_KEY',os.environ.get('API_KEY',existing.get('API_KEY') or '')):
             raise ValueError('请填写 API Key。')
+        (root/'.tmp').mkdir(parents=True,exist_ok=True)
         with tempfile.NamedTemporaryFile(prefix='settings-',suffix='.env',dir=root/'.tmp',delete=False) as f:temp=Path(f.name)
         try:
             temp.write_text(path.read_text(encoding='utf-8') if path.exists() else '',encoding='utf-8')
@@ -67,6 +68,7 @@ def save_product_settings(body,root=ROOT):
 def install_desktop_routes(app,root=ROOT):
     def local(request,write=False):
         if request.client and request.client.host not in ('127.0.0.1','::1','testclient'):raise HTTPException(403)
+        if urlparse(str(request.base_url)).hostname not in ('127.0.0.1','localhost','::1','testserver'):raise HTTPException(403)
         origin=request.headers.get('origin')
         if origin and origin!=str(request.base_url).rstrip('/'):raise HTTPException(403,'只允许本机同源操作。')
         if write and (request.headers.get('x-chatweave-ui')!='1' or request.headers.get('content-type','').split(';')[0]!='application/json'):
@@ -111,6 +113,53 @@ def install_desktop_routes(app,root=ROOT):
         local(request,True)
         try:return save_product_settings(body,root)
         except ValueError as exc:raise HTTPException(400,str(exc)) from None
+
+    # Independent of model credentials, and shared with the native tray shell.
+    desktop_preferences=root/'data'/'desktop-preferences.json'
+    def preferences_value():
+        result=dict(mode='',background=False)
+        try:
+            saved=json.loads(desktop_preferences.read_text(encoding='utf-8'))
+            if saved.get('mode') in ('chat','mcp','both'):result['mode']=saved['mode']
+            if type(saved.get('background')) is bool:result['background']=saved['background']
+        except (OSError,ValueError,AttributeError):pass
+        return result
+
+    @app.get('/api/desktop/preferences')
+    def desktop_prefs(request:Request):
+        local(request)
+        return preferences_value()
+
+    @app.put('/api/desktop/preferences')
+    def save_desktop_prefs(request:Request,body:dict):
+        local(request,True)
+        if not body or set(body)-{'mode','background'} or ('mode' in body and body['mode'] not in ('chat','mcp','both')) or ('background' in body and type(body['background']) is not bool):
+            raise HTTPException(400,'启动设置无效。')
+        with _settings_lock:
+            result=preferences_value();result.update(body)
+            desktop_preferences.parent.mkdir(parents=True,exist_ok=True)
+            with tempfile.NamedTemporaryFile(prefix='desktop-prefs-',suffix='.json',dir=desktop_preferences.parent,delete=False) as f:temp=Path(f.name)
+            try:
+                temp.write_text(json.dumps(result),encoding='utf-8');os.replace(temp,desktop_preferences)
+            finally:temp.unlink(missing_ok=True)
+        return result
+
+    @app.post('/api/desktop/onebot/test')
+    def test_onebot(request:Request,body:dict):
+        local(request,True)
+        if body:raise HTTPException(400,'检测使用已保存的 OneBot 配置。')
+        from .onebot import Client,configuration,OneBotError,invalidate_availability
+        config=configuration(root)
+        invalidate_availability()
+        if not config['url']:return dict(ok=False,message='尚未配置 OneBot；本地聊天查询仍可使用。')
+        try:
+            account=Client(config,timeout=3).login()
+            # Invalidate cached availability after saving/testing a new endpoint.
+            service=getattr(app.state,'tulpa_mcp',None)
+            if service:
+                with service.tools.qq_lock:service.tools.qq_at=0
+            return dict(ok=True,account=account,message='已连接 QQ '+account+'。MCP 可复用此配置；请在授权连接中开启 OneBot 读取。')
+        except OneBotError as exc:return dict(ok=False,message=str(exc))
 
     @app.get('/api/desktop/diagnostics')
     def diagnostics(request:Request):

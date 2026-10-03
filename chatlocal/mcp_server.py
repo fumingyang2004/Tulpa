@@ -203,6 +203,7 @@ class MCPService:
                 self.thread.join(5)
             if not self.thread or not self.thread.is_alive():
                 self.thread = self.server = self.listener = None
+                self.error = ''
 
     def status(self):
         setting = self.access.settings()

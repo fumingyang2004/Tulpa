@@ -11,7 +11,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(sys.argv[sys.argv.index('--package')+1]).resolve() if '--package' in sys.argv else Path(__file__).resolve().parents[1]
+(ROOT/'.tmp').mkdir(exist_ok=True)
 sys.path.insert(0, str(ROOT))
 import httpx
 from fastapi import FastAPI
@@ -226,6 +227,36 @@ def main():
             second=ui.post('/api/mcp/connections',json=dict(base,name='Fixture B',platforms=['wechat'],conversations=[['wechat','private']]),headers=ui_headers).json()['token']
             settings=ui.put('/api/mcp',json=dict(enabled=True,port=port),headers=ui_headers).json()
             assert settings['running'], settings
+            # A second process cannot silently take over this server's port.
+            from chatlocal.mcp_server import MCPService
+            rival=MCPService(service.access);rival.start()
+            assert not rival.status()['running'] and rival.status()['error']
+            rival.stop()
+            assert ui.post('/api/mcp/test',json={'token':first}).status_code==403
+            checked=ui.post('/api/mcp/test',json={'token':first},headers=ui_headers)
+            assert checked.status_code==200 and checked.json()['ok'],checked.text
+            assert checked.json()['tools']>=18 and not checked.json()['onebot']
+            assert ui.post('/api/mcp/test',json={'token':'invalid'},headers=ui_headers).status_code==400
+            import tomllib
+            home=folder/'codex';home.mkdir();config=home/'config.toml'
+            config.write_text('# keep comment\nmodel="user-model"\n[mcp_servers.example]\nurl="https://example.test/mcp"\n','utf-8')
+            before=config.read_bytes()
+            from chatlocal.mcp_connect import install_codex
+            with patch('chatlocal.mcp_connect.codex_home',return_value=home):
+                gid=service.access.authorize(first)['id']
+                route='/api/mcp/connections/'+gid+'/codex'
+                assert ui.post(route,json={'token':first}).status_code==403
+                assert ui.post(route,json={'token':second},headers=ui_headers).status_code==403
+                assert ui.post(route,json={'token':first},headers=ui_headers).json()['installed']
+                assert not ui.post(route,json={'token':first},headers=ui_headers).json()['changed']
+                assert next((home/'backups').glob('*.toml')).read_bytes()==before
+                parsed=tomllib.loads(config.read_text('utf-8'))
+                assert parsed['model']=='user-model' and 'example' in parsed['mcp_servers']
+                assert parsed['mcp_servers']['tulpa']['http_headers']['Authorization']=='Bearer '+first
+                saved=config.read_bytes()
+                try:install_codex(settings['url'],second,home=home);raise AssertionError('Existing entry overwritten')
+                except ValueError:pass
+                assert config.read_bytes()==saved
             asyncio.run(protocol(settings['url'],first,second,ui,service,store,folder))
             value=ui.get('/api/mcp').json();assert first not in json.dumps(value) and second not in json.dumps(value)
             assert value['recent'] and not any('content' in r for r in value['recent'])

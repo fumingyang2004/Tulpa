@@ -22,6 +22,21 @@ def main():
         assert not (root/'.env').exists(), 'Display preference touched model credentials'
         assert c.put('/api/ui-preferences',json=dict(show_reasoning='false'),headers={'X-ChatWeave-UI':'1'}).status_code==400
         assert not c.get('/api/desktop/status').json()['settings']['configured']
+        headers={'X-ChatWeave-UI':'1'}
+        onebot_only=dict(sender_url='http://127.0.0.1:3000',sender_token='private-sender-token')
+        response=c.put('/api/desktop/settings',json=onebot_only,headers=headers)
+        assert response.status_code==200 and not response.json()['configured'],response.text
+        assert 'API_KEY' not in (root/'.env').read_text(encoding='utf-8')
+        assert c.put('/api/desktop/settings',json={'model':'some-model'},headers=headers).status_code==400
+        with patch('chatlocal.onebot.Client.login',return_value='12345'):
+            assert c.post('/api/desktop/onebot/test',json={},headers=headers).json()['ok']
+        assert c.post('/api/desktop/onebot/test',json={}).status_code==403
+        assert c.get('/api/desktop/status',headers={'Host':'evil.test'}).status_code==403
+        assert c.get('/api/desktop/preferences').json()==dict(mode='',background=False)
+        assert c.put('/api/desktop/preferences',json=dict(mode='mcp',background=True),headers=headers).status_code==200
+        assert c.put('/api/desktop/preferences',json=dict(background='false'),headers=headers).status_code==400
+        assert c.put('/api/desktop/preferences',json=dict(mode='chat')).status_code==403
+        assert c.get('/api/desktop/preferences').json()==dict(mode='mcp',background=True)
         settings=dict(api_base='https://example.test/v1',api_key='private-fixture-key',model='fixture-model',sender_url='http://127.0.0.1:3000',sender_token='private-sender-token')
         headers={'X-ChatWeave-UI':'1'}
         assert c.put('/api/desktop/settings',json=settings).status_code==403
@@ -39,6 +54,7 @@ def main():
         app2=FastAPI();install_desktop_routes(app2,root)
         assert not TestClient(app2,base_url='http://testserver:54321').get('/api/ui-preferences').json()['show_reasoning']
         assert TestClient(app2).get('/api/desktop/status').json()['settings']['model']=='new-model'
+        assert TestClient(app2).get('/api/desktop/preferences').json()['background']
         diagnostics=c.get('/api/desktop/diagnostics')
         assert diagnostics.status_code==200 and 'attachment;' in diagnostics.headers['content-disposition']
         assert 'private-fixture-key' not in diagnostics.text and str(root) not in diagnostics.text

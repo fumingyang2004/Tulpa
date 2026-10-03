@@ -2,6 +2,16 @@
 
 公开仓库只保留可复现的测试方法与不含私人聊天的夹具。个人账号、真实会话、原文截图、模型私有回答及开发机器的诊断记录不作为公开验收材料。
 
+## 0.4.0 桌面 MCP 本机验收
+
+- 真实 WinForms + WebView2 测试构建：首次模式选择；无模型 API Key 保存 OneBot；授权创建、Token 关闭清除和真实 SDK 检测。浏览器脚本未报错。
+- 桌面关闭进入托盘后 MCP 仍可读取隔离消息；恢复窗口复用同一后端进程；彻底退出回收服务和端口。重启后原 MCP 地址、Token 和范围仍有效，来源链接使用本轮新桌面端口。
+- 使用已运行的真实本机 OneBot，桌面包保存配置后通过 MCP 读取实际群信息及一条群公告。未发送消息，未调用模型；测试凭据已撤销，私人资料不进入发布包。
+- `check_mcp_onebot.py` 使用隔离 HTTP OneBot 服务，验证 EXE 设置保存 → MCP 工具出现 → 公告读取，以及 Token 更换立即生效、不依赖模型 Key。
+- `check_mcp.py` 增加连接检测 API、端口冲突、Codex 配置备份/合并/同名冲突拒绝；配置写入仅测试隔离目录，不修改开发者的真实 Codex 配置。
+- 构建阶段用随包 Python 执行上述 MCP 检查，确认不依赖开发虚拟环境。正式 ZIP 仍按文件清单生成，并执行隐私边界和 CRC 检查。
+- 限制：本轮不是另一台干净 Windows 机器或实际重启 Windows 的验收；开机启动菜单已实现，未修改开发机的登录启动项。其他外部 Agent 客户端仍需分别测试。
+
 ## 隔离回归
 
 安装开发依赖后，在仓库根目录运行：
@@ -12,6 +22,7 @@
 .\.venv\Scripts\python.exe scripts/check_data_controls.py
 .\.venv\Scripts\python.exe scripts/check_desktop.py
 .\.venv\Scripts\python.exe scripts/check_mcp.py
+.\.venv\Scripts\python.exe scripts/check_mcp_onebot.py
 .\.venv\Scripts\python.exe scripts/check_import_batches.py
 .\.venv\Scripts\python.exe scripts/check_chat_browser.py
 .\.venv\Scripts\python.exe scripts/check_reply_history.py

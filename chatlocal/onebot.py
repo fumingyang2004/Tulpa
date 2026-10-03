@@ -25,8 +25,8 @@ READS = frozenset(('get_login_info', 'get_version_info', 'get_group_info',
 WRITES = frozenset(('set_group_ban', 'set_group_kick', 'set_group_name', 'set_group_add_request'))
 
 
-def configuration():
-    values = dotenv_values(ROOT / '.env')
+def configuration(root=None):
+    values = dotenv_values((root or ROOT) / '.env')
     def value(key):
         return str(os.environ.get(key, values.get(key) or '')).strip()
     # The product's OneBot settings are shared. Preserve explicitly configured
@@ -86,6 +86,11 @@ class Client:
 
 _probe_lock = threading.Lock()
 _probe_cache = {}
+
+
+def invalidate_availability():
+    with _probe_lock:
+        _probe_cache.clear()
 
 
 def available_client():

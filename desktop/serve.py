@@ -22,6 +22,8 @@ def main():
     if ready.parent!=(ROOT/'.tmp').resolve():raise SystemExit('Invalid ready path')
     listener=socket.socket();listener.bind(('127.0.0.1',0));port=listener.getsockname()[1]
     application=create_app()
+    # Source links must work before anyone opens the MCP settings dialog.
+    application.state.tulpa_mcp.source_base=f'http://127.0.0.1:{port}'
     server=uvicorn.Server(uvicorn.Config(application,host='127.0.0.1',port=port,access_log=False,log_level='warning',timeout_graceful_shutdown=5))
     @application.post('/api/desktop/quit')
     def quit(request:Request):

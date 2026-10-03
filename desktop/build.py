@@ -109,6 +109,8 @@ def build(no_zip=False,qa=False,output=None):
     subprocess.run([sys.executable,str(ROOT/'scripts/check_snapshot_recovery.py')],check=True)
     subprocess.run([sys.executable,str(ROOT/'scripts/check_live_runtime.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_qq_labels.py'),'--package',str(out)],check=True)
+    subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp.py'),'--package',str(out)],check=True)
+    subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_onebot.py'),'--package',str(out)],check=True)
     tree(ROOT/'tools/whispercpp/Release','tools/whispercpp/Release')
     model=ROOT/'.cache/voice-models/ggml-small-q5_1.bin'
     if digest(model)!='ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb':raise RuntimeError('Voice model checksum mismatch')
@@ -152,7 +154,7 @@ def build(no_zip=False,qa=False,output=None):
         f'/out:{register("Tulpa.Support.exe")}', '/r:System.dll','/r:System.Core.dll','/r:System.Drawing.dll',
         '/r:System.Windows.Forms.dll','/r:System.Web.Extensions.dll',str(ROOT/'desktop/Support.cs')],check=True)
     copy(ROOT/'desktop/ChatWeave.exe.config',executable+'.config')
-    write('开始使用.txt','Tulpa '+VERSION+'\n\n完整解压此文件夹，双击 Tulpa.exe。无需安装 Python、Node 或运行 PowerShell。\n首次进入在「模型设置」填写 API 地址、API Key 和模型名称。\n在「数据与同步」选择本机 QQ / 微信或导入文件。仅支持本机已有且可读取的数据。\n语音模型、OCR、文件解析和 Agent 运行时已随包提供。QQ 发送需要另行登录并配置本机 OneBot 服务，每条发送仍需批准。\n数据和配置保存在本文件夹的 data、imports、.env 等位置，请保留整个文件夹。关闭窗口即退出自带服务；不会关闭 QQ 或微信。\n请放在有写入权限的本地目录，不要直接从 ZIP 内运行。Windows 10/11 x64，.NET Framework 4.8。\n本程序未签名。更新和源码：https://github.com/fumingyang2004/Tulpa 。第三方许可见 doc/THIRD_PARTY.md。\n')
+    write('开始使用.txt', 'Tulpa '+VERSION+'\n\n完整解压此文件夹，双击 Tulpa.exe。无需安装 Python、Node 或运行 PowerShell。\n\n使用外部 Agent（例如 Codex）：\n1. 首次选择「连接外部 Agent」，无需模型 API Key。\n2. 在「数据与同步」登录并选择本机 QQ / 微信账号，导入需要的聊天。\n3. 打开「外部 Agent / MCP」，启用服务，选择平台、会话、日期及可选权限，创建连接。\n4. 点击检测连接，确认后写入本机 Codex 配置，或复制配置到其他支持 Streamable HTTP 的客户端。\n5. 在客户端重新连接 MCP。不要把 OneBot Token 当成 MCP Token。\n\n使用内置聊天：在「模型与连接」填写自己的模型 API 地址、API Key 和模型名称。\nOneBot 可独立保存并检测；MCP 与 QQ 扩展共用这份配置。SnowLuma 等接入服务仍需独立运行，本包不附带。\n\n勾选「关闭窗口后留在托盘」后，关闭窗口仍可提供 MCP 和实时读取。双击托盘图标打开，右键「彻底退出」停止服务；托盘菜单可选择开机启动（默认关闭）。不勾选时关闭窗口即退出。移动文件夹后请重新设置开机启动。\n数据和配置保存在本文件夹的 data、imports、.env 等位置。升级请先彻底退出并备份，保留个人数据；不要同时运行两个指向同一数据目录的版本。\n请放在有写入权限的本地目录，不要直接从 ZIP 内运行。Windows 10/11 x64，.NET Framework 4.8。\n本程序未签名。源码：https://github.com/fumingyang2004/Tulpa 。第三方许可见 doc/THIRD_PARTY.md，教程见 doc/MCP.md。\n')
     tree(ROOT/'desktop/licenses','licenses')
     for name in ('LICENSE','README.md'):
         copy(ROOT/name,name)

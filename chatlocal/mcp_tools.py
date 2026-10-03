@@ -40,14 +40,18 @@ class MCPTools:
         self.qq_lock = threading.Lock()
         self.qq_at = 0
         self.qq_client = None
+        self.qq_config = None
 
     def onebot(self, grant):
         if not grant['scope']['onebot'] or 'qq' not in grant['scope']['platforms']:
             return None
         with self.qq_lock:
-            if time.monotonic() - self.qq_at > 15:
-                from .onebot import available_client
+            from .onebot import available_client, configuration
+            cfg=configuration()
+            key=(cfg['url'],cfg['token'])
+            if key != self.qq_config or time.monotonic() - self.qq_at > 15:
                 self.qq_client = available_client()
+                self.qq_config = key
                 self.qq_at = time.monotonic()
             return self.qq_client
 

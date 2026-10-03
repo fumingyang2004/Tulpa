@@ -10,12 +10,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
+using Microsoft.Win32;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
 static class Program {
     internal static string Root = AppDomain.CurrentDomain.BaseDirectory;
     internal static string Connect = "";
+    internal static bool Background = false;
     internal static uint ActivateMessage;
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern uint RegisterWindowMessage(string name);
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hwnd,uint msg,IntPtr w,IntPtr l);
@@ -24,7 +26,8 @@ static class Program {
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
         SetProcessDPIAware();
         try {
-            if(args.Length!=0) {
+            if(args.Length==1 && args[0]=="--background")Background=true;
+            else if(args.Length!=0) {
                 if(args.Length!=2 || args[0]!="--connect") throw new Exception("无法识别启动参数。");
                 Uri uri;
                 if(!Uri.TryCreate(args[1],UriKind.Absolute,out uri) || uri.Scheme!="http" || uri.Host!="127.0.0.1" || uri.AbsolutePath!="/" || uri.Query!="" || uri.UserInfo!="" || uri.Fragment!="")
@@ -49,10 +52,11 @@ sealed class DesktopWindow:Form {
     readonly Label title=new Label(),hint=new Label();
     readonly System.Windows.Forms.Timer health=new System.Windows.Forms.Timer();
     readonly JavaScriptSerializer json=new JavaScriptSerializer();
+    readonly NotifyIcon tray=new NotifyIcon();
     Process backend;
     Job owner;
     string service="",token="",ready="";
-    bool closing=false,loaded=false;
+    bool closing=false,loaded=false,exitRequested=false,closePending=false,trayNotice=false,cleaned=false;
     public DesktopWindow() {
         Text="Tulpa";StartPosition=FormStartPosition.CenterScreen;
         using(var graphics=CreateGraphics()) {
@@ -62,6 +66,23 @@ sealed class DesktopWindow:Form {
         MinimumSize=new Size(900,650);
         BackColor=Color.FromArgb(250,249,245);Font=new Font("Segoe UI",10);
         Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        tray.Icon=Icon;tray.Text="Tulpa · 本机资料服务";
+        var menu=new ContextMenuStrip();
+        menu.Items.Add("打开 Tulpa",null,delegate{ShowWindow();});
+        if(Program.Connect=="") {
+            var startup=new ToolStripMenuItem("开机启动（当前文件夹）");startup.CheckOnClick=true;
+            using(var key=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
+                startup.Checked=key!=null && (string)key.GetValue("Tulpa","")==StartupCommand();
+            startup.Click+=delegate {
+                try {using(var key=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")) {
+                    if(startup.Checked)key.SetValue("Tulpa",StartupCommand());
+                    else if((string)key.GetValue("Tulpa","")==StartupCommand())key.DeleteValue("Tulpa",false);
+                }}catch {startup.Checked=!startup.Checked;MessageBox.Show(this,"无法保存开机启动设置。","Tulpa");}
+            };
+            menu.Items.Add(startup);
+        }
+        menu.Items.Add("彻底退出",null,delegate{exitRequested=true;Close();});
+        tray.ContextMenuStrip=menu;tray.DoubleClick+=delegate{ShowWindow();};tray.Visible=true;
         using(var stream=typeof(DesktopWindow).Assembly.GetManifestResourceStream("Tulpa.Logo.png"))
         using(var image=Image.FromStream(stream))logo.Image=new Bitmap(image);
         logo.Size=new Size(96,96);logo.SizeMode=PictureBoxSizeMode.Zoom;logo.BackColor=Color.Black;
@@ -70,11 +91,14 @@ sealed class DesktopWindow:Form {
         Controls.Add(logo);Controls.Add(title);Controls.Add(hint);Resize+=delegate{CenterSplash();};CenterSplash();
         Shown+=async delegate{await Start();};FormClosing+=OnClosing;
         health.Interval=4000;health.Tick+=delegate {
-            if(!closing&&loaded&&backend!=null&&backend.HasExited){health.Stop();MessageBox.Show(this,"本机服务已停止。已保存的记录保留，请关闭并重新打开 Tulpa。","Tulpa",MessageBoxButtons.OK,MessageBoxIcon.Information);}
+            if(!closing&&loaded&&backend!=null&&backend.HasExited){health.Stop();ShowWindow();tray.Text="Tulpa · 本机服务已停止";MessageBox.Show(this,"本机服务已停止。已保存的记录保留，请退出并重新打开 Tulpa。","Tulpa",MessageBoxButtons.OK,MessageBoxIcon.Information);}
         };
     }
     void CenterSplash(){logo.Left=(ClientSize.Width-logo.Width)/2;logo.Top=ClientSize.Height/2-175;title.Left=(ClientSize.Width-title.Width)/2;title.Top=ClientSize.Height/2-55;hint.Left=(ClientSize.Width-hint.Width)/2;hint.Top=ClientSize.Height/2+15;}
-    protected override void WndProc(ref Message m){if(m.Msg==Program.ActivateMessage){if(WindowState==FormWindowState.Minimized)WindowState=FormWindowState.Normal;Activate();}base.WndProc(ref m);}
+    string StartupCommand(){return "\""+Application.ExecutablePath+"\" --background";}
+    void ShowWindow(){Show();ShowInTaskbar=true;if(WindowState==FormWindowState.Minimized)WindowState=FormWindowState.Normal;Activate();}
+    void HideToTray(){Hide();ShowInTaskbar=false;if(!trayNotice){trayNotice=true;tray.ShowBalloonTip(4000,"Tulpa 仍在运行","MCP 和实时读取继续运行。双击托盘图标打开，右键可彻底退出。",ToolTipIcon.Info);}}
+    protected override void WndProc(ref Message m){if(m.Msg==Program.ActivateMessage)ShowWindow();base.WndProc(ref m);}
     object GetJson(string path){var req=(HttpWebRequest)WebRequest.Create(service+path);req.Proxy=null;req.Timeout=2000;using(var r=req.GetResponse())using(var sr=new StreamReader(r.GetResponseStream()))return json.DeserializeObject(sr.ReadToEnd());}
     async Task Start() {
         try {
@@ -132,19 +156,26 @@ sealed class DesktopWindow:Form {
             view.CoreWebView2.NewWindowRequested+=(s,e)=>{e.Handled=true;Uri uri;if(Uri.TryCreate(e.Uri,UriKind.Absolute,out uri)&&(uri.Scheme=="https"||uri.Scheme=="http"))Process.Start(new ProcessStartInfo(uri.AbsoluteUri){UseShellExecute=true});};
             view.CoreWebView2.PermissionRequested+=(s,e)=>{e.State=CoreWebView2PermissionState.Deny;};
 #if QA
-            view.CoreWebView2.WebMessageReceived+=(s,e)=>{if(e.Source.StartsWith(service+"/")&&e.TryGetWebMessageAsString()=="chatweave-qa-close")Close();};
+            view.CoreWebView2.WebMessageReceived+=(s,e)=>{if(e.Source.StartsWith(service+"/")){var command=e.TryGetWebMessageAsString();if(command=="chatweave-qa-close"){exitRequested=true;Close();}else if(command=="tulpa-qa-hide")Close();else if(command=="tulpa-qa-show")ShowWindow();}};
 #endif
             view.CoreWebView2.Navigate(service+"/?desktop=1");
             loaded=true;health.Start();
+            if(Program.Background)HideToTray();
         } catch(Exception e){if(!closing){MessageBox.Show(this,e.Message,"Tulpa 启动提示",MessageBoxButtons.OK,MessageBoxIcon.Information);closing=true;Close();}}
     }
     async void OnClosing(object sender,FormClosingEventArgs e) {
         if(closing){Cleanup();return;}
+        if(e.CloseReason==CloseReason.WindowsShutDown||e.CloseReason==CloseReason.TaskManagerClosing){closing=true;Cleanup();return;}
         e.Cancel=true;
+        if(closePending)return;closePending=true;
         if(loaded&&backend!=null&&!backend.HasExited){
             try {
+                if(!exitRequested){
+                    var prefs=(System.Collections.Generic.Dictionary<string,object>)await Task.Run(()=>GetJson("/api/desktop/preferences"));
+                    if((bool)prefs["background"]){closePending=false;HideToTray();return;}
+                }
                 var status=(System.Collections.Generic.Dictionary<string,object>)await Task.Run(()=>GetJson("/api/desktop/status"));
-                if((bool)status["busy"]&&MessageBox.Show(this,"还有任务正在执行。退出会停止当前任务，已保存的内容会保留。\n\n现在退出？","Tulpa",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
+                if((bool)status["busy"]&&MessageBox.Show(this,"还有任务正在执行。退出会停止当前任务，已保存的内容会保留。\n\n现在退出？","Tulpa",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes){closePending=false;exitRequested=false;return;}
             }catch{}
         }
         closing=true;health.Stop();Hide();
@@ -153,7 +184,7 @@ sealed class DesktopWindow:Form {
         }
         Cleanup();Close();
     }
-    void Cleanup(){health.Stop();view.Dispose();if(logo.Image!=null){logo.Image.Dispose();logo.Image=null;}if(owner!=null){owner.Dispose();owner=null;}if(backend!=null){backend.Dispose();backend=null;}if(ready!="")try{File.Delete(ready);}catch{}}
+    void Cleanup(){if(cleaned)return;cleaned=true;health.Stop();tray.Visible=false;tray.Dispose();view.Dispose();if(logo.Image!=null){logo.Image.Dispose();logo.Image=null;}if(owner!=null){owner.Dispose();owner=null;}if(backend!=null){backend.Dispose();backend=null;}if(ready!="")try{File.Delete(ready);}catch{}}
 }
 
 sealed class Job:IDisposable {

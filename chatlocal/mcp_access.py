@@ -152,10 +152,13 @@ class MCPAccess:
 
     def list(self):
         with self.connect() as db:
-            rows = [dict(r) for r in db.execute('SELECT id,name,scope,accounts,created_at,revoked FROM grants ORDER BY created_at DESC')]
+            rows = [dict(r) for r in db.execute('SELECT id,name,scope,accounts,epoch,created_at,revoked FROM grants ORDER BY created_at DESC')]
             for row in rows:
                 row['scope'] = json.loads(row['scope'])
                 row['accounts'] = json.loads(row['accounts'])
+                try:row['valid']=not row['revoked'] and row.pop('epoch')==self.epoch() and row['accounts']==self.accounts(row['scope']['platforms'])
+                except ValueError:row['valid']=False
+                row.pop('epoch',None)
                 row['calls'] = db.execute('SELECT count(*) FROM calls WHERE grant_id=?', (row['id'],)).fetchone()[0]
             recent = [dict(r) for r in db.execute('SELECT c.*,g.name FROM calls c JOIN grants g ON c.grant_id=g.id ORDER BY c.id DESC LIMIT 30')]
         return dict(connections=rows, recent=recent)
