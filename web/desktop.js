@@ -1,16 +1,21 @@
 'use strict';
 // Presentation and local configuration only. All existing workflows are reused.
 (function(){
-  if(document.documentElement.dataset.desktop!=='true')return;
-  document.title='Tulpa';
+  // Configuration is shared by the web and desktop entry points. Also guard
+  // against duplicate loading while an older running server injects this file.
+  if(document.getElementById('desktop-settings'))return;
+  const isDesktop=document.documentElement.dataset.desktop==='true';
   const icon=name=>`<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
-  document.querySelector('#welcome h2').textContent='从真实交流中，慢慢懂你。';
-  document.querySelector('#welcome > p').textContent='留住重要的消息，理清值得继续的事。';
-  const eyebrow=document.createElement('div');eyebrow.className='desktop-eyebrow';eyebrow.textContent='TULPA / 通信工作区';
-  document.querySelector('#welcome h2').before(eyebrow);
-  document.querySelectorAll('.suggestions button').forEach((button,i)=>button.insertAdjacentHTML('afterbegin',icon(['chat','watch','workspace'][i])));
-  const badge=document.createElement('span');badge.className='desktop-local-badge';badge.textContent='本机工作空间';
-  document.getElementById('header-range').before(badge);
+  if(isDesktop){
+    document.title='Tulpa';
+    document.querySelector('#welcome h2').textContent='从真实交流中，慢慢懂你。';
+    document.querySelector('#welcome > p').textContent='留住重要的消息，理清值得继续的事。';
+    const eyebrow=document.createElement('div');eyebrow.className='desktop-eyebrow';eyebrow.textContent='TULPA / 通信工作区';
+    document.querySelector('#welcome h2').before(eyebrow);
+    document.querySelectorAll('.suggestions button').forEach((button,i)=>button.insertAdjacentHTML('afterbegin',icon(['chat','watch','workspace'][i])));
+    const badge=document.createElement('span');badge.className='desktop-local-badge';badge.textContent='本机工作空间';
+    document.getElementById('header-range').before(badge);
+  }
   const settings=document.createElement('button');settings.id='desktop-settings';settings.className='desktop-settings-button';
   settings.innerHTML=icon('sliders')+'<span>模型设置</span><span id="desktop-model-status">未配置</span>';
   document.querySelector('.sidebar-bottom').prepend(settings);
@@ -54,5 +59,5 @@
     }catch(e){el('desktop-config-error').textContent=e.message;}finally{save.disabled=false;}
   };
   dialog.addEventListener('close',()=>{el('desktop-api-key').value='';el('desktop-sender-token').value='';});
-  load().then(s=>{if(!s.configured&&!sessionStorage.getItem('chatweave.setup-seen')){sessionStorage.setItem('chatweave.setup-seen','1');dialog.showModal();}}).catch(()=>{el('desktop-model-status').textContent='设置不可用';});
+  load().then(s=>{if(isDesktop&&!s.configured&&!sessionStorage.getItem('chatweave.setup-seen')){sessionStorage.setItem('chatweave.setup-seen','1');dialog.showModal();}}).catch(()=>{el('desktop-model-status').textContent='设置不可用';});
 })();

@@ -1,14 +1,13 @@
 $ErrorActionPreference = 'Stop'
-$senderDir = Join-Path $PSScriptRoot 'tools\snowluma-v1.14.19'
+$senderDir = Join-Path $PSScriptRoot 'tools\snowluma-v1.14.20'
 $senderExe = Join-Path $senderDir 'node.exe'
 if (-not (Test-Path -LiteralPath $senderExe)) {
-    throw 'QQ sender is not installed. See REPLY_COPILOT.md.'
+    throw 'QQ sender is not installed. See doc/SNOWLUMA_SETUP.md.'
 }
 $existing = Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.ExecutablePath -eq $senderExe }
 if ($existing) { Write-Host 'QQ sender is already running.'; return }
 $env:SNOWLUMA_TELEMETRY = '0'
-$env:SNOWLUMA_ACCEPT_EULA = '1'
-$env:SNOWLUMA_ACCEPT_PRIVACY = '1'
+# Reuse consent saved by SnowLuma; leave new agreement acceptance to its WebUI.
 $env:SNOWLUMA_LOG_LEVEL = 'warn'
 $env:TEMP = Join-Path $PSScriptRoot '.tmp'
 $env:TMP = $env:TEMP

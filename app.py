@@ -60,7 +60,6 @@ def create_app():
         }
         if request.query_params.get('desktop')=='1':
             page=(web/'index.html').read_text(encoding='utf-8').replace('<html lang="zh-CN">','<html lang="zh-CN" data-desktop="true">')
-            page=page.replace('</head>','<script src="/ui/desktop.js" defer></script></head>')
             return HTMLResponse(page,headers=headers)
         return FileResponse(web/'index.html',headers=headers)
 
