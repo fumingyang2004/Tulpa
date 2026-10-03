@@ -37,8 +37,8 @@ async function fetch(path){
   }else throw Error(path);
   return {ok:true,json:async()=>JSON.parse(JSON.stringify(data))};
 }
-let timer=0;const timers=new Set();
-const ctx=vm.createContext({console,assert,$:el,document:doc,fetch,AbortSignal,URLSearchParams,
+let timer=0;const timers=new Set(),browserWindow={};
+const ctx=vm.createContext({console,assert,$:el,document:doc,window:browserWindow,fetch,AbortSignal,URLSearchParams,
   renderVoice:()=>new Element('audio'),setTimeout:()=>{timers.add(++timer);return timer;},clearTimeout:id=>timers.delete(id)});
 vm.runInContext(fs.readFileSync('web/chat.js','utf8'),ctx);
 const run=s=>vm.runInContext(s,ctx),add=()=>{rows=[...rows,{...rows.at(-1),id:rows.length+1,timestamp:1000+rows.length,content:'新消息 '+rows.length}];sequence++;};
@@ -48,6 +48,11 @@ const run=s=>vm.runInContext(s,ctx),add=()=>{rows=[...rows,{...rows.at(-1),id:ro
   assert(el('chat-conversations').children[0].textContent.includes('消息 19'));
   assert.equal(el('chat-conversations').children[0]['aria-current'],'true');
   const old=el('chat-timeline').children[5];assert(old.textContent.includes('<script>not executable</script>'));
+  assert(old.textContent.includes('保存证据'),'Full edition lost its evidence action');
+  browserWindow.TULPA_MCP_ONLY=true;
+  const lite=run("createChatMessage(chatPage.messages[0])");
+  assert(lite.textContent.includes('消息 0')&&!lite.textContent.includes('保存证据'),'MCP edition must render messages without an unavailable evidence action');
+  browserWindow.TULPA_MCP_ONLY=false;
   add();await run('tickChatBrowser()');
   assert.equal(el('chat-timeline').children.length,21);assert.equal(el('chat-timeline').scrollTop,1700);
   assert.equal(el('chat-timeline').children[5],old,'Unchanged message/media node replaced');
