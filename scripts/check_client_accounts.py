@@ -94,7 +94,10 @@ def api(folder):
         with store.connect() as db:before=[tuple(r) for r in db.execute('SELECT * FROM sync_state')];message_count=db.execute('SELECT count(*) FROM messages').fetchone()[0]
         body['scope']['wechat']['account']='wxid_fixture_a';body['scope']['qq']['enabled']=False
         count=len(calls)
-        rejected=wait(client,client.post('/api/data/read',json=body).json())
+        body['load_stickers']=True
+        with patch('chatlocal.media_refresh.refresh_for_import') as media:
+            rejected=wait(client,client.post('/api/data/read',json=body).json())
+            assert not media.called,'Rejected account must not refresh another account\'s media'
         assert rejected['status']=='error' and '独立' in rejected['error'] and len(calls)==count
         with store.connect() as db:
             assert before==[tuple(r) for r in db.execute('SELECT * FROM sync_state')]

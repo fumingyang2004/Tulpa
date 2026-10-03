@@ -84,8 +84,10 @@ def read_clients(store,scope,limits,ranges,stickers,independent,progress,*,all_m
             entry=dict(platform=platform,status='ok',added=0,duplicate=0)
             output=Path(folder)/(platform+'-real.json')
             read_receipt={}
+            source_selected=False
             try:
                 account=resolve_account(store,platform,item.get('account'))
+                source_selected=True
                 args+=['--account',account]
                 saved_scope[platform]=dict(item,account=account)
                 save_scope(store,saved_scope)
@@ -119,7 +121,7 @@ def read_clients(store,scope,limits,ranges,stickers,independent,progress,*,all_m
                 partial=getattr(exc,'result',read_receipt)
                 if partial.get('job_id'):entry.update(added=partial['imported'],duplicate=partial['duplicate'],job_id=partial['job_id'])
                 progress(f"{label} 聊天记录读取失败：{entry['detail']}")
-            if stickers and not (cancelled and cancelled.is_set()):
+            if stickers and source_selected and not (cancelled and cancelled.is_set()):
                 # Explicit opt-in also repairs previously omitted rows outside
                 # the latest-N export. Existing archives suffice even if the
                 # client snapshot is busy; that is reported as partial success.
