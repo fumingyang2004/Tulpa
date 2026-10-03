@@ -18,6 +18,10 @@ Tulpa 可以作为本机资料服务，让 Codex 或其他支持 **Streamable HT
 
 源代码开发仍可执行 `setup.ps1` / `start.ps1`，然后打开同样的 MCP 页面。开发目录与便携包的配置、资料和授权独立，不自动迁移。
 
+## DeepSeek Harness
+
+独立的 DeepSeek 客户端见 [DeepSeek Harness 部署与实测](DEEPSEEK_MCP.md)。已用官方 Harness 调用全部 23 个资料工具，并由真实 DeepSeek 模型完成跨来源任务，无需经过 Codex。
+
 ## Codex 配置
 
 将 Tulpa 生成的配置加入自己的 Codex `config.toml`。Windows 通常位于 `$env:USERPROFILE\.codex\config.toml`；不要提交到项目仓库。同名配置已经存在时替换该段，不能重复写两个 `[mcp_servers.tulpa]`。
