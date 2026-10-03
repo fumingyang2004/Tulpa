@@ -134,7 +134,7 @@ def api_test(folder):
         output.write_text(json.dumps([dict(platform=platform,conversation_id='only',conversation='only',sender='甲',timestamp='2026-06-01',content='范围导入',source_id='1')]),encoding='utf-8')
     scope={'qq':dict(enabled=False,conversations=None),'wechat':dict(enabled=True,conversations=['only'])}
     body=dict(scope=scope,limits=dict(qq_days=30,qq_per_chat=1,wechat_per_chat=1),start='2026-06-01',end='2026-06-01')
-    with TestClient(app) as client,patch('chatlocal.data_routes.run_reader',side_effect=reader):
+    with TestClient(app) as client,patch('chatlocal.data_routes.run_reader',side_effect=reader),patch('chatlocal.client_accounts.discover_accounts',return_value=['fixture_owner']):
         assert client.post('/api/data/read',json=dict(body,start='bad')).status_code==400
         job=client.post('/api/data/read',json=body).json()
         def finish(job):
@@ -145,7 +145,7 @@ def api_test(folder):
             raise AssertionError('Job timeout')
         assert finish(job)['result']['platforms'][0]['added']==1
         assert len(commands)==1 and commands[0][0]=='wechat' and '--chat' in commands[0][1] and '--start' in commands[0][1]
-        assert client.get('/api/data/settings').json()['scope']==scope
+        assert client.get('/api/data/settings').json()['scope']==dict(scope,wechat=dict(scope['wechat'],account='fixture_owner'))
         delete=dict(platform='wechat',conversations=['only'],start='2026-06-01',end='2026-06-01')
         before=client.post('/api/data/delete-preview',json=delete).json();assert before['messages']==1
         job=client.post('/api/data/delete',json={'token':before['token']}).json()

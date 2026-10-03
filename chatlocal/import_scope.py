@@ -31,6 +31,9 @@ def validate_scope(value):
         if ids is not None and (not isinstance(ids,list) or not ids or len(ids)>500 or any(not isinstance(v,str) or not v.strip() or len(v)>300 for v in ids)):
             raise ValueError('请勾选至少一个会话，或选择全部会话')
         result[p]=dict(enabled=item['enabled'],conversations=list(dict.fromkeys(ids)) if ids is not None else None)
+        if item.get('account') is not None:
+            from .client_accounts import account_id
+            result[p]['account']=account_id(item['account'])
     if not any(v['enabled'] for v in result.values()):raise ValueError('请至少启用一个读取平台')
     return result
 

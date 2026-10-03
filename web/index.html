@@ -202,6 +202,8 @@
       <div id="client-scope-controls">
         <section class="scope-platform" aria-label="QQ 读取设置">
           <div class="read-platform-head"><label><input id="read-enable-qq" type="checkbox" checked>QQ</label><select id="read-mode-qq" aria-label="QQ 会话范围"><option value="all">全部会话</option><option value="selected">指定会话</option></select></div>
+          <label class="source-account">本机 QQ 账号<select id="read-account-qq" aria-label="本机 QQ 账号" aria-describedby="read-account-note-qq"><option value="">正在检测账号…</option></select></label>
+          <p id="read-account-note-qq" class="field-hint" aria-live="polite"></p>
           <div id="read-pick-qq" hidden><input id="read-search-qq" type="search" placeholder="搜索 QQ 好友或群"><div id="read-options-qq" class="conversation-options"></div></div>
           <div class="date-fields"><label>开始日期<input id="read-qq-start" type="date" aria-label="QQ 开始日期"></label><label>截止日期<input id="read-qq-end" type="date" aria-label="QQ 截止日期"></label></div>
           <label class="sticker-option"><input id="read-all-qq" type="checkbox">读取所选日期范围内全部消息</label>
@@ -209,6 +211,8 @@
         </section>
         <section class="scope-platform" aria-label="微信读取设置">
           <div class="read-platform-head"><label><input id="read-enable-wechat" type="checkbox" checked>微信</label><select id="read-mode-wechat" aria-label="微信会话范围"><option value="all">全部会话</option><option value="selected">指定会话</option></select></div>
+          <label class="source-account">本机微信账号<select id="read-account-wechat" aria-label="本机微信账号" aria-describedby="read-account-note-wechat"><option value="">正在检测账号…</option></select></label>
+          <p id="read-account-note-wechat" class="field-hint" aria-live="polite"></p>
           <div id="read-pick-wechat" hidden><input id="read-search-wechat" type="search" placeholder="搜索微信好友或群"><div id="read-options-wechat" class="conversation-options"></div></div>
           <div class="date-fields"><label>开始日期<input id="read-wechat-start" type="date" aria-label="微信开始日期"></label><label>截止日期<input id="read-wechat-end" type="date" aria-label="微信截止日期"></label></div>
           <label class="sticker-option"><input id="read-all-wechat" type="checkbox">读取所选日期范围内全部消息</label>
@@ -216,7 +220,9 @@
         </section>
         <p class="field-hint">北京时间，截止日期包含当天。开始留空表示不限开始时间，截止留空表示至今。未勾选“全部消息”时，每会话读取范围内最新的 1–10000 条。大范围会自动分批完成，无须手动拆分日期；时间取决于本机数据量与媒体缓存。</p>
         <button id="read-catalog" class="quiet-button" type="button">从客户端更新会话列表</button>
+        <button id="read-accounts" class="quiet-button" type="button">重新检测账号</button>
         <p class="field-hint">找不到好友或群时更新列表；此操作不导入正文。</p>
+        <p class="field-hint">按本机数据目录列出账号，不代表都已登录；请保持所选账号登录。微信可能显示账号目录名。每个平台使用一个账号，已有来源不会自动切换；其他账号请使用独立的 Tulpa 文件夹。</p>
       </div>
       <p id="read-window-summary" class="read-window-summary" aria-live="polite" hidden></p>
     </fieldset>

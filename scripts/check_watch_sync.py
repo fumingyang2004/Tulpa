@@ -8,6 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
@@ -146,4 +147,5 @@ def main():
     print('PASS: idempotent delta, atomic checkpoint rollback, source reset, platform isolation, late arrivals, query failure retry, independent import scope and frozen snapshot. Synthetic only.')
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    with patch('chatlocal.client_accounts.discover_accounts',return_value=['test']):main()

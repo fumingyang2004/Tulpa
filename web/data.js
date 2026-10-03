@@ -1,5 +1,6 @@
 'use strict';
 let dataSettings=null,deleteToken=null;
+let accountDiscovery=null,accountLoading=false;
 const readSelection={qq:new Set(),wechat:new Set()},deleteSelection=new Set(),mediaRefreshSelection=new Set();
 function syncDataControls(locked) {
   document.querySelectorAll('#client-scope-controls input,#client-scope-controls select,#client-scope-controls button,#delete-section input,#delete-section select,#delete-section button,#media-refresh-section input,#media-refresh-section select,#media-refresh-section button').forEach(n=>n.disabled=locked);
@@ -26,13 +27,46 @@ function scopeChoices(host,rows,selected,query,onchange) {
 }
 function renderReadScope(p) {
   $('read-pick-'+p).hidden=$('read-mode-'+p).value!=='selected';
-  scopeChoices($('read-options-'+p),(dataSettings?.conversations||[]).filter(r=>r.platform===p),readSelection[p],$('read-search-'+p).value);
+  const account=$('read-account-'+p).value,owner=dataSettings?.catalog_accounts?.[p];
+  scopeChoices($('read-options-'+p),(dataSettings?.conversations||[]).filter(r=>r.platform===p&&(!owner||owner===account)),readSelection[p],$('read-search-'+p).value);
+}
+async function loadClientAccounts({keepDraft=false}={}) {
+  if(accountLoading)return;
+  accountLoading=true;$('read-accounts').disabled=true;
+  const previous=Object.fromEntries(['qq','wechat'].map(p=>[p,$('read-account-'+p).value]));
+  for(const p of ['qq','wechat'])$('read-account-note-'+p).textContent='正在检测本机账号目录…';
+  for(const p of ['qq','wechat'])$('read-account-'+p).disabled=true;
+  try {
+    accountDiscovery=await watchApi('/api/data/accounts');
+    for(const p of ['qq','wechat']) {
+      const info=accountDiscovery[p],select=$('read-account-'+p),selected=(keepDraft&&previous[p])||info.selected||'';
+      select.replaceChildren();
+      const add=(value,text)=>{const option=document.createElement('option');option.value=value;option.textContent=text;select.append(option);};
+      add('',info.accounts.length>1?'请选择要读取的账号':'请选择账号');
+      for(const id of info.accounts)add(id,id);
+      if(selected&&!info.accounts.includes(selected))add(selected,selected+'（当前未找到）');
+      select.value=selected;
+      accountSelectionNote(p);
+      renderReadScope(p);
+    }
+  }catch(error){for(const p of ['qq','wechat'])$('read-account-note-'+p).textContent='检测失败：'+error.message+'，请重新检测。';}
+  finally {accountLoading=false;$('read-accounts').disabled=false;syncControls();}
+}
+function accountSelectionNote(p) {
+  const info=accountDiscovery?.[p],value=$('read-account-'+p).value;
+  $('read-account-note-'+p).textContent=info?.detail||(value?'读取后会记住该账号，后续刷新继续使用。':'检测到多个账号，请选择本次读取的账号。');
+}
+function selectedReadAccount(p) {
+  const value=$('read-account-'+p).value;
+  if(!value)throw new Error(`请先选择本机 ${p==='qq'?'QQ':'微信'} 账号；没有选项时请重新检测账号`);
+  return value;
 }
 function renderDeleteScope() {
   scopeChoices($('delete-options'),(dataSettings?.imported||[]).filter(r=>r.platform===$('delete-platform').value),deleteSelection,$('delete-search').value,invalidateDelete);
 }
 async function loadDataSettings({keepDraft=false}={}) {
   dataSettings=await watchApi('/api/data/settings');
+  await loadClientAccounts({keepDraft});
   for(const p of ['qq','wechat']) {
     if(!keepDraft) {
       const scope=dataSettings.scope[p];readSelection[p]=new Set(scope.conversations||[]);
@@ -54,6 +88,7 @@ function clientReadScope() {
     const selected=$('read-mode-'+p).value==='selected',enabled=$('read-enable-'+p).checked;
     if(enabled&&selected&&!readSelection[p].size)throw new Error(`请勾选 ${p==='qq'?'QQ':'微信'} 会话，或选择全部会话`);
     scope[p]={enabled,conversations:selected&&readSelection[p].size?[...readSelection[p]]:null};
+    if(enabled)scope[p].account=selectedReadAccount(p);
   }
   if(!Object.values(scope).some(p=>p.enabled))throw new Error('请至少选择一个平台');
   return scope;
@@ -87,8 +122,16 @@ async function readScoped() {
   }catch(error){toast(error.message);}
 }
 $('read-latest').onclick=readScoped;
-$('read-catalog').onclick=()=>runDataJob('/api/data/catalog',{platforms:['qq','wechat'].filter(p=>$('read-enable-'+p).checked)},{keepDraft:true});
+$('read-catalog').onclick=()=>{
+  try {
+    const platforms=['qq','wechat'].filter(p=>$('read-enable-'+p).checked);
+    const accounts=Object.fromEntries(platforms.map(p=>[p,selectedReadAccount(p)]));
+    runDataJob('/api/data/catalog',{platforms,accounts},{keepDraft:true});
+  }catch(error){toast(error.message);}
+};
+$('read-accounts').onclick=()=>loadClientAccounts({keepDraft:true});
 for(const p of ['qq','wechat']) {
+  $('read-account-'+p).onchange=()=>{readSelection[p].clear();$('read-mode-'+p).value='all';accountSelectionNote(p);renderReadScope(p);};
   const all=$('read-all-'+p);
   if(all){
     try{all.checked=localStorage.getItem('chatweave.read-all-'+p)==='true';}catch{}

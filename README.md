@@ -10,13 +10,15 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 
 ## 开始使用
 
-1. 在 [Releases](https://github.com/fumingyang2004/Tulpa/releases) 下载 `Tulpa-0.3.0-win-x64.zip`。GitHub 自动提供的 `Source code` 不是桌面安装包。
+1. 在 [Releases](https://github.com/fumingyang2004/Tulpa/releases) 下载 `Tulpa-0.3.1-win-x64.zip`。GitHub 自动提供的 `Source code` 不是桌面安装包。
 2. **完整解压**到有写入权限的本地目录，打开 `Tulpa/Tulpa.exe`。不要单独取出 EXE，也不要直接从压缩包内运行。
 3. 在 **模型设置**填写自己的 API 地址、API Key 和模型名称。接口需要支持流式 Chat Completions 和工具调用；当前主要验证 DeepSeek。
 4. 登录本机 QQ / 微信，在 **数据与同步**选择平台、会话和日期，点击读取。可以分批读取整个所选时间范围，并查看进度。
 5. 回到对话页面提问，或打开 **浏览聊天记录**查看原文。没有 OneBot 也可以使用本地导入、检索和回复草稿。
 
 运行环境：**Windows 10 / 11 x64、.NET Framework 4.8**。便携包自带 Python、WebView2 和所需运行组件。QQ / 微信客户端、模型服务及可选 OneBot 服务需用户自行准备。客户端读取是否可用，受版本、登录账号、权限和本机缓存影响。
+
+本机留有多个 QQ / 微信账号目录时，先在 **数据与同步 → 本机账号** 选择要读取的账号，再更新会话列表或导入消息。只有一个候选时自动选中；读取后会记住选择。列表反映本地数据目录，不代表账号已登录。每个程序数据目录、每个平台使用一个账号；已有来源不会自动切换，其他账号请使用独立的 Tulpa 文件夹。
 
 ## 能做什么
 

@@ -78,7 +78,7 @@ def check(root):
             def prepared_reader(platform,arguments,destination,**kwargs):
                 destination.write_bytes(output.read_bytes());return receipt
             events=[]
-            with patch('chatlocal.data_routes.run_reader',side_effect=prepared_reader):
+            with patch('chatlocal.data_routes.run_reader',side_effect=prepared_reader),patch('chatlocal.client_accounts.discover_accounts',return_value=['fixture_owner']):
                 result=read_clients(store,{'qq':dict(enabled=True,conversations=None),'wechat':dict(enabled=False,conversations=None)},
                     dict(qq_per_chat=500),{'qq':dict(start='',end='')},False,True,events.append)
             assert result['status']=='ok' and result['platforms'][0]['duplicate']==4,result

@@ -65,6 +65,8 @@ def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, 
             try:
                 if cancelled and cancelled.is_set():raise ValueError('用户已停止刷新')
                 if not scope[platform]['enabled']:raise ValueError('此平台未启用读取，请在聊天数据中修改读取范围。')
+                from .client_accounts import resolve_account
+                account=resolve_account(store,platform,scope[platform].get('account'))
                 with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='sync-') as folder:
                     folder=Path(folder);request=folder/'request.json';output=folder/'delta.json'
                     inventory={}
@@ -78,7 +80,7 @@ def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, 
                         conversations=scope[platform]['conversations'],
                         inventory=inventory,bootstrap_since=bootstrap_time(store,platform,full_only=platform=='qq') if bootstrap else 0)),encoding='utf-8')
                     command=[sys.executable,str(ROOT/'scripts'/f'export_{platform}.py'),'--refresh',
-                        '--incremental-request',str(request),'--output',str(output)]
+                        '--incremental-request',str(request),'--output',str(output),'--account',account]
                     if not load_stickers:command.append('--no-stickers')
                     batch_result={}
                     if runner is None:
@@ -88,9 +90,9 @@ def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, 
                             timing['attempts']=attempt+1
                             try:
                                 batch_result=run_batches(store,platform,
-                                    ['--incremental-request',str(request)]+([] if load_stickers else ['--no-stickers']),output,
+                                    ['--incremental-request',str(request),'--account',account]+([] if load_stickers else ['--no-stickers']),output,
                                     progress=progress,cancelled=cancelled,automatic=True,
-                                    key=dict(checkpoint=checkpoint,conversations=scope[platform]['conversations'],load_stickers=load_stickers),
+                                    key=dict(checkpoint=checkpoint,account=account,conversations=scope[platform]['conversations'],load_stickers=load_stickers),
                                     env={'CHATLOCAL_SYNC_METRICS':str(folder/'metrics.json')})
                                 break
                             except ValueError as exc:

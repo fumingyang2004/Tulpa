@@ -13,6 +13,7 @@ from .import_scope import bounds,get_scope,save_scope,validate_scope
 from .read_options import read_options
 from .sync import ingestion_lock,message_commit_lock
 from .data_delete import preview,purge
+from .client_accounts import resolve_account,accounts_view,account_id,bound_account
 
 
 def run_reader(platform,arguments,output,*,store=None,progress=None,cancelled=None):
@@ -59,7 +60,10 @@ def read_clients(store,scope,limits,ranges,stickers,independent,progress,*,all_m
     from .normalize import TZ
     started=datetime.now(TZ).isoformat();results=[]
     with ingestion_lock(commit=False),tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='read-') as folder:
-        save_scope(store,scope)
+        saved_scope=get_scope(store)
+        for platform,item in scope.items():
+            if not item['enabled']:
+                saved_scope[platform]=dict(item)
         for platform,item in scope.items():
             if not item['enabled']:continue
             if cancelled and cancelled.is_set():
@@ -81,6 +85,10 @@ def read_clients(store,scope,limits,ranges,stickers,independent,progress,*,all_m
             output=Path(folder)/(platform+'-real.json')
             read_receipt={}
             try:
+                account=resolve_account(store,platform,item.get('account'))
+                args+=['--account',account]
+                saved_scope[platform]=dict(item,account=account)
+                save_scope(store,saved_scope)
                 for attempt in range(3):
                     try:read_receipt=run_reader(platform,args,output,store=store,progress=progress,cancelled=cancelled) or {};break
                     except ValueError as exc:
@@ -167,21 +175,40 @@ def install_data_routes(app,store,start,idle,same_origin):
             for row in db.execute("SELECT value FROM client_settings WHERE name LIKE 'catalog_%'"):
                 for item in json.loads(row[0]):catalog[(item['platform'],item['conversation_id'])]=item
             pending=[dict(r) for r in db.execute("SELECT id,platform,status,updated_at FROM import_jobs WHERE status!='completed' ORDER BY updated_at DESC LIMIT 10")]
-        return dict(scope=get_scope(store),conversations=list(catalog.values()),imported=imported,pending_imports=pending)
+        owners={}
+        for p in ('qq','wechat'):
+            try:owners[p]=bound_account(store,p) or get_scope(store)[p].get('account')
+            except ValueError:owners[p]=None
+        return dict(scope=get_scope(store),conversations=list(catalog.values()),imported=imported,pending_imports=pending,catalog_accounts=owners)
+
+    @app.get('/api/data/accounts')
+    def accounts(request:Request):
+        same_origin(request)
+        return accounts_view(store)
 
     @app.post('/api/data/catalog')
     def catalog(request:Request,body:dict):
         same_origin(request)
         platforms=body.get('platforms')
         if not isinstance(platforms,list) or not platforms or any(p not in ('qq','wechat') for p in platforms):raise HTTPException(400,'请选择读取平台')
+        accounts=body.get('accounts',{})
+        try:
+            if not isinstance(accounts,dict) or any(p not in ('qq','wechat') for p in accounts):raise ValueError('无效账号选择')
+            accounts={p:account_id(v) for p,v in accounts.items()}
+        except ValueError as exc:raise HTTPException(400,str(exc)) from None
         def work(progress):
             results=[]
             with ingestion_lock(),tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='catalog-') as folder:
                 for platform in dict.fromkeys(platforms):
                     progress(f'正在读取 {platform} 会话目录（不导入消息）…')
                     try:
-                        output=Path(folder)/(platform+'.json');run_reader(platform,['--list'],output)
+                        account=resolve_account(store,platform,accounts.get(platform))
+                        output=Path(folder)/(platform+'.json');run_reader(platform,['--list','--account',account],output)
                         rows=json.loads(output.read_text(encoding='utf-8'))['conversations']
+                        scope=get_scope(store)
+                        if scope[platform].get('account') not in (None,account):scope[platform]['conversations']=None
+                        scope[platform]['account']=account
+                        save_scope(store,scope)
                         with store.connect() as db:
                             db.execute('INSERT OR REPLACE INTO client_settings VALUES(?,?)',('catalog_'+platform,json.dumps(rows)))
                             if platform=='qq':

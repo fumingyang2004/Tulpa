@@ -8,6 +8,8 @@
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/check_publication.py
+.\.venv\Scripts\python.exe scripts/check_client_accounts.py
+.\.venv\Scripts\python.exe scripts/check_data_controls.py
 .\.venv\Scripts\python.exe scripts/check_desktop.py
 .\.venv\Scripts\python.exe scripts/check_import_batches.py
 .\.venv\Scripts\python.exe scripts/check_chat_browser.py
@@ -38,6 +40,8 @@ node scripts/check_refresh_ui.cjs
 5. 核对 SHA256，发布后验证远程仓库、标签、CI、Release 附件大小与摘要。
 
 ## 验证边界
+
+0.3.1 的账号选择修复通过合成双账号目录验证实际目录发现与导出器选择、HTTP 账号参数传递、持久化、增量刷新、账号失效和跨账号进度保护。浏览器使用实际页面与隔离数据验证选择第二个账号、读取会话列表、模拟导入及刷新页面后保留选择。本机单账号目录检测已验证；没有真实多账号电脑，因此不声明真实多账号解密与导入已通过。每个平台仍使用一个活动来源，不支持在同一数据目录并行同步多个账号。
 
 隔离夹具不证明真实账号兼容性、识别准确率或实际发送成功。真实读取需在目标机器、对应客户端版本和账号上另行检查；真实发送和群管理只能在明确授权的目标与操作范围内执行。
 

@@ -32,11 +32,9 @@ q._decrypt_db_qq_result = timed('decrypt')(q._decrypt_db_qq_result)
 def snapshot(account=None,reuse=None):
     source_root = q.find_qq_data_root()
     accounts = q.find_qq_account_databases(source_root) if source_root else {}
-    if account:
-        accounts = {key: value for key, value in accounts.items() if key == account}
-    if len(accounts) != 1:
-        raise ValueError('需要一个 QQ 账号；多个账号时使用 --account 明确指定。')
-    account, source = next(iter(accounts.items()))
+    from chatlocal.client_accounts import choose_account
+    account=choose_account('qq',accounts,account)
+    source=accounts[account]
     target = local_path(DATA/'qq-snapshot'/account/'nt_qq'/'nt_db')
     target.mkdir(parents=True, exist_ok=True)
     from snapshot_cache import refresh_families
@@ -93,6 +91,8 @@ def export(args):
     previous=request['checkpoint'] if request else {}
     info = DATA/'qq-snapshot-info.json'
     meta = snapshot(args.account,previous if previous.get('method')=='native-id-inventory-v1' else None) if args.refresh or not info.exists() else json.loads(info.read_text(encoding='utf-8'))
+    if args.account and args.account!=meta['account']:
+        raise ValueError('已有快照属于其他账号，请同时指定 --refresh。')
     unchanged=previous.get('method')=='native-id-inventory-v1' and message_files_unchanged(previous,meta,'qq')
     reader = q.QQDBReader(data_root=DATA/'qq-snapshot', account_id=meta['account'], live_key_timeout_s=75)
     if not reader.is_available():

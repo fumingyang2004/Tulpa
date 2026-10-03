@@ -28,10 +28,9 @@ install_page_cache(WeChatDB)
 def refresh_snapshot(account=None,reuse=None):
     source_root=auto_detect_db_dir()
     accounts=[Path(p) for p in _find_account_dirs(source_root)] if source_root else []
-    if account:
-        accounts=[p for p in accounts if p.name==account]
-    if len(accounts)!=1:
-        raise ValueError('需要一个微信账号；多个账号时使用 --account 明确指定。')
+    from chatlocal.client_accounts import choose_account
+    selected=choose_account('wechat',[p.name for p in accounts],account)
+    accounts=[p for p in accounts if p.name==selected]
     source=accounts[0]/'db_storage'
     target=local_path(DATA/'wechat-reader-source'/accounts[0].name/'db_storage')
     sys.path.insert(0,str(ROOT/'tools'/'qq-reader'))
