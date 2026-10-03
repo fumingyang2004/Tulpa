@@ -6,7 +6,7 @@ Tulpa 的 MCP 是通用资料接口，不依赖 Codex。本次使用独立安装
 
 目录为 `tools/deepseek-harness/`，安装 `@deepseek-ai/dsh@0.2.0-rc.2`，模型为 `deepseek-flash`。
 
-1. 打开 `release/Tulpa/Tulpa.exe`，保持 MCP 服务开启。
+1. 打开自己使用的 Tulpa EXE（例如 `release/0.5.0/Tulpa/Tulpa.exe` 或 `release/0.5.0-mcp/Tulpa/Tulpa.exe`），保持 MCP 服务开启。
 2. 要查询当前 QQ 群公告、精华、成员或群文件，再开启已经配置的 SnowLuma。普通本地聊天查询不需要 OneBot。
 3. 双击 `tools/deepseek-harness/start.cmd`，启动 Harness 并打开网页。已运行时复用现有进程。
 4. 在网页交任务，例如：“通过 Tulpa MCP 检查授权范围，再核对某课程群最近的作业要求，保留引用，区分已确认与不确定的内容。”
@@ -15,6 +15,12 @@ Tulpa 的 MCP 是通用资料接口，不依赖 Codex。本次使用独立安装
 网页地址为 `http://127.0.0.1:3080`。首次需要启动器携带的本机登录凭据；裸地址出现 `Unauthorized` 时，重新运行 `start.cmd`。
 
 `connection.env` 保存现有模型配置与独立 MCP Token；`home/` 保存会话，`workspace/` 是工作目录，`logs/` 是私人日志。整个安装目录和测试报告均被 Git 忽略。不要分享凭据、会话或日志。Tulpa 中授权名称为 **DeepSeek Harness**，可单独撤销；不依赖 Codex 配置。
+
+### 重启或切换版本后连接
+
+同一数据目录、端口和授权未变时，可继续用原 MCP URL / Token。切换到新的独立程序目录或重新创建连接后，将新值填入 `connection.env` 的 `TULPA_MCP_URL` 和 `TULPA_MCP_TOKEN`，保留模型配置；先运行 `stop.cmd`，再运行 `start.cmd`。仅刷新网页或对已运行的服务重复点 `start.cmd` 不会重新加载配置。HTTP 401 表示当前 Token 未获该 Tulpa 服务授权，不是模型 API Key 有误。Token 遗失时在 Tulpa 撤销旧连接并新建，不要贴到公开 Issue。
+
+新建对话后，可先让模型调用 `get_data_status` 检查连接和范围。0.5.0 在原资料工具基础上增加原文件下载；勾选发送和群管理权限后，对应工具直接执行。具体权限、文件阅读边界和本轮验收见 [轻量版说明](MCP_LITE.md) 与 [验证说明](VALIDATION.md)。
 
 ## 在其他机器复现
 
@@ -108,7 +114,7 @@ node --env-file="$dshRoot/connection.env" "$dshRoot/node_modules/@deepseek-ai/ds
 
 **浏览器交互未验收**：内置浏览器返回 `ERR_BLOCKED_BY_CLIENT`。HTTP 登录和真实 SDK 模型任务不能替代网页渲染、点击验证；用户可通过 `start.cmd` 在自己的浏览器审阅。
 
-## 边界
+## 2026-10-03 验收边界（0.4.0）
 
 - 验证的是 **MCP 已开放的 23 个资料工具**。发送消息、群管理、审批、工作区写入尚未开放为 MCP 工具。
 - 权限不全或 OneBot 不可用时，可见工具会减少。

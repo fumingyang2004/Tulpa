@@ -10,13 +10,20 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 
 ## 开始使用
 
-1. 在 [Releases](https://github.com/fumingyang2004/Tulpa/releases) 下载对应版本的 `Tulpa-版本号-win-x64.zip`。GitHub 自动提供的 `Source code` 不是桌面安装包。
+0.5.0 同时提供两个版本，使用相同的 QQ / 微信读取器和 MCP 权限机制：
+
+| 下载包 | 适合谁 | 包含内容 |
+| --- | --- | --- |
+| `Tulpa-0.5.0-win-x64.zip` 完整版 | 在 Tulpa 内直接聊天、回复、使用记忆和工作区 | 内置 Harness、MCP、本地 OCR / 语音 / Office 解析和固定 WebView2 |
+| `Tulpa-MCP-0.5.0-win-x64.zip` 轻量版 | 使用 Codex、DeepSeek Harness 等外部 Agent | 导入、实时读取、聊天浏览、原文件下载、OneBot 和 MCP；语音模型按需安装，使用系统 WebView2 |
+
+1. 在 [Releases](https://github.com/fumingyang2004/Tulpa/releases/latest) 选择一个 ZIP。GitHub 自动提供的 `Source code` 不是桌面安装包。两个版本请放在各自的文件夹中，不要混合覆盖程序文件。
 2. **完整解压**到有写入权限的本地目录，打开 `Tulpa/Tulpa.exe`。不要单独取出 EXE，也不要直接从压缩包内运行。
 3. 首次选择 **使用内置聊天** 或 **连接外部 Agent**。内置聊天在 **模型与连接**填写自己的 API 地址、API Key 和模型名称；只使用 MCP 无需模型配置。
 4. 登录本机 QQ / 微信，在 **数据与同步**选择平台、会话和日期，点击读取。可以分批读取整个所选时间范围，并查看进度。
 5. 回到对话页面提问，或打开 **浏览聊天记录**查看原文。没有 OneBot 也可以使用本地导入、检索和回复草稿。
 
-运行环境：**Windows 10 / 11 x64、.NET Framework 4.8**。便携包自带 Python、WebView2 和所需运行组件。QQ / 微信客户端、模型服务及可选 OneBot 服务需用户自行准备。客户端读取是否可用，受版本、登录账号、权限和本机缓存影响。
+运行环境：**Windows 10 / 11 x64、.NET Framework 4.8**。两版均自带 Python；完整版自带 WebView2，轻量版使用系统 WebView2 Evergreen Runtime。QQ / 微信客户端、模型服务及可选 OneBot 服务需用户自行准备。客户端读取是否可用，受版本、登录账号、权限和本机缓存影响。
 
 本机留有多个 QQ / 微信账号目录时，先在 **数据与同步 → 本机账号** 选择要读取的账号，再更新会话列表或导入消息。只有一个候选时自动选中；读取后会记住选择。列表反映本地数据目录，不代表账号已登录。每个程序数据目录、每个平台使用一个账号；已有来源不会自动切换，其他账号请使用独立的 Tulpa 文件夹。
 
@@ -37,11 +44,11 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 
 完整行为和限制见 [FEATURES.md](doc/FEATURES.md)。
 
-0.4.0 桌面包已包含 MCP。在侧栏 **外部 Agent / MCP** 导入资料、选择范围，再点击创建连接（可一并开启服务）；随后检测连接、写入本机 Codex 配置或复制到其他客户端。OneBot 与 **模型与连接** 共用设置，可独立保存，不要求 API Key。操作步骤见 [MCP 教程](doc/MCP.md)。
+两个版本均包含 MCP。在侧栏 **外部 Agent / MCP** 或 **连接外部 Agent** 导入资料、选择范围，再点击创建连接（可一并开启服务）；随后检测连接、写入本机 Codex 配置或复制到其他客户端。OneBot 设置可独立保存，不要求模型 API Key。操作步骤见 [MCP 教程](doc/MCP.md)。
 
 需要后台提供 MCP 时，可勾选关闭窗口后留在托盘。托盘菜单支持打开窗口、开机启动（默认关闭）和彻底退出。只有彻底退出才会停止托盘模式中的服务；移动程序目录后应重新设置开机启动。
 
-0.5.0 新增 [MCP 轻量版](doc/MCP_LITE.md)：保留导入、实时读取、聊天浏览与全部 MCP 服务，不附带内置 Harness、Gradio、本地 OCR 和固定浏览器，使用系统 WebView2。
+轻量版的文件链路是 **OneBot 下载原文件 → 返回本机路径 → 外部 Agent 用自己的工具读取**，不要求先解析 Office 文件。使用方式见 [MCP 轻量版](doc/MCP_LITE.md)，版本变化见 [0.5.0 发布说明](doc/releases/0.5.0.md)。
 
 ## 发送和群管理
 
@@ -86,7 +93,7 @@ cd Tulpa
 | 查询与多模态资料 | [调查和证据](doc/INVESTIGATION.md)、[文件](doc/ARTIFACTS.md)、[语音](doc/VOICE.md) |
 | 持续工作 | [工作区](doc/WORKSPACES.md)、[行为记忆](doc/TULPA.md) |
 | QQ 扩展 | [回复助手](doc/REPLY_COPILOT.md)、[群管理](doc/GROUP_MANAGEMENT.md)、[OneBot 教程](doc/SNOWLUMA_SETUP.md) |
-| 外部 Agent 接入 | [MCP 教程与实现边界](doc/MCP.md) |
+| 外部 Agent 接入 | [MCP 教程与实现边界](doc/MCP.md)、[轻量版](doc/MCP_LITE.md)、[DeepSeek Harness](doc/DEEPSEEK_MCP.md) |
 | 开发与验证 | [贡献指南](doc/CONTRIBUTING.md)、[验证说明](doc/VALIDATION.md)、[安全报告](doc/SECURITY.md) |
 
 ## 开源许可

@@ -187,7 +187,17 @@ def build(no_zip=False,qa=False,output=None,lite=False):
         sha=digest(archive)
         sources=archive.parent/'FFmpeg-b08d7969c5-source.tar.gz'
         shutil.copy2(CACHE/sources.name,sources)
-        (archive.parent/'SHA256SUMS.txt').write_text(sha+'  '+archive.name+'\n'+digest(sources)+'  '+sources.name+'\n',encoding='ascii')
+        # A release can contain both editions; do not erase the first build's
+        # checksum when building the second. Exclude archives from other commits.
+        checksums={archive.name:sha}
+        other=archive.parent/f'Tulpa-{"" if lite else "MCP-"}{VERSION}-win-x64.zip'
+        if other.is_file():
+            with zipfile.ZipFile(other) as previous:
+                prior=json.loads(previous.read('Tulpa/build-manifest.json'))
+            if prior.get('checkpoint')==manifest['checkpoint'] and prior.get('version')==VERSION:
+                checksums[other.name]=digest(other)
+        checksums[sources.name]=digest(sources)
+        (archive.parent/'SHA256SUMS.txt').write_text(''.join(value+'  '+name+'\n' for name,value in sorted(checksums.items())),encoding='ascii')
         print(f'ZIP {archive.name}: {archive.stat().st_size:,} bytes; SHA256 {sha}',flush=True)
 
 if __name__=='__main__':

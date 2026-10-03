@@ -33,7 +33,7 @@ WeChat WXGF / HEVC images. Its license is not the BSD license of the Python wrap
 The executable's source revision is
 [`b08d7969c5`](https://github.com/FFmpeg/FFmpeg/commit/b08d7969c5).
 The corresponding FFmpeg source archive is provided alongside the desktop ZIP
-on the [Tulpa release page](https://github.com/fumingyang2004/Tulpa/releases/tag/v0.3.0).
+on the [Tulpa release page](https://github.com/fumingyang2004/Tulpa/releases/latest).
 The build provider's full configuration and external library revisions are
 reproduced without changes in `desktop/licenses/FFmpeg-build.txt` (in the portable
 package: `licenses/FFmpeg-build.txt`). The original distribution, source links and
