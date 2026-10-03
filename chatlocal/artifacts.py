@@ -143,7 +143,7 @@ class Artifacts:
         from .store import tokens
         f=filters or {};where,args=source_scope(plan,f)
         query=f.get('query','').strip()
-        limit=max(1,min(int(f.get('limit',12)),40));offset=max(0,min(int(f.get('offset',0)),10000))
+        limit=max(1,min(int(f.get('limit',12)),40));offset=max(0,int(f.get('offset',0)))
         join=' LEFT JOIN artifacts a ON a.sha256=s.sha256 '
         fields='s.*,a.cache_status,a.parse_status,a.parser,a.parse_note,a.user_pinned,a.referenced_by_answer'
         if body:

@@ -4,3 +4,4 @@ jieba==0.42.1
 python-dotenv==1.2.3
 deepseek-harness-sdk==0.1.5rc1
 apsw==3.53.4.0
+mcp==1.26.0

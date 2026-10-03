@@ -134,6 +134,7 @@ class ChatTools(ArtifactTools,InvestigationTools,WorkspaceTools,QQTools):
         self.lock = threading.RLock()
         self.workspace_context=None
         self.read_only=False
+        self.strict_scope_dates=False
         self.schemas=SCHEMAS
         where, args = scope_sql(plan)
         with store.connect() as db:
@@ -270,7 +271,7 @@ class ChatTools(ArtifactTools,InvestigationTools,WorkspaceTools,QQTools):
                     note='仅当前已入库消息，不代表完整客户端历史；最新消息时间不是同步时钟。',scope=vars(self.plan))
 
     def _people_directory(self):
-        if self.people_index is None:self.people_index=people_directory(self.store,self.plan,strict_dates=bool(self.workspace_context))
+        if self.people_index is None:self.people_index=people_directory(self.store,self.plan,strict_dates=bool(self.workspace_context) or self.strict_scope_dates)
         return self.people_index
 
     def _remember_person(self,person):
@@ -340,7 +341,7 @@ class ChatTools(ArtifactTools,InvestigationTools,WorkspaceTools,QQTools):
         # Validate explicit platform before the metadata-only date relaxation.
         self._scope(args)
         plan=replace(self.plan,platforms=[args['platform']] if args.get('platform') else self.plan.platforms)
-        groups=group_identities(self.store,plan,strict_dates=bool(self.workspace_context))
+        groups=group_identities(self.store,plan,strict_dates=bool(self.workspace_context) or self.strict_scope_dates)
         if args.get('conversation_id'):groups=[g for g in groups if g['conversation_id']==args['conversation_id']]
         if args.get('query'):groups=[g for g in groups if args['query'].casefold() in g['conversation'].casefold()]
         return groups

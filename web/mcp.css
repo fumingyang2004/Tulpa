@@ -1,0 +1,14 @@
+.mcp-dialog{width:min(780px,94vw);max-height:88vh;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text)}
+.mcp-dialog::backdrop{background:rgba(0,0,0,.32)}
+.mcp-dialog>.dialog-head{position:sticky;top:0;z-index:2;background:var(--panel);padding:14px 24px;margin:0;border-bottom:1px solid var(--line)}
+.mcp-body{padding:8px 24px 24px}.mcp-body p{font-size:14px;line-height:1.65}.mcp-muted{color:var(--muted)}
+.mcp-body h3{margin-top:24px;font-size:16px}.mcp-body input:not([type=checkbox]),.mcp-body textarea{display:block;width:100%;margin:6px 0 14px;padding:9px;border:1px solid var(--line);border-radius:6px;background:transparent;color:inherit;box-sizing:border-box}
+.mcp-body input[type=checkbox]{width:16px;height:16px;flex-shrink:0;accent-color:var(--accent)}
+.mcp-body fieldset{border:1px solid var(--line);margin:16px 0;padding:12px;min-width:0}.mcp-body fieldset>label{display:flex;gap:8px;align-items:center;margin:8px 0}
+.mcp-body button{padding:7px 12px;border:1px solid var(--line);border-radius:6px;color:inherit;background:transparent;cursor:pointer}
+.mcp-body button:disabled{opacity:.5}.mcp-body #mcp-create{background:var(--accent);color:white}
+.mcp-service{display:flex;align-items:center;flex-wrap:wrap;gap:16px}.mcp-service>label{display:flex;align-items:center;gap:8px}.mcp-service #mcp-port{width:95px;margin:0}
+.mcp-dates{display:grid;grid-template-columns:1fr 1fr;gap:20px}.mcp-chats{max-height:235px;overflow:auto;border:1px solid var(--line);padding:8px}
+.mcp-chats label{display:flex;align-items:flex-start;gap:9px;padding:7px 2px}.mcp-chats span{overflow-wrap:anywhere}.mcp-all{font-weight:500}.mcp-connection{padding:14px 0;border-bottom:1px solid var(--line)}
+#mcp-secret{border-top:1px solid var(--line);margin-top:24px}#mcp-config{font-family:monospace;font-size:12px}#mcp-error{color:var(--danger);position:sticky;bottom:0;background:var(--panel)}
+@media(max-width:520px){.mcp-body{padding:8px 16px 20px}.mcp-dates{grid-template-columns:1fr;gap:0}}

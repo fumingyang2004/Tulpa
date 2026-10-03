@@ -11,6 +11,7 @@
 .\.venv\Scripts\python.exe scripts/check_client_accounts.py
 .\.venv\Scripts\python.exe scripts/check_data_controls.py
 .\.venv\Scripts\python.exe scripts/check_desktop.py
+.\.venv\Scripts\python.exe scripts/check_mcp.py
 .\.venv\Scripts\python.exe scripts/check_import_batches.py
 .\.venv\Scripts\python.exe scripts/check_chat_browser.py
 .\.venv\Scripts\python.exe scripts/check_reply_history.py
@@ -28,6 +29,8 @@ node scripts/check_refresh_ui.cjs
 ```
 
 这些检查使用临时库、模拟提供方或模拟接口，不发送真实 QQ 消息，不调用付费模型。`agent_smoke.py` 使用实际安装的 Harness 配合本地假 Provider。CI 在 Windows 上运行选定的隔离检查。
+
+`check_mcp.py` 启动真实 localhost MCP 服务，并使用官方 Python MCP 客户端完成初始化、工具发现与调用。隔离数据覆盖两个授权范围、消息和身份目录、受限 SQL、同 SHA 文件、520 条连续分页、密集长消息分页、GIF 图像内容、模拟 OneBot 公告/成员、取消与撤销、来源账号变化和持久限流。OneBot 分支是夹具，不代表真实 QQ 远端兼容性；协议检查也不替代外部 Agent 模型的任务效果验收。
 
 原生读取器的版本、SQLite 特殊锁页、快照恢复和媒体分支另有 `check_reader_runtime.py`、`check_live_runtime.py`、`check_qq_history.py` 等测试，桌面构建会运行相关门禁。
 

@@ -29,6 +29,8 @@ def create_app():
     install_workspace_routes(app)
     from chatlocal.desktop_routes import install_desktop_routes
     install_desktop_routes(app)
+    from chatlocal.mcp_routes import install_mcp_routes
+    install_mcp_routes(app)
     web=ROOT/'web'
 
     @app.get('/api/agent-presets')
@@ -64,7 +66,7 @@ def create_app():
 
     @app.get('/ui/{name}')
     def asset(name:str):
-        if name not in ('app.css','app.js','chat.js','reply.js','group-admin.js','watch.js','data.js','live.js','artifacts.js','voice.js','collections.js','workspaces.js','desktop.css','desktop.js','tulpa-logo.png','tulpa.js','tulpa.css'):
+        if name not in ('app.css','app.js','chat.js','reply.js','group-admin.js','watch.js','data.js','live.js','artifacts.js','voice.js','collections.js','workspaces.js','desktop.css','desktop.js','tulpa-logo.png','tulpa.js','tulpa.css','mcp.js','mcp.css'):
             raise HTTPException(404)
         return FileResponse(web/name,headers={'Cache-Control':'no-cache'})
 

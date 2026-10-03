@@ -33,8 +33,11 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 | 工作区 | 围绕一个目标持续调查，产出 Markdown / CSV，查看差异、审批修改、保留版本并回退 |
 | 证据集合 | 组织消息、媒体、文件片段及群资料的引用，保留来源 |
 | QQ 扩展 | 连接 OneBot 后按需读公告、精华和群文件；批准回复发送；按账号权限管理群 |
+| 外部 Agent / MCP（开发分支） | 让 Codex 等客户端直接查询授权的聊天与文件，复用本地检索；无需 Tulpa 模型配置，不开放发送或群管理 |
 
 完整行为和限制见 [FEATURES.md](doc/FEATURES.md)。
+
+开发分支已加入本机 MCP 接口，尚未包含在上方的 0.3.1 发布包中。从源码启动后，在侧栏 **外部 Agent / MCP** 启用服务、选择会话和日期，再创建连接凭据。操作步骤、Codex 配置与权限边界见 [MCP 教程](doc/MCP.md)。
 
 ## 发送和群管理
 
@@ -77,6 +80,7 @@ cd Tulpa
 | 查询与多模态资料 | [调查和证据](doc/INVESTIGATION.md)、[文件](doc/ARTIFACTS.md)、[语音](doc/VOICE.md) |
 | 持续工作 | [工作区](doc/WORKSPACES.md)、[行为记忆](doc/TULPA.md) |
 | QQ 扩展 | [回复助手](doc/REPLY_COPILOT.md)、[群管理](doc/GROUP_MANAGEMENT.md)、[OneBot 教程](doc/SNOWLUMA_SETUP.md) |
+| 外部 Agent 接入 | [MCP 教程与实现边界](doc/MCP.md) |
 | 开发与验证 | [贡献指南](doc/CONTRIBUTING.md)、[验证说明](doc/VALIDATION.md)、[安全报告](doc/SECURITY.md) |
 
 ## 开源许可
