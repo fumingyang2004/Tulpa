@@ -20,6 +20,13 @@ def codex_config(url, token, scope=None):
     for flag,tool in [('send','send_qq_message'),('manage','manage_qq_group')]:
         if (scope or {}).get(flag) is True:
             stanza += f'\n[mcp_servers.tulpa.tools.{tool}]\napproval_mode = "approve"\n'
+    if (scope or {}).get('chat') is True:
+        for tool in ('start_chat_session','get_chat_session','list_chat_sessions','wait_chat_messages','send_chat_message','stop_chat_session','list_chat_groups'):
+            stanza += f'\n[mcp_servers.tulpa.tools.{tool}]\napproval_mode = "approve"\n'
+        from .mcp_chat_media import MEDIA_TOOLS
+        for tool,flag in MEDIA_TOOLS.items():
+            if (scope or {}).get(flag):
+                stanza += f'\n[mcp_servers.tulpa.tools.{tool}]\napproval_mode = "approve"\n'
     return stanza
 
 

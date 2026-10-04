@@ -1,5 +1,7 @@
 # DeepSeek Harness 连接 Tulpa MCP
 
+从旧版本升级：先看 [保留数据升级教程](UPGRADE.md)，可将其中的指令交给本机 Codex / DSH。原目录更新会保留 MCP 端口、凭据和读取进度，无需重新导入；新增能力仍需主动授权。
+
 Tulpa 的 MCP 是通用资料接口，不依赖 Codex。本次使用独立安装的 DeepSeek 官方 Harness，通过它自带的 MCP 客户端连接桌面版 Tulpa，调用真实模型完成资料任务。
 
 ## 本机使用

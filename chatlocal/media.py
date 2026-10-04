@@ -32,13 +32,19 @@ def unavailable(kind='image',reason='本机缓存中未找到媒体',**metadata)
 def cache_image(data,kind='image',load_stickers=True,**metadata):
     """Validate decoded bytes, infer actual format (QQ may name a GIF .jpg)."""
     if len(data)>MAX_MEDIA_BYTES: raise ValueError('媒体超过20MB上限')
-    with Image.open(io.BytesIO(data)) as im:
-        fmt=im.format
-        if fmt not in FORMATS or im.width*im.height>MAX_PIXELS:
-            raise ValueError('媒体格式或尺寸暂不支持')
-        size=im.size
-        frames=getattr(im,'n_frames',1)
-        im.verify()
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            fmt=im.format
+            if fmt not in FORMATS or im.width*im.height>MAX_PIXELS:
+                raise ValueError('媒体格式或尺寸暂不支持')
+            size=im.size
+            frames=getattr(im,'n_frames',1)
+            im.verify()
+    except SyntaxError as exc:
+        # Pillow reports invalid PNG chunk checksums as SyntaxError. Normalize
+        # that data error for all import/read callers' existing media fallback;
+        # never cache bad bytes or abort the rest of a message batch.
+        raise ValueError('图片数据损坏或尚未完整写入') from exc
     if not load_stickers and (kind in ('sticker','gif') or frames>1 or fmt=='GIF'):
         return omitted_sticker(kind,**metadata)
     ext,mime=FORMATS[fmt]

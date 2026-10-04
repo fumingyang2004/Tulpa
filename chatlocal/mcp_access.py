@@ -10,6 +10,9 @@ from contextlib import contextmanager
 from .client_accounts import bound_account
 from .retrieval import Plan, date_bound
 
+CHAT_MEDIA_FLAGS = ('chat_images', 'chat_sticker_send', 'chat_sticker_collect')
+CHAT_MEDIA_TOOLS = ('read_chat_image','list_chat_stickers','read_chat_sticker','note_chat_sticker','send_chat_sticker','collect_chat_sticker')
+
 DEFAULT_PORT = 18777
 
 
@@ -71,7 +74,7 @@ class MCPAccess:
         return {p: bound_account(self.store, p) or '' for p in platforms}
 
     def create(self, body):
-        fields = {'name', 'platforms', 'conversations', 'all_conversations', 'start', 'end', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage'}
+        fields = {'name', 'platforms', 'conversations', 'all_conversations', 'start', 'end', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS}
         if not isinstance(body, dict) or set(body) - fields:
             raise ValueError('连接配置字段无效。')
         name = body.get('name', '')
@@ -81,6 +84,16 @@ class MCPAccess:
         if not isinstance(platforms, list) or not platforms or any(p not in ('qq', 'wechat') for p in platforms):
             raise ValueError('请选择允许访问的平台。')
         conversations = body.get('conversations', [])
+        # Live chat can be authorized before importing any native chat history.
+        chat_account = None
+        live_groups = set()
+        if body.get('chat') is True and body.get('send') is True and 'qq' in platforms:
+            from .onebot import Client
+            client = Client(timeout=3)
+            chat_account = client.login()
+            if not body.get('all_conversations'):
+                live_groups = {f'{chat_account}:group:{g["group_id"]}' for g in client.call('get_group_list', {})
+                               if isinstance(g,dict) and str(g.get('group_id','')).isdigit()}
         if not isinstance(conversations, list) or len(conversations) > 500:
             raise ValueError('请选择最多 500 个会话。')
         selections = []
@@ -88,12 +101,12 @@ class MCPAccess:
             if not isinstance(pair, list) or len(pair) != 2 or pair[0] not in platforms or not isinstance(pair[1], str) or not 1 <= len(pair[1]) <= 200:
                 raise ValueError('会话选择无效。')
             with self.store.connect() as db:
-                if not db.execute('SELECT 1 FROM messages WHERE platform=? AND conversation_id=? LIMIT 1', pair).fetchone():
+                if not db.execute('SELECT 1 FROM messages WHERE platform=? AND conversation_id=? LIMIT 1', pair).fetchone() and not (pair[0]=='qq' and pair[1] in live_groups):
                     raise ValueError('所选会话已不存在，请重新选择。')
             selection = json.dumps(pair, ensure_ascii=False)
             if selection not in selections:
                 selections.append(selection)
-        for flag in ('all_conversations', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage'):
+        for flag in ('all_conversations', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS):
             if flag in body and type(body[flag]) is not bool:
                 raise ValueError('权限开关必须为布尔值。')
         if body.get('all_conversations'):
@@ -117,9 +130,16 @@ class MCPAccess:
         if start is not None and end is not None and start >= end:
             raise ValueError('开始日期不能晚于截止日期。')
         scope = dict(platforms=sorted(set(platforms)), conversations=selections, **dates,
-                     **{k: body.get(k, False) for k in ('media', 'prepare', 'voice', 'onebot', 'send', 'manage')})
+                     **{k: body.get(k, False) for k in ('media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS)})
         if (scope['send'] or scope['manage']) and 'qq' not in platforms:
             raise ValueError('发送和群管理需要选择 QQ 平台。')
+        if scope['chat'] and not scope['send']:
+            raise ValueError('持续聊天需要同时允许直接发送 QQ 消息。')
+        if any(scope[k] for k in CHAT_MEDIA_FLAGS) and not scope['chat']:
+            raise ValueError('表情包子功能需要开启持续群聊。')
+        if (scope['chat_sticker_send'] or scope['chat_sticker_collect']) and not scope['chat_images']:
+            raise ValueError('发送和收藏表情需要先允许持续聊天看图。')
+        if chat_account:scope['chat_account'] = chat_account
         token = secrets.token_urlsafe(32)
         gid = uuid.uuid4().hex
         with self.connect() as db:
@@ -131,27 +151,28 @@ class MCPAccess:
     def digest(token):
         return hashlib.sha256(token.encode('utf-8')).hexdigest()
 
-    def authorize(self, token):
+    def authorize(self, token, *, source=True):
         if not isinstance(token, str) or not 20 <= len(token) <= 200 or not self.settings()['enabled']:
             raise AccessDenied('MCP 未启用或连接凭据已失效。')
         with self.connect() as db:
             row = db.execute('SELECT * FROM grants WHERE token_hash=? AND revoked=0', (self.digest(token),)).fetchone()
         if not row:
             raise AccessDenied('连接凭据无效或已撤销。')
-        return self.validate_grant(row)
+        return self.validate_grant(row, source=source)
 
-    def by_id(self, gid):
+    def by_id(self, gid, *, source=True):
         if not self.settings()['enabled']:
             raise AccessDenied('MCP 服务已停用。')
         with self.connect() as db:
             row = db.execute('SELECT * FROM grants WHERE id=? AND revoked=0', (gid,)).fetchone()
         if not row:
             raise AccessDenied('连接凭据无效或已撤销。')
-        return self.validate_grant(row)
+        return self.validate_grant(row, source=source)
 
-    def validate_grant(self, row):
+    def validate_grant(self, row, *, source=True):
         grant = dict(row)
         grant['scope'] = json.loads(grant['scope'])
+        if not source:return grant  # Authentication only. Tool-specific checks still apply.
         try:
             valid = grant['epoch'] == self.epoch() and json.loads(grant['accounts']) == self.accounts(grant['scope']['platforms'])
         except ValueError:
@@ -181,13 +202,19 @@ class MCPAccess:
         # Per-page processing limits, not an artificial task-wide message cap.
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
-            limit = {'prepare_file': 12, 'download_file': 12, 'transcribe_voice': 12, 'read_image': 60}.get(tool)
-            group = ('prepare_file','download_file') if tool in ('prepare_file','download_file') else (tool,)
+            limit = {'prepare_file': 12, 'download_file': 12, 'transcribe_voice': 12, 'read_image': 60,
+                     'read_chat_image':60,'read_chat_sticker':60,'collect_chat_sticker':12}.get(tool)
+            group = ('prepare_file','download_file') if tool in ('prepare_file','download_file') else ('read_chat_image','read_chat_sticker') if tool in ('read_chat_image','read_chat_sticker') else (tool,)
             if limit and db.execute('SELECT count(*) FROM calls WHERE grant_id=? AND tool IN ('+','.join('?' for _ in group)+') AND at>?',
                                     (gid, *group, time.time()-3600)).fetchone()[0] >= limit:
                 raise RateLimited('本连接已达到该按需处理工具的每小时上限；请稍后继续。')
-            if db.execute('SELECT count(*) FROM calls WHERE grant_id=? AND at>?', (gid, time.time()-60)).fetchone()[0] >= 120:
+            # A busy Agent must always be able to stop its own session.
+            family = 'IN' if tool in CHAT_MEDIA_TOOLS else 'NOT IN'
+            placeholders = ','.join('?' for _ in CHAT_MEDIA_TOOLS)
+            if tool != 'stop_chat_session' and db.execute(f"SELECT count(*) FROM calls WHERE grant_id=? AND at>? AND tool!='stop_chat_session' AND tool {family} ({placeholders})", (gid, time.time()-60, *CHAT_MEDIA_TOOLS)).fetchone()[0] >= 120:
                 raise RateLimited('本连接请求过于频繁，请稍后继续。')
+            if tool=='send_chat_sticker' and db.execute("SELECT count(*) FROM calls WHERE grant_id=? AND tool=? AND at>?",(gid,tool,time.time()-60)).fetchone()[0]>=12:
+                raise RateLimited('表情发送过于频繁，请稍后继续；普通聊天不受影响。')
             return db.execute('INSERT INTO calls(grant_id,tool,at,status) VALUES(?,?,?,?)',
                               (gid, tool, time.time(), 'running')).lastrowid
 

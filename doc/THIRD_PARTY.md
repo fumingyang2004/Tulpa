@@ -14,6 +14,7 @@ and the source commit are recorded in `build-manifest.json`.
 | APSW | [APSW license](https://github.com/rogerbinns/apsw/blob/master/LICENSE); package notices retained |
 | WebView2 SDK 1.0.4191.47 and Fixed Runtime 153.0.4234.48 | [Microsoft distribution terms](https://developer.microsoft.com/en-us/microsoft-edge/webview2/); SDK license in `licenses/`, runtime notices in `_internal/WebView2/` |
 | DeepSeek Harness SDK/runtime 0.1.5rc1 | [MIT](https://github.com/deepseek-ai/deepseek-harness/blob/master/LICENSE) |
+| websockets 15.0.1 | BSD-3-Clause; original LICENSE retained in package `.dist-info` |
 | MCP Python SDK 1.26.0 | [MIT](https://github.com/modelcontextprotocol/python-sdk/blob/v1.26.0/LICENSE); package license retained |
 | QQ reader (`chatlog-keeper`) | [MIT](https://github.com/labazhou2024/chatlog-keeper/blob/b55675779e50edec913fab9d891e4185c8f7c9ac/LICENSE); commit `b55675779e50edec913fab9d891e4185c8f7c9ac` |
 | WeChat reader (`wechatauto-replica`) | [Apache-2.0](https://github.com/fanyuantaier/wechatauto-replica/blob/492a8fb70b95865613d6d8d9740323233dbfa197/LICENSE); commit `492a8fb70b95865613d6d8d9740323233dbfa197` |

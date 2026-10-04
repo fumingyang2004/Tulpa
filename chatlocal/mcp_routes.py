@@ -73,6 +73,7 @@ def install_mcp_routes(app, store=None):
                 raise ValueError('请选择允许访问的平台。')
             with store.connect() as db:
                 for platform in body.get('platforms',[]):
+                    if platform=='qq' and body.get('chat') is True and body.get('send') is True:continue
                     if not db.execute('SELECT 1 FROM messages WHERE platform=? LIMIT 1',(platform,)).fetchone():
                         raise ValueError('请先导入所选平台的聊天，确认来源账号后再创建连接。')
             return access.create(body)
@@ -109,6 +110,7 @@ def install_mcp_routes(app, store=None):
     @app.post('/api/mcp/connections/{gid}/revoke')
     def revoke(gid: str, request: Request, body: dict):
         local(request, True)
+        service.tools.chat.stop_all(gid, '连接已撤销')
         service.tools.actions.revoke(gid)
         service.cancel(gid)
         return dict(revoked=True)
@@ -117,6 +119,31 @@ def install_mcp_routes(app, store=None):
     def operations(request: Request):
         local(request)
         return dict(operations=service.tools.actions.list())
+
+    @app.get('/api/mcp/chats')
+    def chats(request: Request):
+        local(request)
+        return dict(sessions=service.tools.chat.listed(),receiver=service.tools.chat.receiver.status())
+
+    @app.get('/api/mcp/live-groups')
+    def live_groups(request: Request):
+        local(request)
+        from .onebot import Client
+        try:
+            client=Client(timeout=4); account=client.login()
+            rows=client.call('get_group_list', {})
+            return dict(items=[dict(platform='qq',conversation_id=f'{account}:group:{r["group_id"]}',name=str(r.get('group_name') or r['group_id']),count='OneBot')
+                               for r in rows if isinstance(r,dict) and str(r.get('group_id','')).isdigit()])
+        except ValueError as exc:raise HTTPException(400,str(exc)) from None
+
+    @app.post('/api/mcp/chats/{sid}/stop')
+    def stop_chat(sid: str, request: Request, body: dict):
+        local(request, True)
+        if body:raise HTTPException(400, '停止操作不接受额外参数。')
+        try:
+            if sid=='all':return service.tools.chat.stop_all()
+            return service.tools.chat.stop(sid)
+        except ValueError as exc:raise HTTPException(404,str(exc)) from None
 
     @app.get('/api/mcp/conversations')
     def conversations(request: Request, query: str='', offset: int=0):

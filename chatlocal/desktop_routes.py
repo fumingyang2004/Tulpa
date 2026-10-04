@@ -13,7 +13,7 @@ from .config import ROOT
 
 from .version import VERSION
 _settings_lock=threading.Lock()
-_fields=('API_BASE','API_KEY','MODEL','REPLY_ONEBOT_URL','REPLY_ONEBOT_TOKEN')
+_fields=('API_BASE','API_KEY','MODEL','REPLY_ONEBOT_URL','REPLY_ONEBOT_TOKEN','REPLY_ONEBOT_WS_URL','REPLY_ONEBOT_WS_TOKEN')
 
 
 def read_product_settings(root=ROOT):
@@ -22,19 +22,23 @@ def read_product_settings(root=ROOT):
     return dict(api_base=value('API_BASE'),model=value('MODEL'),has_api_key=bool(value('API_KEY')),
         configured=all(value(k) for k in ('API_BASE','API_KEY','MODEL')),
         sender_url=value('REPLY_ONEBOT_URL'),has_sender_token=bool(value('REPLY_ONEBOT_TOKEN')),
+        events_url=value('REPLY_ONEBOT_WS_URL'),has_events_token=bool(value('REPLY_ONEBOT_WS_TOKEN')),
         environment_overrides=[k for k in _fields if k in os.environ])
 
 
 def save_product_settings(body,root=ROOT):
-    if not isinstance(body,dict) or set(body)-{'api_base','model','api_key','sender_url','sender_token'}:
+    if not isinstance(body,dict) or set(body)-{'api_base','model','api_key','sender_url','sender_token','events_url','events_token'}:
         raise ValueError('模型配置字段无效。')
     update={}
-    for key,env in [('api_base','API_BASE'),('model','MODEL'),('api_key','API_KEY'),('sender_url','REPLY_ONEBOT_URL'),('sender_token','REPLY_ONEBOT_TOKEN')]:
+    for key,env in [('api_base','API_BASE'),('model','MODEL'),('api_key','API_KEY'),('sender_url','REPLY_ONEBOT_URL'),('sender_token','REPLY_ONEBOT_TOKEN'),('events_url','REPLY_ONEBOT_WS_URL'),('events_token','REPLY_ONEBOT_WS_TOKEN')]:
         if key not in body:continue
         value=body[key]
         if not isinstance(value,str) or len(value)>4096 or any(ord(c)<32 for c in value):raise ValueError('配置中不能包含换行或控制字符。')
         value=value.strip()
-        if key in ('api_key','sender_token') and not value:continue  # Blank means keep existing, never expose a mask as the key.
+        if key in ('api_key','sender_token','events_token') and not value:continue  # Blank means keep existing, never expose a mask as the key.
+        if key=='events_url' and value:
+            from .onebot_events import validate_url
+            validate_url(value)
         if key in ('api_base','sender_url') and value:
             parsed=urlparse(value)
             if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
@@ -158,7 +162,19 @@ def install_desktop_routes(app,root=ROOT):
             service=getattr(app.state,'tulpa_mcp',None)
             if service:
                 with service.tools.qq_lock:service.tools.qq_at=0
-            return dict(ok=True,account=account,message='已连接 QQ '+account+'。MCP 可复用此配置；请在授权连接中开启 OneBot 读取。')
+            from .onebot_events import configuration as events_configuration
+            event_note='持续群聊还需填写下方 WebSocket 事件地址。'
+            receiver=None
+            if service and events_configuration(root)['url']:
+                import time
+                service.tools.chat.receiver.start()
+                deadline=time.monotonic()+5
+                while time.monotonic()<deadline:
+                    receiver=service.tools.chat.receiver.status()
+                    if receiver['state'] in ('connected','auth_error','account_mismatch'):break
+                    time.sleep(.05)
+                event_note=receiver['note']
+            return dict(ok=True,account=account,receiver=receiver,message='QQ HTTP 接口已连接 '+account+'。'+event_note)
         except OneBotError as exc:return dict(ok=False,message=str(exc))
 
     @app.get('/api/desktop/diagnostics')

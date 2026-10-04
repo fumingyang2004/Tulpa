@@ -11,5 +11,6 @@
 .mcp-service{display:flex;align-items:center;flex-wrap:wrap;gap:16px}.mcp-service>label{display:flex;align-items:center;gap:8px}.mcp-service #mcp-port{width:95px;margin:0}
 .mcp-dates{display:grid;grid-template-columns:1fr 1fr;gap:20px}.mcp-chats{max-height:235px;overflow:auto;border:1px solid var(--line);padding:8px}
 .mcp-chats label{display:flex;align-items:flex-start;gap:9px;padding:7px 2px}.mcp-chats span{overflow-wrap:anywhere}.mcp-all{font-weight:500}.mcp-connection{padding:14px 0;border-bottom:1px solid var(--line)}
+.mcp-connection pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.6}.mcp-connection details{margin:10px 0}
 #mcp-secret{border-top:1px solid var(--line);margin-top:24px}#mcp-config{font-family:monospace;font-size:12px}#mcp-error{color:var(--danger);position:sticky;bottom:0;background:var(--panel)}
 @media(max-width:520px){.mcp-body{padding:8px 16px 20px}.mcp-dates{grid-template-columns:1fr;gap:0}}

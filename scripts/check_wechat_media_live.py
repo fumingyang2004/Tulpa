@@ -21,6 +21,47 @@ from reader_media import WeChatMedia
 from live_media import WeChatMediaRetries
 
 
+def check_bad_png(folder,png,media,raw,head,target):
+    damaged=bytearray(png)
+    pos=png.index(b'IDAT')
+    crc=pos+4+int.from_bytes(png[pos-4:pos],'big')
+    damaged[crc]^=1  # Valid header, invalid IDAT checksum: Pillow SyntaxError.
+    damaged=bytes(damaged)
+    try:
+        with Image.open(io.BytesIO(damaged)) as image:image.verify()
+    except SyntaxError:pass
+    else:raise AssertionError('Fixture must reproduce PNG checksum failure')
+    try:cache.cache_image(damaged)
+    except ValueError:pass
+    else:raise AssertionError('Invalid PNG must not enter the media cache')
+    assert not any((cache.DATA/'media').rglob(hashlib.sha256(damaged).hexdigest()+'.png'))
+    media.cache={};target.write_bytes(damaged)
+    _,unavailable,_=media.parse(raw)
+    assert unavailable[0]['status']=='unavailable'
+    source=folder/'bad-png-batch.json';store=Store(folder/'bad-png.sqlite3')
+    following=dict(raw,local_id=2,server_id=124,type_code=1,content='图片之后的正常文字',text='图片之后的正常文字',media=[])
+    cp=dict(account='fixture',cursors={'fixture':dict(last=2,signature='after-image')})
+    transition=dict(platform='wechat',previous={},next=cp,observed_at=time.time())
+    source.write_text(json.dumps(dict(head,messages=[dict(raw,text='',media=unavailable),following])),'utf-8')
+    assert store.import_file(source,live=transition)['imported']==2
+    assert store.message(1)['media'][0]['status']=='unavailable'
+    assert store.message(2)['content']=='图片之后的正常文字'
+    with store.connect() as db:
+        assert json.loads(db.execute("SELECT checkpoint FROM live_state WHERE platform='wechat'").fetchone()[0])==cp
+    # Same worker can recover the attachment once the source file becomes valid.
+    target.write_bytes(png)
+    recovered,_=WeChatMediaRetries(store.path).collect(media,'self',None)
+    assert len(recovered)==1 and recovered[0]['media'][0]['status']=='available'
+    source.write_text(json.dumps(dict(head,messages=recovered)),'utf-8')
+    transition['previous']=cp
+    result=store.import_file(source,live=transition)
+    assert result['imported']==0 and result['duplicate']==1
+    assert store.message(1)['media'][0]['status']=='available'
+    # Direct archive imports use the same validation boundary.
+    archived=cache.DATA/'media/bad-checksum.png';archived.write_bytes(damaged)
+    assert cache.import_media([dict(kind='image',local_path=archived.relative_to(ROOT).as_posix())])[0]['status']=='unavailable'
+
+
 def main():
     with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='wx-media-check-') as tmp:
         folder=Path(tmp);now=time.time()
@@ -91,7 +132,8 @@ def main():
             assert media.parse(raw)[1][0]['status']=='omitted', 'GIF stays excluded with stickers off'
             with patch.object(media,'current_paths',side_effect=AssertionError('Known stickers must skip lookup')):
                 assert media.parse(dict(raw,type_code=47))[1][0]['status']=='omitted'
-    print('PASS: post-start attachment discovery, delayed/partial file recovery, no full rescan, retry cadence, scope/account isolation, same-ID enrichment, unchanged cursor, deletion protection and sticker opt-out. Synthetic only.')
+            check_bad_png(folder,png,media,raw,head,target)
+    print('PASS: PNG checksum failure isolation, following text and cursor commit, later same-ID recovery; post-start attachment discovery, no full rescan, retry cadence, scope/account isolation, deletion protection and sticker opt-out. Synthetic only.')
 
 
 if __name__=='__main__':main()

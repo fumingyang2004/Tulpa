@@ -17,6 +17,8 @@ from starlette.routing import Route
 
 from .mcp_access import AccessDenied
 from .mcp_tools import MCPTools, INSTRUCTIONS
+from .mcp_chat import CHAT_TOOLS
+from .mcp_chat_media import MEDIA_TOOLS, MEDIA_WRITES
 from .version import VERSION
 
 
@@ -31,6 +33,8 @@ class MCPService:
         self.lock = threading.RLock()
         self.pending_lock = threading.Lock()
         self.pending = {}
+        self.wait_limiter = None
+        self.media_limiter = None
 
     def application(self, port):
         protocol = Server('tulpa', version=VERSION, instructions=INSTRUCTIONS)
@@ -46,12 +50,15 @@ class MCPService:
         @protocol.list_tools()
         async def list_tools():
             token = credential()
-            grant = self.access.authorize(token)
+            # Listing contains only static tool descriptions/permission flags.
+            # Native source/epoch validation belongs to every historical tool
+            # call, not the transport; live chat must work without that database.
+            grant = self.access.authorize(token, source=False)
             rows = await anyio.to_thread.run_sync(self.tools.schemas, grant)
-            self.access.authorize(token)
+            self.access.authorize(token, source=False)
             return [types.Tool(name=s['name'], description=s['description'], inputSchema=s['parameters'],
-                    annotations=types.ToolAnnotations(readOnlyHint=s['name'] not in ('prepare_file', 'download_file', 'transcribe_voice', 'read_qq_group', 'get_group_knowledge','send_qq_message','manage_qq_group'),
-                        destructiveHint=s['name']=='manage_qq_group', openWorldHint=s['name'] in ('send_qq_message','manage_qq_group'))) for s in rows]
+                    annotations=types.ToolAnnotations(readOnlyHint=s['name'] not in CHAT_TOOLS and s['name'] not in MEDIA_WRITES and s['name'] not in ('prepare_file', 'download_file', 'transcribe_voice', 'read_qq_group', 'get_group_knowledge','send_qq_message','manage_qq_group'),
+                        destructiveHint=s['name']=='manage_qq_group', openWorldHint=s['name'] in ('send_qq_message','manage_qq_group','send_chat_message','send_chat_sticker','collect_chat_sticker'))) for s in rows]
 
         @protocol.call_tool(validate_input=False)
         async def call_tool(name, arguments):
@@ -62,7 +69,13 @@ class MCPService:
                 # Worker IO is bounded by the underlying SQL/parser/ASR limits.
                 # On disconnect/cancellation don't orphan disclosure or reset quota.
                 with anyio.fail_after(240):
-                    return await anyio.to_thread.run_sync(self.tools.call, token, name, arguments, cancel, self.source_base, abandon_on_cancel=True)
+                    # Isolate long polls from Starlette's shared thread pool too.
+                    if name=='wait_chat_messages' and self.wait_limiter is None:
+                        self.wait_limiter=anyio.CapacityLimiter(16)
+                    if name in MEDIA_TOOLS and self.media_limiter is None:
+                        self.media_limiter=anyio.CapacityLimiter(4)
+                    return await anyio.to_thread.run_sync(self.tools.call, token, name, arguments, cancel, self.source_base,
+                        abandon_on_cancel=True, limiter=self.wait_limiter if name=='wait_chat_messages' else self.media_limiter if name in MEDIA_TOOLS else None)
             except AccessDenied:
                 return self.tools.result(dict(error='连接已失效，请重新授权。'))
             except TimeoutError:
@@ -90,7 +103,7 @@ class MCPService:
                 if not auth.startswith('Bearer '):
                     return await rejected(401)(scope, receive, send)
                 try:
-                    grant = service.access.authorize(auth[7:])
+                    grant = service.access.authorize(auth[7:], source=False)
                 except AccessDenied:
                     return await rejected(401)(scope, receive, send)
                 # Bound bodies without relying on Content-Length (chunked supported).
@@ -161,6 +174,8 @@ class MCPService:
             setting = self.access.settings()
             if not setting['enabled']:
                 return
+            self.tools.chat.resume()
+            self.wait_limiter=None
             import uvicorn
             listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
@@ -170,6 +185,7 @@ class MCPService:
                 listener.listen(128)
             except OSError:
                 listener.close()
+                self.tools.chat.available=False
                 self.error = 'MCP 端口无法使用，可能已被其他 Tulpa 实例或程序占用。请更换端口。'
                 return
             self.listener = listener
@@ -180,6 +196,7 @@ class MCPService:
                 try:
                     self.server.run(sockets=[listener])
                 finally:
+                    self.tools.chat.suspend()
                     listener.close()
             self.thread = threading.Thread(target=run, name='tulpa-mcp', daemon=True)
             self.thread.start()
@@ -197,6 +214,7 @@ class MCPService:
 
     def stop(self):
         with self.lock:
+            self.tools.chat.suspend()
             self.cancel()
             if self.server:
                 self.server.should_exit = True

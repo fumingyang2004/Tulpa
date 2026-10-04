@@ -56,8 +56,8 @@ class MCPActions:
             raise ValueError('目标不在连接允许的会话和日期范围内。')
         return dict(row)
 
-    def prepare(self, grant, cid, kind, params):
-        row = self.scoped_target(grant, cid, kind)
+    def prepare(self, grant, cid, kind, params, *, target_resolver=None):
+        row = (target_resolver or self.scoped_target)(grant, cid, kind)
         if kind == 'send':
             text = params.get('text')
             if not isinstance(text, str) or not text.strip() or len(text) > 4000 or any(ord(c)<32 and c not in '\n\t' for c in text):
@@ -94,21 +94,23 @@ class MCPActions:
             rows = db.execute('SELECT o.id,g.name FROM operations o JOIN grants g ON o.grant_id=g.id ORDER BY o.created DESC LIMIT 100').fetchall()
         return [dict(self.get(r['id']), connection_name=r['name']) for r in rows]
 
-    def execute(self, grant, kind, args, cancel):
+    def execute(self, grant, kind, args, cancel, *, guard=None, target_resolver=None):
         cid, key = args['conversation_id'], args['idempotency_key']
         params = {k:v for k,v in args.items() if k not in ('conversation_id','idempotency_key')}
         signature = hashlib.sha256(dump([kind,cid,params]).encode()).hexdigest()
         with _execution:
-            grant = self.access.by_id(grant['id'])
-            self.scoped_target(grant,cid,kind)
+            if guard:guard()
+            grant = self.access.by_id(grant['id'], source=target_resolver is None)
+            (target_resolver or self.scoped_target)(grant,cid,kind)
             with self.access.connect() as db:
                 old = db.execute('SELECT * FROM operations WHERE grant_id=? AND request_key=?', (grant['id'],key)).fetchone()
             if old:
                 if old['signature'] != signature:
                     raise ValueError('同一个幂等编号不能用于不同内容。')
                 return self.get(old['id'], grant['id'])
-            prepared, summary, target = self.prepare(grant, cid, kind, params)
-            self.access.by_id(grant['id'])
+            prepared, summary, target = self.prepare(grant, cid, kind, params, target_resolver=target_resolver)
+            self.access.by_id(grant['id'], source=target_resolver is None)
+            if guard:guard()
             if cancel.is_set():
                 raise ValueError('调用已取消，未执行操作。')
             oid, now = uuid.uuid4().hex, time.time()
@@ -119,11 +121,13 @@ class MCPActions:
                 db.execute('INSERT INTO operation_events(operation_id,state,at) VALUES(?,?,?)',(oid,'EXECUTING',now))
             dispatched = False
             try:
-                self.access.by_id(grant['id'])
+                self.access.by_id(grant['id'], source=target_resolver is None)
+                if guard:guard()
                 if cancel.is_set():raise ValueError('调用已取消，未执行。')
                 if kind=='send':
                     dispatched = True
-                    result = self.sender_factory().send(target,params['text'],prepared)
+                    sender=self.sender_factory()
+                    result = sender.send(target,params['text'],prepared,guard=guard) if target_resolver else sender.send(target,params['text'],prepared)
                 else:
                     dispatched = True
                     self.client_factory().call(prepared['api'],prepared['payload'],approved=True)

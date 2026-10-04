@@ -140,7 +140,7 @@ class QQSender:
         address=self.check_target(target)
         return dict(address,quote_id=self.quote_id(target,address) if quote else None)
 
-    def send(self,target,text,prepared):
+    def send(self,target,text,prepared,*,guard=None):
         address=self.check_target(target)
         if any(address[k]!=prepared[k] for k in ('account','kind','peer','name')):raise SendError('目标会话信息已变化，请重新确认，未发送。')
         quote_id=prepared.get('quote_id')
@@ -148,6 +148,7 @@ class QQSender:
         segments=[dict(type='text',data=dict(text=text))]
         if quote_id is not None:segments.insert(0,dict(type='reply',data=dict(id=str(quote_id))))
         group=address['kind']=='group';key='group_id' if group else 'user_id'
+        if guard:guard()
         data=self.call('send_group_msg' if group else 'send_private_msg',{key:int(address['peer']),'message':segments},sending=True)
         if not isinstance(data,dict) or type(data.get('message_id')) is not int:
             raise SendUncertain('接口未返回可靠消息编号，请到 QQ 核对，本条不会自动重发。')

@@ -27,6 +27,12 @@ def main():
         response=c.put('/api/desktop/settings',json=onebot_only,headers=headers)
         assert response.status_code==200 and not response.json()['configured'],response.text
         assert 'API_KEY' not in (root/'.env').read_text(encoding='utf-8')
+        event_settings=dict(events_url='ws://127.0.0.1:3001/',events_token='event-secret')
+        events=c.put('/api/desktop/settings',json=event_settings,headers=headers)
+        assert events.status_code==200 and events.json()['has_events_token'] and 'event-secret' not in events.text
+        assert c.put('/api/desktop/settings',json=dict(events_url=event_settings['events_url'],events_token=''),headers=headers).json()['has_events_token']
+        for url in ('ws://evil.test:3001/','ws://127.0.0.1:3001/?token=bad','ws://user:pass@127.0.0.1:3001/'):
+            assert c.put('/api/desktop/settings',json=dict(events_url=url),headers=headers).status_code==400
         assert c.put('/api/desktop/settings',json={'model':'some-model'},headers=headers).status_code==400
         with patch('chatlocal.onebot.Client.login',return_value='12345'):
             assert c.post('/api/desktop/onebot/test',json={},headers=headers).json()['ok']

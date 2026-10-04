@@ -36,6 +36,8 @@
         <p class="config-intro">这份配置同时用于 QQ 回复、群管理和已授权的 MCP 群资料读取。OneBot 服务须独立运行；本地聊天检索不依赖它。</p>
         <label for="desktop-sender-url">本机 OneBot 地址</label><input id="desktop-sender-url" type="url" placeholder="http://127.0.0.1:3000" maxlength="2048">
         <label for="desktop-sender-token">访问 Token</label><input id="desktop-sender-token" type="password" autocomplete="new-password" maxlength="4096"><small>只保存在本机，不提供给外部 Agent。留空保留已存 Token。</small>
+        <label for="desktop-events-url">实时事件地址 · 持续群聊</label><input id="desktop-events-url" type="url" placeholder="ws://127.0.0.1:3001" maxlength="2048"><small>在 SnowLuma 开启正向 WebSocket 服务。持续群聊从这里接收新消息，无需数据库实时读取。</small>
+        <label for="desktop-events-token">事件 Token</label><input id="desktop-events-token" type="password" autocomplete="new-password" maxlength="4096"><small>填写 WebSocket 节点的 Token，可能与 HTTP 不同。留空保留；尚未设置时使用 HTTP Token。</small>
         <div class="config-foot"><button type="button" id="desktop-onebot-test">检测已保存的连接</button><button type="submit" class="primary-button" id="desktop-onebot-save">保存并检测</button></div>
         <p id="desktop-onebot-status" role="status"></p>
       </form>
@@ -56,6 +58,7 @@
     el('desktop-api-key').placeholder=s.has_api_key?'已保存 · 留空保留现有密钥':'输入你的 API Key';
     el('desktop-key-hint').textContent=s.has_api_key?'密钥已保存在本机，不会回显。':'密钥不会随发布包分发。';
     el('desktop-sender-url').value=s.sender_url;el('desktop-sender-token').value='';el('desktop-sender-token').placeholder=s.has_sender_token?'已保存 · 留空保留':'访问 Token（如接口需要）';
+    el('desktop-events-url').value=s.events_url||'';el('desktop-events-token').value='';el('desktop-events-token').placeholder=s.has_events_token?'已保存 · 留空保留':'WebSocket 节点 Token';
     el('desktop-model-status').textContent=s.configured?'已配置':prefs.mode==='mcp'?'外部 Agent':'设置';
     el('model-label').textContent=s.configured?s.model:'未配置模型';
     el('desktop-background').checked=prefs.background;
@@ -85,13 +88,13 @@
   };
   el('desktop-onebot-form').onsubmit=event=>{
     event.preventDefault();action(el('desktop-onebot-save'),async()=>{
-      await api('settings','PUT',{sender_url:el('desktop-sender-url').value,sender_token:el('desktop-sender-token').value});
+      await api('settings','PUT',{sender_url:el('desktop-sender-url').value,sender_token:el('desktop-sender-token').value,events_url:el('desktop-events-url').value,events_token:el('desktop-events-token').value});
       await load();await testOneBot();
     });
   };
   el('desktop-onebot-test').onclick=()=>action(el('desktop-onebot-test'),testOneBot);
   el('desktop-background').onchange=()=>action(el('desktop-background'),async()=>{await api('preferences','PUT',{background:el('desktop-background').checked});});
-  dialog.addEventListener('close',()=>{el('desktop-api-key').value='';el('desktop-sender-token').value='';});
+  dialog.addEventListener('close',()=>{el('desktop-api-key').value='';el('desktop-sender-token').value='';el('desktop-events-token').value='';});
   const welcome=document.createElement('dialog');welcome.id='desktop-onboarding';welcome.className='desktop-config';
   welcome.innerHTML=`<div class="dialog-head"><h2>从哪里开始？</h2><button type="button" class="icon-button" id="desktop-onboarding-close" aria-label="关闭使用向导">${icon('close')}</button></div>
     <div class="desktop-config-body"><p class="config-intro">资料留在本机。选择一种方式开始，稍后也可以同时使用。</p>

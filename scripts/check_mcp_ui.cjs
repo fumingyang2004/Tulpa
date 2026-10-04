@@ -10,7 +10,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
   try{
     const page=await browser.newPage({viewport:{width:1100,height:920}}),errors=[];
     page.on('pageerror',e=>errors.push(e.message));
-    let state,requests,mode,failList=false,delayCreate=false;
+    let state,requests,mode,failList=false,delayCreate=false,sessions=[];
     await page.route('http://127.0.0.1:39879/**',async route=>{
       const r=route.request(),url=new URL(r.url()),method=r.method();
       if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:html});
@@ -21,9 +21,14 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
         return reply({...state,connections:[],recent:[],data_platforms:{qq:3,wechat:2},onebot_configured:false});
       }
       if(url.pathname==='/api/mcp/conversations')return reply({items:[{platform:'qq',conversation_id:'111:group:222',name:'测试会话',count:3}],has_more:false,next_offset:80});
+      if(url.pathname==='/api/mcp/live-groups')return reply({items:[{platform:'qq',conversation_id:'111:group:444',name:'未导入的实时群',count:'OneBot'}]});
       if(url.pathname==='/api/desktop/preferences')return reply({background:false});
       if(url.pathname==='/api/desktop/status')return reply({owned:true});
+      if(url.pathname==='/api/mcp/chats'&&method==='GET')return reply({sessions,receiver:{state:'connected',note:'SnowLuma 实时事件已连接。'}});
       const body=r.postDataJSON();requests.push({path:url.pathname,method,body});
+      if(url.pathname.startsWith('/api/mcp/chats/')&&method==='POST'){
+        const sid=url.pathname.split('/')[4];sessions=sessions.map(s=>sid==='all'||s.id===sid?{...s,active:false,state:'stopped'}:s);return reply({stopped:1});
+      }
       if(url.pathname==='/api/mcp'&&method==='PUT'){
         state={...state,...body,running:body.enabled&&mode!=='conflict',error:mode==='conflict'?'MCP 端口无法使用，请更换端口。':'',url:`http://127.0.0.1:${body.port}/mcp`};return reply(state);
       }
@@ -36,7 +41,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     });
     const waitText=(id,text)=>page.waitForFunction(([id,text])=>document.getElementById(id).textContent.includes(text),[id,text]);
     async function setup(running=false){
-      state={enabled:running,running,port:18777,url:'http://127.0.0.1:18777/mcp',error:''};requests=[];mode='ok';failList=false;delayCreate=false;
+      state={enabled:running,running,port:18777,url:'http://127.0.0.1:18777/mcp',error:''};requests=[];mode='ok';failList=false;delayCreate=false;sessions=[];
       await page.goto('http://127.0.0.1:39879/');await page.locator('#open-mcp').click();await page.locator('#mcp-chats input').waitFor();
       await page.locator('#mcp-name').fill('qqmcp');await page.locator('#mcp-all').check();
       await page.locator('#mcp-start').fill('2026-09-01');await page.locator('#mcp-end').fill('2026-10-03');
@@ -47,7 +52,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     if(process.env.MCP_UI_SCREENSHOT){await page.locator('#mcp-create').scrollIntoViewIfNeeded();await page.screenshot({path:process.env.MCP_UI_SCREENSHOT});}
     await create();
     assert.deepEqual(requests.map(x=>x.method+' '+x.path),['PUT /api/mcp','POST /api/mcp/connections']);
-    assert.deepEqual(requests[1].body,{name:'qqmcp',platforms:['qq','wechat'],conversations:[],all_conversations:true,start:'2026-09-01',end:'2026-10-03',media:false,prepare:false,voice:false,onebot:false});
+    assert.deepEqual(requests[1].body,{name:'qqmcp',platforms:['qq','wechat'],conversations:[],all_conversations:true,start:'2026-09-01',end:'2026-10-03',media:false,prepare:false,voice:false,onebot:false,send:false,manage:false,chat:false,chat_images:false,chat_sticker_send:false,chat_sticker_collect:false});
     // Stale offline UI must recheck; it should not reconfigure an already running service.
     await setup();state.running=state.enabled=true;await create();assert.equal(requests.length,1);assert.equal(requests[0].method,'POST');
     // Stale online UI must ask explicitly before turning a now stopped service back on.
@@ -68,7 +73,37 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     await setup(true);failList=true;await create();await waitText('mcp-create-status','连接已创建');assert.equal(await page.locator('#mcp-token').inputValue(),'fixture-only-not-a-real-credential');
     await setup(true);mode='reject';await page.locator('#mcp-create').click();await waitText('mcp-create-status','fixture invalid source');
     assert.equal(await page.locator('#mcp-secret').isVisible(),false);assert.equal(await page.locator('#mcp-create').isEnabled(),true);
+    // Dedicated permission requires send, and clearing send clears chat.
+    await setup(true);assert.equal(await page.locator('#mcp-chat').isChecked(),false);
+    assert.equal(await page.locator('#mcp-chat_images').isEnabled(),false);
+    await page.locator('#mcp-chat').check();assert.equal(await page.locator('#mcp-send').isChecked(),true);
+    assert.equal(await page.locator('#mcp-chat_images').isEnabled(),true);
+    assert.equal(await page.locator('#mcp-chat_sticker_send').isEnabled(),false);
+    await page.locator('#mcp-chat_images').check();await page.locator('#mcp-chat_sticker_send').check();await page.locator('#mcp-chat_sticker_collect').check();
+    await page.locator('#mcp-send').uncheck();assert.equal(await page.locator('#mcp-chat').isChecked(),false);
+    assert.equal(await page.locator('#mcp-chat_sticker_send').isChecked(),false);
+    assert.equal(await page.locator('#mcp-chat_sticker_collect').isEnabled(),false);
+    await page.locator('#mcp-chat').check();await page.locator('#mcp-chat_images').check();await page.locator('#mcp-chat_sticker_send').check();await create();assert.equal(requests[0].body.chat,true);
+    assert.equal(requests[0].body.chat_images,true);assert.equal(requests[0].body.chat_sticker_send,true);assert.equal(requests[0].body.chat_sticker_collect,false);
+    assert.ok((await page.locator('#mcp-config').inputValue()).includes('tools.stop_chat_session'));
+    assert.ok((await page.locator('#mcp-config').inputValue()).includes('tools.send_chat_sticker'));
+    assert.ok(!(await page.locator('#mcp-config').inputValue()).includes('tools.collect_chat_sticker'));
+    await setup(true);await page.locator('#mcp-all').uncheck();await page.locator('#mcp-live-groups').click();
+    await waitText('mcp-chats','未导入的实时群');await page.locator('#mcp-chat-refresh').click();
+    await waitText('mcp-event-status','SnowLuma 实时事件已连接');
+    await page.locator('#mcp-search').fill('实时');await waitText('mcp-chats','未导入的实时群');
+    await page.locator('#mcp-chats input').check();await page.locator('#mcp-chat').check();await create();
+    assert.deepEqual(requests[0].body.conversations,[['qq','111:group:444']]);
+    // Display literal persona, preserve expanded details across polling, stop one/all.
+    sessions=[{id:'fixture-chat',name:'测试群',connection_name:'qqmcp',active:true,state:'waiting_messages',persona:'<img src=x onerror=alert(1)> 自然聊天',participation:'natural',cursor:12}];
+    await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-status','1 个');
+    await page.locator('#mcp-chat-sessions summary').click();assert.equal(await page.locator('#mcp-chat-sessions img').count(),0);
+    await page.locator('#mcp-chat-refresh').click();await page.waitForTimeout(100);assert.equal(await page.locator('#mcp-chat-sessions details').getAttribute('open'),'');
+    await page.locator('[data-chat-stop]').click();await waitText('mcp-chat-sessions','已停止');
+    assert.equal(await page.locator('#mcp-chat-stop-all').isEnabled(),false);
+    sessions[0]={...sessions[0],active:true,state:'waiting_agent'};await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-sessions','等待外部 Agent 接续');
+    await page.locator('#mcp-chat-stop-all').click();await waitText('mcp-chat-sessions','已停止');
     assert.deepEqual(errors,[]);
-    console.log('PASS: real Edge + actual MCP UI; stopped/stale service, explicit start, port conflict, scope retention, single-flight, credential retention. API fixtures only.');
+    console.log('PASS: real Edge + actual MCP UI; service/creation regressions, chat permission, literal persona, stable details, independent stop/all. API fixtures only.');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

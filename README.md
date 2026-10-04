@@ -10,12 +10,12 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 
 ## 开始使用
 
-0.5.0 同时提供两个版本，使用相同的 QQ / 微信读取器和 MCP 权限机制：
+0.5.1 同时提供两个版本，使用相同的 QQ / 微信读取器和 MCP 权限机制：
 
 | 下载包 | 适合谁 | 包含内容 |
 | --- | --- | --- |
-| `Tulpa-0.5.0-win-x64.zip` 完整版 | 在 Tulpa 内直接聊天、回复、使用记忆和工作区 | 内置 Harness、MCP、本地 OCR / 语音 / Office 解析和固定 WebView2 |
-| `Tulpa-MCP-0.5.0-win-x64.zip` 轻量版 | 使用 Codex、DeepSeek Harness 等外部 Agent | 导入、实时读取、聊天浏览、原文件下载、OneBot 和 MCP；语音模型按需安装，使用系统 WebView2 |
+| `Tulpa-0.5.1-win-x64.zip` 完整版 | 在 Tulpa 内直接聊天、回复、使用记忆和工作区 | 内置 Harness、MCP、本地 OCR / 语音 / Office 解析和固定 WebView2 |
+| `Tulpa-MCP-0.5.1-win-x64.zip` 轻量版 | 使用 Codex、DeepSeek Harness 等外部 Agent | 导入、实时读取、聊天浏览、原文件下载、OneBot 和 MCP；语音模型按需安装，使用系统 WebView2 |
 
 1. 在 [Releases](https://github.com/fumingyang2004/Tulpa/releases/latest) 选择一个 ZIP。GitHub 自动提供的 `Source code` 不是桌面安装包。两个版本请放在各自的文件夹中，不要混合覆盖程序文件。
 2. **完整解压**到有写入权限的本地目录，打开 `Tulpa/Tulpa.exe`。不要单独取出 EXE，也不要直接从压缩包内运行。
@@ -40,6 +40,7 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 | 工作区 | 围绕一个目标持续调查，产出 Markdown / CSV，查看差异、审批修改、保留版本并回退 |
 | 证据集合 | 组织消息、媒体、文件片段及群资料的引用，保留来源 |
 | QQ 扩展 | 连接 OneBot 后按需读公告、精华和群文件；批准回复发送；按账号权限管理群 |
+| 持续群聊与表情包（MCP） | 外部 Agent 根据人格持续接收 OneBot 群消息，按授权看图、发送/收藏表情；可随时停止，与历史调查分开运行 |
 | 外部 Agent / MCP | 让 Codex 等客户端直接查询授权的聊天与文件，复用本地检索；无需 Tulpa 模型配置；可为连接持续授权 QQ 发送和群管理 |
 
 完整行为和限制见 [FEATURES.md](doc/FEATURES.md)。
@@ -48,7 +49,7 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 
 需要后台提供 MCP 时，可勾选关闭窗口后留在托盘。托盘菜单支持打开窗口、开机启动（默认关闭）和彻底退出。只有彻底退出才会停止托盘模式中的服务；移动程序目录后应重新设置开机启动。
 
-轻量版的文件链路是 **OneBot 下载原文件 → 返回本机路径 → 外部 Agent 用自己的工具读取**，不要求先解析 Office 文件。使用方式见 [MCP 轻量版](doc/MCP_LITE.md)，版本变化见 [0.5.0 发布说明](doc/releases/0.5.0.md)。
+轻量版的文件链路是 **OneBot 下载原文件 → 返回本机路径 → 外部 Agent 用自己的工具读取**，不要求先解析 Office 文件。使用方式见 [MCP 轻量版](doc/MCP_LITE.md)，版本变化见 [0.5.1 发布说明](doc/releases/0.5.1.md)。
 
 ## 发送和群管理
 
@@ -68,7 +69,7 @@ MCP 连接的发送与群管理使用独立授权：界面勾选后为持续允�
 - API Key / OneBot Token 保存在本机配置中，请勿共享整个使用过的程序目录。提交问题时先移除聊天内容、账号、密钥和个人路径。
 - 检索结果只覆盖已经取得的本地资料。引用有效不保证模型解释正确；未通过引用检查的文字会标注原因。
 
-升级前退出程序并备份。将新版本程序文件合并到原目录时，保留自己的 `data/`、`imports/` 和 `.env`。不要让两个版本同时使用同一数据目录。更多说明见 [DESKTOP.md](doc/DESKTOP.md)。
+**从旧版本升级无需重新导入。** 按 [升级教程](doc/UPGRADE.md) 将新版解压到临时目录，用随包升级工具检查、备份并更新原安装目录；聊天、附件、授权、账号选择和实时读取进度保留。教程附有可交给 Codex / DSH 的执行指令。升级后仍打开原目录 EXE，重新连接 MCP。
 
 ## 从源码运行
 
@@ -88,6 +89,7 @@ cd Tulpa
 | 主题 | 文档 |
 | --- | --- |
 | 功能与边界 | [功能清单](doc/FEATURES.md) |
+| 保留数据升级 | [升级教程与 Agent 执行指令](doc/UPGRADE.md) |
 | 桌面运行、开发与打包 | [DESKTOP.md](doc/DESKTOP.md) |
 | 数据读取、进度和诊断 | [导入](doc/IMPORTS.md)、[实时摄取](doc/LIVE_INGESTION.md) |
 | 查询与多模态资料 | [调查和证据](doc/INVESTIGATION.md)、[文件](doc/ARTIFACTS.md)、[语音](doc/VOICE.md) |

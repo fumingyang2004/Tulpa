@@ -26,6 +26,8 @@ static class Program {
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
         SetProcessDPIAware();
         try {
+            if(File.Exists(Path.Combine(Root,".tmp","upgrade.lock")))
+                throw new Exception("程序正在升级，或上次升级意外中断。请先检查 reports/private/upgrades 中的备份记录和 doc/UPGRADE.md，再启动。");
             if(args.Length==1 && args[0]=="--background")Background=true;
             else if(args.Length!=0) {
                 if(args.Length!=2 || args[0]!="--connect") throw new Exception("无法识别启动参数。");
@@ -113,7 +115,7 @@ sealed class DesktopWindow:Form {
                 ready=Path.Combine(Program.Root,".tmp","desktop-ready-"+Guid.NewGuid().ToString("N")+".json");
                 var start=new ProcessStartInfo(Path.Combine(Program.Root,"runtime","python.exe"),"-X utf8 -B desktop/serve.py "+Path.GetFileName(ready));
                 start.WorkingDirectory=Program.Root;start.UseShellExecute=false;start.CreateNoWindow=true;start.RedirectStandardOutput=true;start.RedirectStandardError=true;
-                foreach(string key in new[]{"PYTHONHOME","PYTHONPATH","API_KEY","API_BASE","MODEL","REPLY_ONEBOT_URL","REPLY_ONEBOT_TOKEN","DSH_HOME","DEEPSEEK_HARNESS_RUNTIME_MODE"})start.EnvironmentVariables.Remove(key);
+                foreach(string key in new[]{"PYTHONHOME","PYTHONPATH","API_KEY","API_BASE","MODEL","REPLY_ONEBOT_URL","REPLY_ONEBOT_TOKEN","REPLY_ONEBOT_WS_URL","REPLY_ONEBOT_WS_TOKEN","DSH_HOME","DEEPSEEK_HARNESS_RUNTIME_MODE"})start.EnvironmentVariables.Remove(key);
                 start.EnvironmentVariables["CHATWEAVE_SESSION_TOKEN"]=token;
                 start.EnvironmentVariables["PYTHONUTF8"]="1";
                 start.EnvironmentVariables["PYTHONDONTWRITEBYTECODE"]="1";

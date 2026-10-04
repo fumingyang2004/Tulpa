@@ -6,6 +6,7 @@ jieba==0.42.1
 python-dotenv==1.2.3
 apsw==3.53.4.0
 mcp==1.26.0
+websockets==15.0.1
 jsonschema==4.26.0
 cryptography==50.0.1
 zstandard==0.25.0

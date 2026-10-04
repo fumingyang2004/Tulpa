@@ -18,11 +18,11 @@ class OneBotUncertain(OneBotError):
     pass
 
 
-READS = frozenset(('get_login_info', 'get_version_info', 'get_group_info',
+READS = frozenset(('get_login_info', 'get_version_info', 'get_group_info', 'get_group_list',
     'get_group_member_info', 'get_group_member_list', 'get_group_system_msg',
     '_get_group_notice', 'get_essence_msg_list', 'get_group_file_system_info',
-    'get_group_root_files', 'get_group_files_by_folder', 'get_group_file_url'))
-WRITES = frozenset(('set_group_ban', 'set_group_kick', 'set_group_name', 'set_group_add_request'))
+    'get_group_root_files', 'get_group_files_by_folder', 'get_group_file_url', 'get_image', 'fetch_custom_face_detail'))
+WRITES = frozenset(('set_group_ban', 'set_group_kick', 'set_group_name', 'set_group_add_request', 'add_custom_face'))
 
 
 def configuration(root=None):

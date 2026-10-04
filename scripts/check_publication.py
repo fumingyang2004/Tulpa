@@ -100,6 +100,12 @@ def archive_check(path):
         head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
         if manifest.get('checkpoint') != head:
             errors.append('archive was not built from current source commit')
+        hashes = manifest.get('file_sha256', {})
+        if set(hashes) != set(manifest['files']):
+            errors.append('missing per-file upgrade integrity manifest')
+        for name, sha in hashes.items():
+            if hashlib.sha256(z.read('Tulpa/' + name)).hexdigest() != sha:
+                errors.append('upgrade hash mismatch: ' + name)
         for required in ('Tulpa.exe', 'Tulpa.Support.exe', 'LICENSE', 'doc/THIRD_PARTY.md', 'doc/assets/title.png', 'web/tulpa-logo.png',
                          'tools/qq-reader/LICENSE', 'tools/wechat-reader/LICENSE'):
             if 'Tulpa/' + required not in expected:
