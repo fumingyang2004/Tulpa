@@ -32,6 +32,7 @@ def digest(path):
 
 def child(root, name):
     """Check every component before touching a path, including Windows junctions."""
+    root = Path(root).resolve()  # Windows may provide TEMP using an 8.3 short name.
     p = PurePosixPath(name)
     if not name or '\\' in name or ':' in name or p.is_absolute() or '..' in p.parts:
         raise UpgradeError('安装清单包含不安全的路径。')

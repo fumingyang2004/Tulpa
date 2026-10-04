@@ -1,5 +1,6 @@
 """Upgrade real SQLite/WAL fixtures; no personal installation or credentials."""
 import json
+from contextlib import ExitStack, closing
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -34,8 +35,8 @@ def fails(fn):
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix='tulpa-upgrade-') as folder:
-        base = Path(folder)
+    with tempfile.TemporaryDirectory(prefix='tulpa-upgrade-') as folder, ExitStack() as cleanup:
+        base = Path(folder).resolve()
         new, old = base / '新版本', base / '现有版本'
         package(new, '0.5.1')
         package(old, '0.5.0', extra=True)
@@ -43,7 +44,7 @@ def main():
             (old / directory).mkdir(parents=True, exist_ok=True)
             (old / directory / 'keep.bin').write_bytes(b'user-owned')
         (old / '.env').write_text('API_KEY=local-fixture\nREPLY_ONEBOT_WS_URL=ws://127.0.0.1:3001\n')
-        db = sqlite3.connect(old / 'data/chats.sqlite3')
+        db = cleanup.enter_context(closing(sqlite3.connect(old / 'data/chats.sqlite3')))
         db.executescript("PRAGMA journal_mode=WAL; CREATE TABLE messages(id INTEGER PRIMARY KEY, content TEXT); INSERT INTO messages VALUES(7,'kept'); CREATE TABLE local_change_meta(epoch TEXT); INSERT INTO local_change_meta VALUES('stable'); CREATE TABLE live_state(checkpoint TEXT); INSERT INTO live_state VALUES('cursor-99');")
         db.commit()
         # Keep a WAL reader open; the migration must preserve the main DB + WAL pair.
@@ -51,6 +52,10 @@ def main():
         mcp.executescript("CREATE TABLE grants(token_hash TEXT, scope TEXT); INSERT INTO grants VALUES('same-token-hash','unchanged-permissions'); CREATE TABLE settings(port INTEGER, enabled INTEGER); INSERT INTO settings VALUES(18777,1);")
         mcp.close()
         state = u.state_files(old)
+        import ctypes
+        short = ctypes.create_unicode_buffer(32768)
+        if ctypes.windll.kernel32.GetShortPathNameW(str(old), short, len(short)):
+            assert u.state_files(Path(short.value)) == state, 'Windows short-name path differs'
         quiet = lambda *args, **kwargs: None
         with patch.object(u, 'running_in', return_value=[]):
             plan = u.upgrade(new, old, progress=quiet)
