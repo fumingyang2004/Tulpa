@@ -132,6 +132,16 @@ def main():
                     assert not call('read_chat_sticker',session_id=sid,sticker_id=listed).isError
                     assert data('note_chat_sticker',session_id=sid,sticker_id=listed,description='兴奋时使用',tags=['开心'])['saved']
                     assert data('list_chat_stickers',session_id=sid,query='开心')['matched']==1
+                    # Wait-time hints must never fetch QQ's catalog or images.
+                    with patch('chatlocal.mcp_chat_media.download',side_effect=AssertionError('Prompt downloaded an image')),patch.object(tools.chat.media,'client',side_effect=AssertionError('Prompt contacted QQ')):
+                        familiar=data('get_chat_session',session_id=sid)['chat_prompt']['familiar_stickers']
+                    assert len(familiar)==1 and familiar[0]['tags']==['开心']
+                    assert 'qpic' not in json.dumps(familiar)
+                    with access.connect() as db:
+                        digest=db.execute('SELECT digest FROM chat_media_assets WHERE id=?',(listed,)).fetchone()[0]
+                        db.execute('INSERT OR REPLACE INTO chat_sticker_notes VALUES(?,?,?,?,?,?)',('other-grant','111',digest,'SECRET OTHER GRANT','[]',time.time()))
+                        db.execute('INSERT OR REPLACE INTO chat_sticker_notes VALUES(?,?,?,?,?,?)',(g['id'],'999',digest,'SECRET OTHER ACCOUNT','[]',time.time()))
+                    assert 'SECRET' not in json.dumps(data('get_chat_session',session_id=sid))
                     send=dict(session_id=sid,sticker_id=asset,idempotency_key='gif-send-once')
                     with ThreadPoolExecutor(2) as pool:results=list(pool.map(lambda _:data('send_chat_sticker',**send),range(2)))
                     assert len(StickerBot.sent)==1 and all(r['state'] in ('SUCCEEDED','EXECUTING') for r in results),results

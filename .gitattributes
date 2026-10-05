@@ -1,2 +1,4 @@
 # Preserve upstream license/build-notice formatting.
 desktop/licenses/* -whitespace
+# Keep distributed prompt provenance stable across platforms.
+chatlocal/prompts/mcp_chat/* text eol=lf

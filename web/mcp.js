@@ -44,7 +44,8 @@
       <p>下方是将写入本机 Codex 的配置。点击写入会备份原文件、保留其他设置；已有同名连接时不会覆盖。写入后请在 Codex 的 MCP 设置中重新连接，必要时重启 Codex。</p><textarea id="mcp-config" readonly rows="5" aria-label="Codex MCP 连接配置"></textarea><button id="mcp-install-codex" type="button">写入本机 Codex 配置</button> <button id="mcp-copy" type="button">复制 Codex 配置</button><p id="mcp-install-result" role="status"></p><small class="mcp-muted">其他客户端：选择 Streamable HTTP，填写上方地址，添加 Authorization: Bearer Token。OneBot 的密钥不需要填入客户端。</small></section>
       <h3>已授权连接</h3><div id="mcp-connections"></div>
       <section class="mcp-step" id="mcp-chat-panel"><h3>持续群聊 · 外部 Agent</h3>
-        <p class="mcp-muted">在专用的外部 Agent 对话中说“用以下人格在某群持续聊天，直到我停止”，附上人格提示词即可；无需设置时长。先给连接勾选持续群聊和发送权限。此处不调用内置模型。</p>
+        <p class="mcp-muted">在专用的外部 Agent 对话中说“用小鲸鱼预设在某群持续聊天，直到我停止”即可；也可以提供自定义人格或补充语气要求，无需设置时长。先给连接勾选持续群聊和发送权限。此处不调用内置模型。</p>
+        <p class="mcp-muted">新人格可保存为 UTF-8 .md 文件，放入当前安装目录的 chatlocal/prompts/mcp_chat/。让 Agent 查看人格列表即可发现，无需重启；已经开启的群聊继续使用原人格。</p>
         <p class="mcp-muted">保持 QQ、SnowLuma WebSocket 事件服务和外部 Agent 运行。新消息直接来自 OneBot，不依赖聊天导入或数据库实时读取。外部客户端结束任务后需接续，Tulpa 不会自动启动模型。</p>
         <p id="mcp-event-status" role="status" class="mcp-muted"></p><button id="mcp-chat-refresh" type="button">刷新聊天状态</button> <button id="mcp-chat-stop-all" type="button" disabled>停止全部群聊</button>
         <p id="mcp-chat-status" role="status" aria-live="polite"></p><div id="mcp-chat-sessions"></div>
@@ -120,7 +121,7 @@
       $('mcp-chat-status').textContent=active?active+' 个持续聊天会话 · 无总时长限制':'暂无持续聊天。';
       for(const row of data.sessions){
         const card=node('div','', 'mcp-connection');card.append(node('strong',row.name+' · '+(labels[row.state]||row.state)),node('p',row.connection_name+' · '+({quiet:'安静',natural:'自然',active:'活跃'}[row.participation]||row.participation),'mcp-muted'));
-        const details=node('details',''),summary=node('summary','人格与会话进度');details.dataset.session=row.id;details.open=opened.has(row.id);details.append(summary,node('pre',row.persona));
+        const details=node('details',''),summary=node('summary','人格与会话进度');details.dataset.session=row.id;details.open=opened.has(row.id);details.append(summary,node('p',row.persona_name||'自定义人格'),node('pre',row.persona));
         if(row.note)details.append(node('p','当前话题：'+row.note));
         details.append(node('p','会话编号：'+row.id+' · 已处理事件 '+row.cursor,'mcp-muted'));card.append(details);
         if(row.gap_note)card.append(node('p',row.gap_note,'mcp-muted'));
@@ -186,7 +187,7 @@
       $('mcp-secret').hidden=false;$('mcp-url').value=current.url;$('mcp-token').value=result.token;
       $('mcp-config').value='[mcp_servers.tulpa]\nurl = '+JSON.stringify(current.url)+'\nhttp_headers = { Authorization = '+JSON.stringify('Bearer '+result.token)+' }\ntool_timeout_sec = 240\n';
       for(const [flag,tool] of [['send','send_qq_message'],['manage','manage_qq_group']])if(body[flag])$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = \"approve\"\n';
-      if(body.chat)for(const tool of ['start_chat_session','get_chat_session','list_chat_sessions','wait_chat_messages','send_chat_message','stop_chat_session','list_chat_groups'])$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = "approve"\n';
+      if(body.chat)for(const tool of ['start_chat_session','get_chat_session','list_chat_sessions','wait_chat_messages','send_chat_message','stop_chat_session','list_chat_groups','list_chat_personas'])$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = "approve"\n';
       for(const [flag,names] of [['chat_images',['read_chat_image','list_chat_stickers','read_chat_sticker','note_chat_sticker']],['chat_sticker_send',['send_chat_sticker']],['chat_sticker_collect',['collect_chat_sticker']]])if(body[flag])for(const tool of names)$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = "approve"\n';
       $('mcp-secret').scrollIntoView({block:'nearest'});
       // Show the one-time credential before refreshing the surrounding lists.

@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import shutil
 import socket
 import sys
 import tempfile
@@ -23,6 +24,7 @@ from mcp.client.streamable_http import streamable_http_client
 from chatlocal.store import Store
 from chatlocal.mcp_routes import install_mcp_routes
 from chatlocal.mcp_chat import MCPChat, CHAT_TOOLS
+from chatlocal import mcp_chat_prompts as prompts
 from chatlocal.onebot import invalidate_availability
 
 
@@ -117,6 +119,48 @@ async def protocol(service, token, session_ids, add, ui):
                 for task in waits[2:]:assert (await asyncio.wait_for(task,3)).structuredContent['event']=='stopped'
 
 
+async def hot_personas_protocol(service, token, directory):
+    # A single initialized MCP client keeps its original tool schema while cards
+    # are added/changed/deleted. Neither the service nor the client is restarted.
+    async with httpx.AsyncClient(headers={'Authorization':'Bearer '+token},timeout=20,trust_env=False) as http:
+        async with streamable_http_client(service.status()['url'],http_client=http) as (read,write,_):
+            async with ClientSession(read,write) as client:
+                await client.initialize()
+                schemas={tool.name:tool for tool in (await client.list_tools()).tools}
+                assert 'enum' not in schemas['start_chat_session'].inputSchema['properties']['persona_preset']
+                async def call(name, *, expect_error=False, **args):
+                    response=await client.call_tool(name,args)
+                    assert bool(response.isError)==expect_error,response
+                    return response.structuredContent
+                baseline=await call('list_chat_personas')
+                assert baseline['count']==1 and not baseline['warnings']
+                card=directory/'夜猫子.md'
+                card.write_text('# 夜猫子\n\n电影迷，话不多。\n','utf-8')
+                latest=await call('list_chat_personas')
+                assert latest['count']==2 and {p['id'] for p in latest['personas']}=={'little_whale','夜猫子'}
+                args=dict(conversation_id='111:group:229',persona_preset='夜猫子',idempotency_key='hot-persona-original')
+                first=await call('start_chat_session',**args)
+                sid=first['session']['id'];snapshot=first['chat_prompt']['persona'];version=first['chat_prompt']['prompt_version']
+                assert snapshot==card.read_text('utf-8') and first['session']['persona_name']=='夜猫子'
+                card.write_text('# 白鹭君\n\n音乐迷，慢慢说。\n','utf-8')
+                latest=await call('list_chat_personas')
+                assert next(p for p in latest['personas'] if p['id']=='夜猫子')['name']=='白鹭君'
+                second=await call('start_chat_session',**(args|dict(conversation_id='111:group:230',idempotency_key='hot-persona-updated')))
+                assert second['chat_prompt']['persona']==card.read_text('utf-8') and second['session']['persona_name']=='白鹭君'
+                assert second['chat_prompt']['prompt_version']!=version
+                card.unlink()
+                assert (await call('list_chat_personas'))['count']==1
+                resumed=await call('start_chat_session',**args)
+                assert resumed['session']['id']==sid and resumed['chat_prompt']['persona']==snapshot
+                assert resumed['session']['persona_name']=='夜猫子' and resumed['chat_prompt']['prompt_version']==version
+                saved=await call('get_chat_session',session_id=sid)
+                assert saved['chat_prompt']['persona']==snapshot and saved['chat_prompt']['persona_name']=='夜猫子'
+                rejected=await call('start_chat_session',expect_error=True,**(args|dict(idempotency_key='hot-persona-deleted')))
+                assert rejected['error_code']=='chat_rejected'
+                await call('stop_chat_session',session_id=sid)
+                await call('stop_chat_session',session_id=second['session']['id'])
+
+
 def main():
     (ROOT/'.tmp').mkdir(exist_ok=True)
     events=Events()
@@ -125,6 +169,9 @@ def main():
     try:
         with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='mcp-chat-') as tmp,patch.dict('os.environ',{},clear=True):
             folder=Path(tmp);store=Store(folder/'chats.sqlite3');serial=0
+            persona_dir=folder/'personas';persona_dir.mkdir()
+            for name in ('little_whale.md','little_whale.source.json','behavior.md'):
+                shutil.copy2(prompts.ROOT/name,persona_dir/name)
             def native_add(group,content,*,own=False,old=False):
                 nonlocal serial
                 serial+=1
@@ -137,7 +184,7 @@ def main():
             native_add(999,'FORBIDDEN')
             (folder/'.env').write_text(f'REPLY_ONEBOT_URL=http://127.0.0.1:{upstream.server_port}\nREPLY_ONEBOT_WS_URL=ws://127.0.0.1:{events.port}\nREPLY_ONEBOT_WS_TOKEN=event-fixture\n','utf-8')
             app=FastAPI();service=install_mcp_routes(app,store);access=service.access;tools=service.tools;headers={'X-ChatWeave-UI':'1'}
-            with patch('chatlocal.onebot.ROOT',folder),patch('chatlocal.message_sender.ROOT',folder),TestClient(app) as ui:
+            with patch('chatlocal.onebot.ROOT',folder),patch('chatlocal.message_sender.ROOT',folder),patch.object(prompts,'ROOT',persona_dir),TestClient(app) as ui:
                 invalidate_availability()
                 with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
                 assert ui.put('/api/mcp',json=dict(enabled=True,port=port),headers=headers).json()['running']
@@ -157,6 +204,27 @@ def main():
                 import tomllib
                 entries=tomllib.loads(codex_config('http://127.0.0.1:18777/mcp','fixture',{'chat':True,'send':True}))['mcp_servers']['tulpa']['tools']
                 assert CHAT_TOOLS<=entries.keys()
+                hot=grant(send=True,chat=True)
+                asyncio.run(hot_personas_protocol(service,hot['token'],persona_dir))
+                presets=call('list_chat_personas')['personas']
+                assert [p['id'] for p in presets]==['little_whale']
+                assert presets[0]['name']=='小鲸鱼'
+                assert call('start_chat_session',conversation_id='111:group:223',idempotency_key='missing-persona')['error_code']=='chat_rejected'
+                whale_args=dict(conversation_id='111:group:223',persona_preset='little_whale',persona='少用问号',idempotency_key='whale-preset')
+                whale=call('start_chat_session',**whale_args);wid=whale['session']['id']
+                assert whale['session']['persona_name']=='小鲸鱼' and '少用问号' in whale['chat_prompt']['persona']
+                assert 'behavior' in whale['chat_prompt']
+                # Repeated start keeps the original snapshot even after packaged
+                # preset text changes, including its idempotency signature.
+                with patch.object(prompts,'persona_catalog',side_effect=AssertionError('Retry must use snapshot, not files')):
+                    resumed=call('start_chat_session',**whale_args)
+                assert resumed['session']['id']==wid and resumed['chat_prompt']['persona']==whale['chat_prompt']['persona']
+                compact=call('wait_chat_messages',session_id=wid,timeout_seconds=1,known_prompt_version=whale['chat_prompt']['prompt_version'])
+                assert not compact['prompt_changed'] and 'chat_prompt' not in compact and compact['chat_guidance']['persona_name']=='小鲸鱼'
+                refreshed=call('wait_chat_messages',session_id=wid,timeout_seconds=1,known_prompt_version='old-version')
+                assert refreshed['prompt_changed'] and refreshed['chat_prompt']['behavior']
+                assert not OneBot.sent,'Prompt setup sent messages'
+                call('stop_chat_session',session_id=wid)
                 def add(group,content,*,own=False,old=False):
                     nonlocal serial
                     serial+=1;mid=str(serial)
@@ -180,6 +248,7 @@ def main():
                     assert call('list_chat_groups')['items']
                 assert starts[0]['session']['expires_at'] is None and not OneBot.sent
                 assert 'FORBIDDEN' not in json.dumps(starts)
+                assert starts[0]['session']['persona_preset']=='' and starts[0]['chat_prompt']['persona']==payload['persona']
                 assert call('start_chat_session',**(payload|dict(persona='changed')))['error_code']=='chat_rejected'
                 assert call('start_chat_session',**(payload|dict(conversation_id='111:group:999',idempotency_key='forbidden-start')))['error_code']=='chat_rejected'
                 assert call('get_chat_session',connection=other,session_id=sid)['error_code']=='chat_rejected'
@@ -190,11 +259,22 @@ def main():
                 ids=[add(222,'batch-'+str(i)) for i in range(53)]
                 first=call('wait_chat_messages',session_id=sid,quiet_seconds=0,limit=30)
                 assert first['has_more'] and len(first['messages'])==30
+                assert first['chat_guidance']['social_context']['observed_messages']==30,'Guidance peeked at unread next page'
+                assert any('先接着读' in hint for hint in first['chat_guidance']['reminders'])
                 assert call('wait_chat_messages',session_id=sid,acknowledge_through_id=ids[-1])['error_code']=='chat_rejected'
                 assert call('wait_chat_messages',session_id=sid,quiet_seconds=0)['read_through_id']==first['read_through_id']
                 tools.chat.suspend()
+                # Simulate a pre-preset schema: migration must preserve persona,
+                # unread cursor and legacy idempotency, without opting into whale.
+                with access.connect() as db:
+                    db.execute('ALTER TABLE chat_sessions DROP COLUMN persona_preset')
+                    db.execute('ALTER TABLE chat_sessions DROP COLUMN persona_name')
                 tools.chat=MCPChat(access,tools.actions)
                 assert tools.chat.listed(g['id'])[0]['state']=='waiting_agent'
+                legacy=call('start_chat_session',**payload)
+                assert legacy['session']['id']==sid and legacy['session']['persona_preset']==''
+                assert legacy['session']['persona_name']=='自定义人格'
+                assert legacy['chat_prompt']['persona']==payload['persona']
                 second=call('wait_chat_messages',session_id=sid,acknowledge_through_id=first['read_through_id'],note='等群友补充',quiet_seconds=0)
                 assert [m['id'] for m in first['messages']+second['messages']]==ids
                 eventually(lambda:tools.chat.receiver.status()['state']=='connected')
@@ -306,7 +386,7 @@ def main():
                         asyncio.run(live_only_http())
     finally:
         OneBot.release.set();events.close();upstream.shutdown();upstream.server_close();invalidate_availability()
-    print('PASS: external-only indefinite sessions, persona, real MCP HTTP, isolated OneBot sends, 6 independent waits + ordinary tools, WebSocket push/dedupe/reconnect/native-reader independence/pagination/restart/ack, idempotency/UNKNOWN, stop race/revoke/UI origin. No real QQ sends or internal model calls.')
+    print('PASS: hot persona discovery over one MCP connection, immutable snapshots after edit/deletion, external-only indefinite sessions, real MCP HTTP, isolated OneBot sends, 6 independent waits + ordinary tools, WebSocket push/dedupe/reconnect/native-reader independence/pagination/restart/ack, idempotency/UNKNOWN, stop race/revoke/UI origin. No real QQ sends or internal model calls.')
 
 
 if __name__=='__main__':main()

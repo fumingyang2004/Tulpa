@@ -21,7 +21,8 @@ def codex_config(url, token, scope=None):
         if (scope or {}).get(flag) is True:
             stanza += f'\n[mcp_servers.tulpa.tools.{tool}]\napproval_mode = "approve"\n'
     if (scope or {}).get('chat') is True:
-        for tool in ('start_chat_session','get_chat_session','list_chat_sessions','wait_chat_messages','send_chat_message','stop_chat_session','list_chat_groups'):
+        from .mcp_chat import CHAT_TOOLS
+        for tool in sorted(CHAT_TOOLS):
             stanza += f'\n[mcp_servers.tulpa.tools.{tool}]\napproval_mode = "approve"\n'
         from .mcp_chat_media import MEDIA_TOOLS
         for tool,flag in MEDIA_TOOLS.items():

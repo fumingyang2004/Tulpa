@@ -118,6 +118,7 @@ def build(no_zip=False,qa=False,output=None,lite=False):
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_onebot.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_actions.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_chat.py'),'--package',str(out)],check=True)
+    subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_chat_prompts.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_chat_media.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_downloads.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_upgrade.py')],check=True)
