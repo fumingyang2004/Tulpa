@@ -6,6 +6,8 @@
 
 Tulpa 可以作为本机资料服务，让 Codex 或其他支持 **Streamable HTTP MCP + Bearer Token** 的客户端直接查询已导入的 QQ / 微信资料。外部 Agent 自己决定如何调查、写报告或修改它的工作目录；Tulpa 提供检索、上下文和来源，不再调用一个内部模型替它回答。
 
+首次接入请看 [四款 Agent 配置教程](AGENT_SETUP.md)：包含 Codex、DeepSeek Harness、Antigravity、WorkBuddy 的逐步操作、完整配置示例、连接验证和排错，也可将文末指令交给本机 Agent 执行。本页保留 Tulpa 服务、权限和工具的详细说明。
+
 ## 从零连接（桌面版）
 
 1. 完整解压 0.4.0 或更新版本，打开 `Tulpa.exe`，首次选择 **连接外部 Agent**。只使用 MCP 无需模型 API Key。

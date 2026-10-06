@@ -1,5 +1,11 @@
 # 验证说明
 
+## 外部客户端接入补充（2026-10-06）
+
+- WorkBuddy `5.6.2`：用户按 `streamableHttp`、`url`、Bearer 请求头配置后确认功能跑通。只读核对服务端访问记录，`get_data_status`、`list_conversations`、`read_conversation`、`read_image`、`search_files`、`download_file`、`read_qq_group`、`list_chat_groups`、`list_chat_personas`、`list_chat_sessions` 均有成功调用。用户整体使用反馈与这些可核对的调用记录分别保留；本次文档更新没有另行发送消息或执行群管理，也不把未记录的写操作列为逐项验收通过。
+- Antigravity `2.19.1`：此前在实际应用中完成工具发现、资料状态、会话、消息和图片理解验收。独立只读授权未开放发送、群管理和持续群聊，因此不将其列为该客户端已验收能力。
+- [四款客户端配置教程](AGENT_SETUP.md) 提供配置文件、重连与只读验证步骤。示例仅含占位凭据，不公开本机配置、账号、聊天或原始调用回执。
+
 ## 持续群聊表情包子功能（2026-10-05，本机覆盖验收）
 
 - `check_mcp_chat_media.py`：实际 MCP HTTP 图片块、动图三帧采样与原字节发送、模拟 QQ 收藏和笔记检索；验证独立授权、跨连接/会话隔离、无原生数据库访问、私有网络/任意路径拒绝、代理虚拟 DNS 回退、坏图/尺寸限制、并发幂等、发送与收藏 UNKNOWN 不重试、看图及发送准备阶段停止、撤销、独立额度和并发通道。

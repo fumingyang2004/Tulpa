@@ -4,6 +4,8 @@
 
 Tulpa 的 MCP 是通用资料接口，不依赖 Codex。本次使用独立安装的 DeepSeek 官方 Harness，通过它自带的 MCP 客户端连接桌面版 Tulpa，调用真实模型完成资料任务。
 
+新用户先按 [Agent 配置教程中的 DeepSeek Harness 部分](AGENT_SETUP.md#deepseek-harness) 操作。下文的 `tools/deepseek-harness/` 是维护者本机验收目录，不随 Tulpa 发布包提供；旧版本实测记录保留其当时的能力范围，当前 MCP 能力见 [MCP.md](MCP.md)。
+
 ## 本机使用
 
 目录为 `tools/deepseek-harness/`，安装 `@deepseek-ai/dsh@0.2.0-rc.2`，模型为 `deepseek-flash`。
