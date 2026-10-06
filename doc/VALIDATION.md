@@ -2,9 +2,10 @@
 
 ## 外部客户端接入补充（2026-10-06）
 
+- Claude Code（VS Code 扩展 `2.1.289`）：用户自行配置后确认功能正常。本轮只读核对 `.claude.json` 中项目作用域的 HTTP / Bearer 配置，凭据对应有效的 Tulpa 授权，并对照官方文档整理跨项目配置方法。当前授权与另一客户端共用，服务端调用记录不能独立归因给 Claude Code；本轮未重复执行发送或群管理验收。
 - WorkBuddy `5.6.2`：用户按 `streamableHttp`、`url`、Bearer 请求头配置后确认功能跑通。只读核对服务端访问记录，`get_data_status`、`list_conversations`、`read_conversation`、`read_image`、`search_files`、`download_file`、`read_qq_group`、`list_chat_groups`、`list_chat_personas`、`list_chat_sessions` 均有成功调用。用户整体使用反馈与这些可核对的调用记录分别保留；本次文档更新没有另行发送消息或执行群管理，也不把未记录的写操作列为逐项验收通过。
 - Antigravity `2.19.1`：此前在实际应用中完成工具发现、资料状态、会话、消息和图片理解验收。独立只读授权未开放发送、群管理和持续群聊，因此不将其列为该客户端已验收能力。
-- [四款客户端配置教程](AGENT_SETUP.md) 提供配置文件、重连与只读验证步骤。示例仅含占位凭据，不公开本机配置、账号、聊天或原始调用回执。
+- [Agent 配置教程](AGENT_SETUP.md) 提供配置文件、重连与只读验证步骤。示例仅含占位凭据，不公开本机配置、账号、聊天或原始调用回执。
 
 ## 持续群聊表情包子功能（2026-10-05，本机覆盖验收）
 

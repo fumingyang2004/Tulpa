@@ -5,6 +5,7 @@
 | 文件 | 来源 |
 | --- | --- |
 | `openai.png` | [OpenAI 官方 GitHub 组织](https://github.com/openai)的[头像](https://avatars.githubusercontent.com/u/14957082?v=4)，用于标识 Codex 的提供方 |
+| `claude.png` | [Claude Code 官方文档](https://code.claude.com/docs/en/mcp)的[站点图标](https://code.claude.com/docs/_mintlify/favicons/claude-code/pLsy-mRpNksna2sx/_generated/favicon/android-chrome-192x192.png) |
 | `deepseek.png` | [DeepSeek 官方 GitHub 组织](https://github.com/deepseek-ai)的[头像](https://avatars.githubusercontent.com/u/148330874?v=4) |
 | `antigravity.svg` | [Google Antigravity Press Assets](https://antigravity.google/press) 中的 [Icon — Full Color](https://antigravity.google/assets/image/brand/antigravity-icon__full-color.svg) |
 | `workbuddy.png` | [WorkBuddy 官方开放平台](https://open.workbuddy.cn/)的[站点图标](https://openplatform-cdn.codebuddy.cn/open/static/images/1786973212056_10qf4g.png) |

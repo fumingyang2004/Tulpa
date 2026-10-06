@@ -9,6 +9,7 @@
 | 客户端 | 配置教程 | 已有验证 |
 | --- | --- | --- |
 | Codex | [打开教程](#codex) | 真实资料查询、图片、文件、语音；测试群发言、改名与恢复 |
+| Claude Code | [打开教程](#claude-code) | 用户确认接入后功能正常；已核对 VS Code 扩展 `2.1.289` 的本机 HTTP / Bearer 配置 |
 | DeepSeek Harness | [打开教程](#deepseek-harness) | 官方 DSH `0.2.0-rc.2`；真实资料和 OneBot 调用；持续群聊与表情包另有隔离模型测试 |
 | Google Antigravity | [打开教程](#google-antigravity) | `2.19.1`；实际应用中完成消息查询与图片理解，当次未授予发送、群管理和持续群聊权限 |
 | WorkBuddy | [打开教程](#workbuddy) | `5.6.2`；用户确认功能跑通，服务端记录确认消息、图片、文件下载、群资料、群聊目录与人格发现 |
@@ -19,7 +20,7 @@
 
 1. 在这台电脑打开 `Tulpa.exe`，进入 **外部 Agent / MCP**，轻量版也可能显示为 **连接外部 Agent**。
 2. 要查历史聊天，先到 **数据与同步** 选择 QQ / 微信账号并导入需要的范围。只用 OneBot 实时群聊时，可从 OneBot 选择群，无需导入历史。
-3. 为要连接的客户端创建一个独立授权，名称可填 `codex`、`deepseek`、`antigravity` 或 `workbuddy`。选择平台、会话、日期和所需权限；持续接收新消息时，截止日期留空。
+3. 为要连接的客户端创建一个独立授权，名称可填 `codex`、`claude-code`、`deepseek`、`antigravity` 或 `workbuddy`。选择平台、会话、日期和所需权限；持续接收新消息时，截止日期留空。
 4. 点击 **创建连接凭据** 或 **开启服务并创建连接**，再点 **检测连接与工具**。先确认 Tulpa 这一侧检测成功。
 5. 保存页面显示的 **MCP 地址** 和 **MCP Token**。Token 只显示一次；遗失时撤销旧连接再创建。不同客户端单独建连接，后续可分别撤销。
 6. 保持 Tulpa 运行。勾选关闭窗口后留在托盘，窗口关闭后仍可提供服务。
@@ -56,6 +57,53 @@ tool_timeout_sec = 240
 ```
 
 保存后重新连接。`tool_timeout_sec` 的单位是秒，240 秒为按需文件处理、语音和群聊等待留出时间。安装了 Codex CLI 时，可用 `codex mcp list` 查看是否加载配置；仍需实际工具调用验证连通性。[Codex 官方 MCP 配置说明](https://learn.chatgpt.com/docs/extend/mcp)
+
+## Claude Code
+
+本节适用于同机运行的 Claude Code CLI 和 VS Code 扩展。本次用户已自行配置并确认功能正常；核对的扩展版本为 **2.1.289**。Claude Code 原生支持 Tulpa 的 HTTP MCP 和 Bearer 请求头，无需安装 stdio 转接器。[Claude Code 官方 MCP 教程](https://code.claude.com/docs/en/mcp)
+
+### 1. 取得 Tulpa 连接信息
+
+先完成[共同准备](#共同准备)，在 Tulpa 中给 Claude Code 创建连接，保存 MCP 地址和 Token。连接名称可写 `claude-code`；下面在 Claude Code 中将服务命名为 `tulpa`，两个名称不要求相同。
+
+### 2. 添加服务
+
+**已安装 Claude Code CLI：** 在 PowerShell 中执行下面这一行，把地址和 Token 换成自己的值：
+
+```powershell
+claude mcp add --transport http --scope user tulpa http://127.0.0.1:18777/mcp --header "Authorization: Bearer YOUR_TULPA_MCP_TOKEN"
+```
+
+`--scope user` 让这项个人配置在不同项目中都可用。省略它时默认是 `local`，只在运行命令时所在的项目生效；本机已跑通的配置就是这种项目限定方式。已有同名服务时，先在 `/mcp` 中检查并修改实际生效的条目，不要重复添加。
+
+**只有 VS Code 扩展，或希望手动编辑：** 默认文件是 `%USERPROFILE%\.claude.json`，不是 `.claude/settings.json`。先备份原文件，在 JSON **根对象**的 `mcpServers` 中合并以下 `tulpa` 条目；文件有其他设置或服务时保留它们，不要用示例整份覆盖。如果设置过 `CLAUDE_CONFIG_DIR`，请使用对应配置目录。
+
+```json
+{
+  "mcpServers": {
+    "tulpa": {
+      "type": "http",
+      "url": "http://127.0.0.1:18777/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TULPA_MCP_TOKEN"
+      },
+      "timeout": 240000
+    }
+  }
+}
+```
+
+这里必须有 **`type: "http"`**，地址字段为 **`url`**，`Bearer` 后保留一个空格。`timeout` 单位为毫秒，是单次工具调用的超时；240000 为文件处理、语音和群聊等待预留时间，不代表模型任务无限运行。CLI 添加的条目也可按需补上这一字段。
+
+根级 `mcpServers` 是个人跨项目配置；`projects[项目路径].mcpServers` 是仅当前项目的配置。同名项目条目可能优先于根级条目：如果更换 Token 后仍失败，检查是否改错了作用域。不要把含真实 Token 的配置复制进仓库的 `.mcp.json`。
+
+VS Code 扩展本身不会把 `claude` 命令加入终端 PATH，所以“找不到命令”不代表扩展不能用 MCP。可以采用上面的手动方式；扩展 **2.1.261 及以后**也可以在聊天面板输入 `/mcp`，通过服务管理窗口添加 HTTP 服务、填写地址和请求头，并选择个人作用域。[Claude Code VS Code 扩展说明](https://code.claude.com/docs/en/vs-code)
+
+### 3. 重连并验证
+
+保存后在 Claude Code 会话中输入 `/mcp`，确认 `tulpa` 已启用并显示 **Connected**；必要时重新连接，然后新建对话。有 CLI 时也可运行 `claude mcp list` 检查连接状态。仅显示“添加成功”只代表配置已保存，还没有验证 Token。
+
+在新对话中执行下文的[共同验证](#连接后先这样验证)，确认 `get_data_status` 和 `list_conversations` 真正返回结果。Claude Code 自己的工具权限弹窗由用户选择放行；Tulpa 的访问范围与发送授权仍独立生效。
 
 ## DeepSeek Harness
 
@@ -229,7 +277,9 @@ Tulpa 的发送 / 群管理勾选是持续授权，调用会直接执行；外�
 | HTTP 403 / 范围不符 | 查看具体错误及授权的平台、会话、日期、源账号是否一致；客户端勾选不能扩张 Tulpa 授权 |
 | 连接成功但新消息查不到 | 历史查询先检查数据库实时读取；持续群聊检查 OneBot 事件连接和活跃会话。截止日期留空才允许未来消息 |
 | 看不到发言、群管理或表情包工具 | 检查该连接是否授予对应权限、OneBot 是否有效，再重连客户端；原有只读连接不会自动获得新权限 |
-| 文件、语音或等待超时 | Codex 与 DSH 可按本文增加每工具超时；其他客户端查看其实际工具超时设置。连接超时和模型任务总时限不是同一件事 |
+| 文件、语音或等待超时 | 按本文设置客户端的每工具超时；Claude Code 的 `timeout` 按毫秒填写。连接超时和模型任务总时限不是同一件事 |
+| Claude Code 换个项目就没有 Tulpa | 原配置可能是默认 `local` 作用域；使用 `--scope user` 或根级 `mcpServers` 配置，并检查同名项目条目是否覆盖它 |
+| VS Code 中能用 Claude Code，终端却找不到 `claude` | 扩展不向 PATH 安装独立 CLI；使用扩展的 `/mcp` 管理窗口或按本文合并 `.claude.json` 即可 |
 | DSH 改过 Token 仍报错 | 停止旧进程，重新加载 `connection.env` 再启动；刷新网页不更新环境变量 |
 | Antigravity 找不到远程地址 | 检查是否用了 `serverUrl`，并确认编辑的是应用实际加载的配置文件 |
 | WorkBuddy 显示连接成功但任务不可用 | 检查当前任务的连接器开关、安全中心自定义 MCP 开关；再新建对话验证 |
@@ -241,7 +291,7 @@ Tulpa 的发送 / 群管理勾选是持续授权，调用会直接执行；外�
 复制下面这段话给本机 Agent，并把方括号内的内容换成自己的情况。Token 在本机配置界面或凭据文件中填写，不需要贴到公共聊天、Issue 或截图中。
 
 ```text
-请按 Tulpa 仓库的 doc/AGENT_SETUP.md，为我配置 [Codex / DeepSeek Harness / Antigravity / WorkBuddy] 的 MCP。
+请按 Tulpa 仓库的 doc/AGENT_SETUP.md，为我配置 [Codex / Claude Code / DeepSeek Harness / Antigravity / WorkBuddy] 的 MCP。
 教程：https://github.com/fumingyang2004/Tulpa/blob/main/doc/AGENT_SETUP.md
 
 Tulpa 安装目录：[我的安装目录]
