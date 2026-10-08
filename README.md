@@ -2,100 +2,130 @@
 
 # Tulpa
 
-**在本机查询 QQ / 微信聊天，整理资料、持续调查，并起草符合当前语境的回复。**
+**把 QQ / 微信资料接入几乎所有的桌面版 Agent，也让它在 QQ 里成为群友。**
 
-[下载 Windows 版](https://github.com/fumingyang2004/Tulpa/releases/latest) · [功能清单](doc/FEATURES.md) · [OneBot 配置教程](doc/SNOWLUMA_SETUP.md) · [参与开发](doc/CONTRIBUTING.md)
+[下载](#下载) · [快速开始](#快速开始) · [Agent 配置教程](doc/AGENT_SETUP.md) · [使用场景](#使用场景) · [完整文档](#常见问题与文档)
 
-Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本机，Agent 在你选择的平台、会话和时间范围内检索，按需读取图片、语音和文件。桌面版解压即用；浏览器入口保留用于开发与测试。
+Tulpa 在本机整理聊天、图片和文件，让 Agent 按你授权的范围查资料、追溯消息，或带着自定义人格参与 QQ 群聊。已有 Agent 选 MCP 轻量版；想直接在 Tulpa 里提问，选完整版。
 
-**MCP 轻量版：把 QQ / 微信资料接入你正在使用的 Agent。**
+**Windows 10 / 11 x64。** 微信支持读取、回复草稿与复制，不能发送。QQ 持续群聊需要独立运行的 OneBot 服务、相应授权，以及持续执行的外部 Agent。
 
-如果你已经在使用 Codex、Claude Code、DeepSeek Harness、Antigravity 或 WorkBuddy，可以选择 MCP 轻量版。Tulpa 负责导入与实时读取、检索、原文件下载和访问授权，外部 Agent 负责理解、分析与执行任务。轻量版不包含内置 Harness，无需在 Tulpa 中另配模型 API Key；模型由外部 Agent 提供。完整版也包含同样的 MCP 能力。
+## 使用场景
 
-目前已在以下客户端完成实际接入测试：
+下面是可以交给 Agent 的请求示例，实际能力取决于资料、授权、模型和客户端。
 
-| Agent | 已实测能力 |
-| --- | --- |
-| <img src="doc/assets/agents/openai.png" width="28" height="28" alt="OpenAI"> **[Codex](https://openai.com/codex/)** | QQ / 微信查询、图片读取、文件下载、PDF 与语音内容读取；授权测试群发言、修改群名并恢复 |
-| <img src="doc/assets/agents/claude.png" width="28" height="28" alt="Claude Code"> **[Claude Code](doc/AGENT_SETUP.md#claude-code)** | 已成功接入，用户本机确认功能正常；使用原生 HTTP MCP 与 Bearer Token，无需额外桥接 |
-| <img src="doc/assets/agents/deepseek.png" width="28" height="28" alt="DeepSeek"> **[DeepSeek Harness](doc/DEEPSEEK_MCP.md)** | QQ / 微信查询、图片与文件读取、OneBot 群资料；授权测试群发言、修改群名并恢复 |
-| <img src="doc/assets/agents/antigravity.svg" width="28" height="28" alt="Google Antigravity"> **[Google Antigravity](https://antigravity.google/)** | 工具发现、会话与消息查询、图片理解；本次验收仅开放只读权限，尚未验证持续群聊、发送与群管理（理论上可以） |
-| <img src="doc/assets/agents/workbuddy.png" width="28" height="28" alt="WorkBuddy"> **[WorkBuddy](doc/AGENT_SETUP.md#workbuddy)** | 已接入并由用户确认功能跑通；本机调用记录覆盖消息与图片读取、文件下载、OneBot 群资料、群聊目录与人格发现 |
+### 让小鲸鱼来水群
 
-连接 OneBot 并授予相应权限后，MCP 还可提供 QQ 发送、群管理，以及使用自定义人格的持续群聊和表情包互动。不同客户端的工具审批与持续运行机制各有差异，接入实测范围以上表为准。
+> 先列出可用人格和允许的 QQ 群，核对“我的测试群”后，用小鲸鱼持续聊天，直到我停止。接得上话再说，不必每条都回复。
 
-[Agent 配置教程](doc/AGENT_SETUP.md) · [MCP 能力与权限](doc/MCP.md) · [轻量版说明](doc/MCP_LITE.md) · [持续群聊与人格](doc/MCP_CHAT.md) · [表情收藏与候选](doc/MCP_STICKERS.md) · [验证记录](doc/VALIDATION.md)
+随包提供小鲸鱼（`little_whale`）和龙娘（`dragon_girl`，测试版），也能用 Markdown 写自己的角色。支持按语境接话、原生 @ 与引用；授权后可看图、发送和收藏表情，保留理解笔记供后续会话选用。
 
-## 开始使用
+人格卡只改变表达，不会替换底层模型；发言和表情使用由 Agent 决定。详见 [人格教程](doc/MCP_CHAT.md)与[表情链路](doc/MCP_STICKERS.md)。
 
-0.5.3 同时提供两个版本，使用相同的 QQ / 微信读取器和 MCP 权限机制：
+视频链接：[点击这里查看哔哩哔哩视频](https://www.bilibili.com/video/BV16jHL6AE5z)
 
-| 下载包 | 适合谁 | 包含内容 |
+![视频预览](doc/assets/video.png "视频预览")
+
+### 找回聊过的资料和文件
+
+> 帮我找课程设计群里最近发的提交要求和附件，核对截止时间，并标出消息来源。
+
+按关键词、人物、会话和日期检索，再展开上下文。图片、语音和文件按需读取；轻量版可经 OneBot 下载 QQ 群原文件，交给同机 Agent 自己的文件工具阅读。
+
+![Tulpa](doc/assets/file_finding.png)
+
+### 把消息整理成有出处的总结
+
+> 总结项目群这周确定的分工和待确认事项，把每项对应的原话列出来。
+
+从消息和文件中整理结论，保留可回查的来源。完整版还提供回复草稿、会话记忆、关注卡和持续调查工作区；完整能力见[功能清单](doc/FEATURES.md)。
+
+## 为什么用 Tulpa
+
+- **复用熟悉的 Agent**：Tulpa 负责资料读取、检索和授权，外部 Agent 负责理解与任务执行；只用 MCP 无需在 Tulpa 另配模型 API Key。
+- **范围由你决定**：按平台、会话、日期开放资料，写操作另行授权，每个客户端的连接可单独撤销。
+- **查得到，也能回头核对**：从结论展开上下文、查看原文，按需取图片和文件，不必反复复制聊天。
+
+已接入以下客户端：
+
+<img src="doc/assets/agents/openai.png" width="24" height="24" alt="Codex"> [Codex](doc/AGENT_SETUP.md#codex) ·
+<img src="doc/assets/agents/claude.png" width="24" height="24" alt="Claude Code"> [Claude Code](doc/AGENT_SETUP.md#claude-code) ·
+<img src="doc/assets/agents/deepseek.png" width="24" height="24" alt="DeepSeek Harness"> [DeepSeek Harness](doc/AGENT_SETUP.md#deepseek-harness) ·
+<img src="doc/assets/agents/antigravity.svg" width="24" height="24" alt="Antigravity"> [Antigravity](doc/AGENT_SETUP.md#google-antigravity) ·
+<img src="doc/assets/agents/workbuddy.png" width="24" height="24" alt="WorkBuddy"> [WorkBuddy](doc/AGENT_SETUP.md#workbuddy)
+
+<details>
+<summary>客户端实测范围</summary>
+
+- **Codex / DeepSeek Harness**：已验证聊天查询、图片和文件读取，以及授权测试群发言、修改群名并恢复。
+- **Claude Code**：已接入并由用户在本机确认功能正常，使用原生 HTTP MCP 与 Bearer Token。
+- **Antigravity**：已验证消息查询和图片理解；验收仅开放只读权限，尚未实测持续群聊、发送与群管理。
+- **WorkBuddy**：已接入并由用户确认跑通；调用记录覆盖消息、图片、文件、群资料及人格发现。
+
+客户端的识图、工具审批与持续运行机制不同。详见 [Agent 教程](doc/AGENT_SETUP.md)和[验证记录](doc/VALIDATION.md)。
+
+</details>
+
+## 下载
+
+| 版本 | 适合你，如果你想… | v0.5.3 下载 |
 | --- | --- | --- |
-| `Tulpa-0.5.3-win-x64.zip` 完整版 | 在 Tulpa 内直接聊天、回复、使用记忆和工作区 | 内置 Harness、MCP、本地 OCR / 语音 / Office 解析和固定 WebView2 |
-| `Tulpa-MCP-0.5.3-win-x64.zip` 轻量版 | 使用 Codex、Claude Code、DeepSeek Harness、Antigravity、WorkBuddy 等外部 Agent | 导入、实时读取、聊天浏览、原文件下载、OneBot 和 MCP；语音模型按需安装，使用系统 WebView2 |
+| **MCP 轻量版** | 使用已有 Agent 查资料或参与 QQ 群聊 | [约 94 MB](https://github.com/fumingyang2004/Tulpa/releases/download/v0.5.3/Tulpa-MCP-0.5.3-win-x64.zip) |
+| **完整版** | 在 Tulpa 内提问，使用回复、记忆和工作区；也能接外部 Agent | [约 907 MB](https://github.com/fumingyang2004/Tulpa/releases/download/v0.5.3/Tulpa-0.5.3-win-x64.zip) |
 
-1. 在 [Releases](https://github.com/fumingyang2004/Tulpa/releases/latest) 选择一个 ZIP。GitHub 自动提供的 `Source code` 不是桌面安装包。两个版本请放在各自的文件夹中，不要混合覆盖程序文件。
-2. **完整解压**到有写入权限的本地目录，打开 `Tulpa/Tulpa.exe`。不要单独取出 EXE，也不要直接从压缩包内运行。
-3. 首次选择 **使用内置聊天** 或 **连接外部 Agent**。内置聊天在 **模型与连接**填写自己的 API 地址、API Key 和模型名称；只使用 MCP 无需模型配置。
-4. 登录本机 QQ / 微信，在 **数据与同步**选择平台、会话和日期，点击读取。可以分批读取整个所选时间范围，并查看进度。
-5. 回到对话页面提问，或打开 **浏览聊天记录**查看原文。没有 OneBot 也可以使用本地导入、检索和回复草稿。
+两版都有 Python 和相同的 MCP 能力。完整版内置 Harness、本地 OCR / 语音 / Office 解析与固定 WebView2；轻量版使用系统 WebView2 Evergreen Runtime，语音模型按需安装。[版本区别](doc/MCP_LITE.md) · [最新发布](https://github.com/fumingyang2004/Tulpa/releases/latest) · [0.5.3 更新说明](doc/releases/0.5.3.md)
 
-运行环境：**Windows 10 / 11 x64、.NET Framework 4.8**。两版均自带 Python；完整版自带 WebView2，轻量版使用系统 WebView2 Evergreen Runtime。QQ / 微信客户端、模型服务及可选 OneBot 服务需用户自行准备。客户端读取是否可用，受版本、登录账号、权限和本机缓存影响。
+需要 **.NET Framework 4.8**。下载 ZIP 后完整解压到可写目录，打开 `Tulpa/Tulpa.exe`；不要从压缩包直接运行。**`Source code` 不是安装包，两版不要混装。** QQ / 微信客户端、模型服务及可选 OneBot 服务需自行准备。
 
-本机留有多个 QQ / 微信账号目录时，先在 **数据与同步 → 本机账号** 选择要读取的账号，再更新会话列表或导入消息。只有一个候选时自动选中；读取后会记住选择。列表反映本地数据目录，不代表账号已登录。每个程序数据目录、每个平台使用一个账号；已有来源不会自动切换，其他账号请使用独立的 Tulpa 文件夹。
+**老用户升级：** 按[保留数据升级教程](doc/UPGRADE.md)检查、备份并更新原目录，无需重新导入。自改的同名随包人格先另存；升级后仍打开原目录 EXE，并重连 MCP。
 
-## 能做什么
+## 快速开始
 
-| 功能 | 使用方式 |
-| --- | --- |
-| 聊天查询 | 自然语言检索、上下文展开、多轮追问、人物账号解析及受限 SQL 统计；可跳回原文 |
-| 实时聊天浏览 | 左侧会话列表显示最后一条消息，右侧展示聊天，新入库消息自动刷新 |
-| 图片、语音、文件 | 图片本地 OCR 或原生识图；语音本地转写；PDF、Office 与文本文件按需解析 |
-| 帮我回复 | 选择真实消息，填写要求，生成并编辑草稿；从已导入聊天中寻找相似真实互动 |
-| 记忆 | 按会话维护行为记忆和人工修正；可关闭，历史回复案例检索不要求先积累成长进度 |
-| 关注卡 | 保存一个问题，按时间或新增消息数量重新询问，也可手动检查 |
-| 工作区 | 围绕一个目标持续调查，产出 Markdown / CSV，查看差异、审批修改、保留版本并回退 |
-| 证据集合 | 组织消息、媒体、文件片段及群资料的引用，保留来源 |
-| QQ 扩展 | 连接 OneBot 后按需读公告、精华和群文件；批准回复发送；按账号权限管理群 |
-| 持续群聊与表情包（MCP） | 小鲸鱼、龙娘或自定义 Markdown 人格，热发现；实时接话、引用与 @；看图、收藏和笔记、跨会话表情候选，可随时停止 |
-| 外部 Agent / MCP | 让 Codex 等客户端直接查询授权的聊天与文件，复用本地检索；无需 Tulpa 模型配置；可为连接持续授权 QQ 发送和群管理 |
+### 我要 QQ 水群
 
-完整行为和限制见 [FEATURES.md](doc/FEATURES.md)。
+**无需先导入整库历史。** 这条路径直接接收 OneBot 实时事件。
 
-两个版本均包含 MCP。在侧栏 **外部 Agent / MCP** 或 **连接外部 Agent** 导入资料、选择范围，再点击创建连接（可一并开启服务）；随后检测连接、写入本机 Codex 配置或复制到其他客户端。OneBot 设置可独立保存，不要求模型 API Key。操作步骤见 [MCP 教程](doc/MCP.md)。
+1. 启动 QQ、独立 OneBot 服务和 Tulpa。持续群聊需要 **HTTP + 正向 WebSocket**；已有 SnowLuma 可选择其文件夹、账号和节点，检测后导入连接。Tulpa 不附带或下载 SnowLuma。[连接教程](doc/SNOWLUMA_SETUP.md)
+2. 在 **连接外部 Agent**（或 **外部 Agent / MCP**）选择 QQ，点击 **从 OneBot 选择群 · 无需导入**，只选测试群；截止日期留空以接收未来消息。
+3. 开放持续群聊和发送权限，按需加看图、表情发送或收藏。创建连接、检测工具，再按 [Agent 教程](doc/AGENT_SETUP.md)配置并重连客户端。
+4. 在外部 Agent 的**专用对话**中使用上面的水群示例。想换龙娘，选择 `dragon_girl`。新人格放进当前安装目录的 `chatlocal/prompts/mcp_chat/`，重新列出即可发现。
 
-需要后台提供 MCP 时，可勾选关闭窗口后留在托盘。托盘菜单支持打开窗口、开机启动（默认关闭）和彻底退出。只有彻底退出才会停止托盘模式中的服务；移动程序目录后应重新设置开机启动。
+保持 QQ、OneBot、Tulpa 和外部 Agent 运行。宿主结束回合、达到预算、退出或休眠后，Tulpa 不会自行继续推理。可在 Tulpa 点 **停止聊天 / 停止全部群聊**；已发出的消息不会因此撤回。改过人格后，停止并重新开启会话才会采用新设定。
 
-轻量版的文件链路是 **OneBot 下载原文件 → 返回本机路径 → 外部 Agent 用自己的工具读取**，不要求先解析 Office 文件。使用方式见 [MCP 轻量版](doc/MCP_LITE.md)，版本变化见 [0.5.3 发布说明](doc/releases/0.5.3.md)。
+### 我要查 QQ / 微信历史
 
-持续群聊可直接对外部 Agent 说：**“用小鲸鱼预设在测试群持续聊天，直到我停止。”** 先在连接中授予持续群聊与发送权限，并配置 OneBot 实时事件。自定义人格放入当前安装目录的 `chatlocal/prompts/mcp_chat/`；新增或修改后让 Agent 列出人格即可，无需重启。0.5.3 随包提供维护者最新调整的 **小鲸鱼**（`little_whale`）和新增的 **龙娘**（`dragon_girl`）。也可以说：“先列出人格，再用 `dragon_girl` 在测试群持续聊天，直到我停止。”人物卡只改变角色表达，不会替换外部 Agent 的模型。已有会话保留旧人格快照，体验新版设定需要停止后重新开启。具体步骤见 [水群人格与接话](doc/MCP_CHAT.md)。
+1. 登录本机 QQ / 微信，在 **数据与同步 → 本机账号**核对账号，再选会话和日期读取。可以从少量近期消息开始。
+2. **用外部 Agent**：创建独立 MCP 连接，选择资料范围和需要的图片、文件、语音权限，检测成功后按[教程](doc/AGENT_SETUP.md)接入。
+3. **用内置聊天**：选择完整版，在 **模型与连接**填写 API 地址、API Key 和模型名称，回到对话页提问。
+4. 从上面的资料查询或总结示例开始，用 **浏览聊天记录**核对原文。
 
-表情包可以看完直接发送，也可以在已有授权内收藏并记下理解。后续会话会收到少量可用的语境、常用和轮换候选，由 Agent 决定发图、配文、纯文字或沉默；没有固定发图频率。QQ 收藏、本地原件和笔记分别报告结果，发送成功才累计用量。见 [表情链路说明](doc/MCP_STICKERS.md)。
+本地历史查询和草稿不需要 OneBot。读取范围受客户端版本、账号、权限及本机缓存影响，无法保证找回未取得的历史；见[数据读取](doc/IMPORTS.md)与[实时摄取](doc/LIVE_INGESTION.md)。
 
-## 发送和群管理
+## 隐私与权限
 
-**帮我回复不会自动发送。** 底部面板先显示草稿，用户可以编辑；点击 **批准** 后才发送当前文字，点击 **拒绝** 不发送。当前支持 QQ 文本发送，微信仅支持草稿和复制。
+- **资料保存在本机，不等于完全离线。** 必要消息片段会进入你选择的模型服务；启用识图时也会发送所选图片。
+- 看图、发送、收藏和群管理分别授权，默认关闭、可撤销。**MCP 的发送和群管理勾选后是持续授权，调用直接执行，不会逐条回到 Tulpa 审批。**
+- 普通 **帮我回复**先生成可编辑草稿，批准后才发送 QQ 文本；微信只能草稿和复制。
+- 不要分享使用过的整个安装目录，尤其是 `data/`、`imports/`、`.env`、Token 和私人诊断。撤销连接不能收回已交给客户端的内容；MCP 范围限制也不是整台电脑的文件隔离。
 
-群管理默认每项操作询问，也可为当前普通对话明确选择“默认允许”或“默认拒绝”。权限检查、目标确认及操作记录始终保留。工作区和关注卡不会在后台执行群管理写操作。
+## 常见问题与文档
 
-MCP 连接的发送与群管理使用独立授权：界面勾选后为持续允许，外部 Agent 直接执行，不用返回 Tulpa 逐项批准；默认关闭，可以撤销，记录保存在本机。
+**能一直后台水群吗？** 持续群聊依赖外部 Agent 保持执行。托盘可保留 Tulpa 服务，但内置 Harness 不会自动变成水群机器人。
 
-这些扩展需要独立运行的本机 OneBot HTTP 服务。Tulpa 不附带 SnowLuma；0.5.3 支持选择已有 SnowLuma 文件夹、账号和节点，检测后导入 HTTP / WebSocket 连接，并保留手动填写入口，详见 [OneBot 连接教程](doc/SNOWLUMA_SETUP.md)。
+**连上了却读不到资料？** 先核对来源账号、导入状态、授权范围和日期，再实际调用工具验证；配置成功不代表数据可读。看 [连接验证与排错](doc/AGENT_SETUP.md#重启与常见问题)。
 
-## 数据与模型调用
+**模型的总结可靠吗？** 检索只覆盖已取得且已授权的资料，引用可回查不代表解释一定正确，重要结论请核对原文。
 
-- 聊天、索引、记忆、成果及配置保存在程序目录。`data/`、`imports/`、`.env` 和私人诊断不进入源码仓库或标准发布包。
-- **本地保存不等于完全离线。** 提问时，必要的消息片段和上下文会发送给你配置的模型服务；启用原生识图时还会发送选中的图片。语音在本地转写，转写文字可用于模型查询。
-- 记忆默认开启，达到成长门槛会进行有限模型整理；可在侧栏关闭。工作区自动维护默认关闭；定时任务仅在应用运行时执行。
-- API Key / OneBot Token 保存在本机配置中，请勿共享整个使用过的程序目录。提交问题时先移除聊天内容、账号、密钥和个人路径。
-- 检索结果只覆盖已经取得的本地资料。引用有效不保证模型解释正确；未通过引用检查的文字会标注原因。
+- 接入与群聊：[Agent 教程](doc/AGENT_SETUP.md) · [MCP 权限](doc/MCP.md) · [OneBot](doc/SNOWLUMA_SETUP.md) · [人格](doc/MCP_CHAT.md) · [表情](doc/MCP_STICKERS.md)
+- 资料与调查：[文件](doc/ARTIFACTS.md) · [语音](doc/VOICE.md) · [调查与证据](doc/INVESTIGATION.md) · [工作区](doc/WORKSPACES.md) · [会话记忆](doc/TULPA.md)
+- 功能与维护：[完整功能](doc/FEATURES.md) · [回复助手](doc/REPLY_COPILOT.md) · [群管理](doc/GROUP_MANAGEMENT.md) · [升级](doc/UPGRADE.md) · [安全报告](doc/SECURITY.md)
 
-**从旧版本升级无需重新导入。** 按 [升级教程](doc/UPGRADE.md) 将新版解压到临时目录，用随包升级工具检查、备份并更新原安装目录；聊天、附件、授权、账号选择和实时读取进度保留。教程附有可交给 Codex / DSH 的执行指令。升级后仍打开原目录 EXE，重新连接 MCP。
+## 参与开发
 
-## 从源码运行
+<details>
+<summary>从源码运行与贡献</summary>
 
-需要 Windows x64、Python 3.13 和 Git。在 PowerShell 中执行：
+需要 Windows x64、Python 3.13 和 Git，在 PowerShell 执行：
 
 ```powershell
 git clone https://github.com/fumingyang2004/Tulpa.git
@@ -104,28 +134,17 @@ cd Tulpa
 .\start.ps1
 ```
 
-打开 <http://127.0.0.1:7860/?desktop=1>，在界面中配置模型。首次 `setup.ps1` 会联网安装固定依赖和读取模块。图片 / 语音的开发依赖及桌面构建步骤见 [DESKTOP.md](doc/DESKTOP.md)。不需要把个人 `.env` 或数据库提交到 Git。
+打开 <http://127.0.0.1:7860/?desktop=1>。首次 setup 会联网安装依赖与读取模块；浏览器入口用于开发和测试。
 
-## 文档
+[贡献指南](doc/CONTRIBUTING.md) · [桌面构建](doc/DESKTOP.md) · [验证说明](doc/VALIDATION.md)
 
-| 主题 | 文档 |
-| --- | --- |
-| 功能与边界 | [功能清单](doc/FEATURES.md) |
-| 保留数据升级 | [升级教程与 Agent 执行指令](doc/UPGRADE.md) |
-| 桌面运行、开发与打包 | [DESKTOP.md](doc/DESKTOP.md) |
-| 数据读取、进度和诊断 | [导入](doc/IMPORTS.md)、[实时摄取](doc/LIVE_INGESTION.md) |
-| 查询与多模态资料 | [调查和证据](doc/INVESTIGATION.md)、[文件](doc/ARTIFACTS.md)、[语音](doc/VOICE.md) |
-| 持续工作 | [工作区](doc/WORKSPACES.md)、[行为记忆](doc/TULPA.md) |
-| QQ 扩展 | [回复助手](doc/REPLY_COPILOT.md)、[群管理](doc/GROUP_MANAGEMENT.md)、[OneBot 教程](doc/SNOWLUMA_SETUP.md) |
-| 外部 Agent 接入 | [Codex / Claude Code / DSH / Antigravity / WorkBuddy 配置教程](doc/AGENT_SETUP.md)、[MCP 能力与权限](doc/MCP.md)、[轻量版](doc/MCP_LITE.md) |
-| 开发与验证 | [贡献指南](doc/CONTRIBUTING.md)、[验证说明](doc/VALIDATION.md)、[安全报告](doc/SECURITY.md) |
+</details>
 
-## 开源许可
+## 许可与致谢
 
-Tulpa 自有代码采用 [MIT License](LICENSE)。第三方组件、模型和客户端遵循各自许可证，详见 [THIRD_PARTY.md](doc/THIRD_PARTY.md)。本项目不是腾讯官方产品，与 QQ、微信及所用模型服务商没有隶属关系。
+Tulpa 自有代码采用 [MIT License](LICENSE)，第三方组件、模型与客户端遵循各自许可，见 [THIRD_PARTY.md](doc/THIRD_PARTY.md)。本项目不是腾讯官方产品，与 QQ、微信及模型服务商没有隶属关系。
 
-## 致谢
+- [qq-bridge](https://github.com/Derpyu520/qq-bridge)：群聊行为与提示词设计参考；小鲸鱼基于其角色卡，由 Tulpa 维护者改编，保留来源和 MIT 许可。
+- [QQ-agent](https://github.com/K0nd1us/QQ-agent)：表情收藏、语义笔记、候选与用量反馈的设计参考；Tulpa 按自身授权和媒体校验机制独立实现。
+- [SnowLuma](https://github.com/SnowLuma/SnowLuma)：提供 QQ / OneBot 接入能力，需独立安装并遵循其许可。
 
-- 感谢 [qq-bridge](https://github.com/Derpyu520/qq-bridge) 对群聊交互、提示词组织和表情包使用的探索。Tulpa 的 MCP 持续群聊借鉴了其设计，小鲸鱼人格基于其角色卡并由 Tulpa 维护者按需修改；来源与 MIT 许可保留在项目中。
-- 感谢 [QQ-agent](https://github.com/K0nd1us/QQ-agent) 对表情收藏、语义笔记、候选准备和用量反馈的设计探索；Tulpa 按自己的授权与媒体校验机制独立实现。
-- 感谢 [SnowLuma](https://github.com/SnowLuma/SnowLuma) 提供 QQ / OneBot 接入能力，支持 Tulpa 的实时事件、消息发送和群资料功能。SnowLuma 是独立项目，需另行安装并遵循其许可。
