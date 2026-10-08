@@ -34,7 +34,7 @@ def main():
         for url in ('ws://evil.test:3001/','ws://127.0.0.1:3001/?token=bad','ws://user:pass@127.0.0.1:3001/'):
             assert c.put('/api/desktop/settings',json=dict(events_url=url),headers=headers).status_code==400
         assert c.put('/api/desktop/settings',json={'model':'some-model'},headers=headers).status_code==400
-        with patch('chatlocal.onebot.Client.login',return_value='12345'):
+        with patch('chatlocal.onebot.Client.login',return_value='12345'),patch('chatlocal.onebot_events.probe_connection',return_value=dict(state='connected',note='fixture')):
             assert c.post('/api/desktop/onebot/test',json={},headers=headers).json()['ok']
         assert c.post('/api/desktop/onebot/test',json={}).status_code==403
         assert c.get('/api/desktop/status',headers={'Host':'evil.test'}).status_code==403

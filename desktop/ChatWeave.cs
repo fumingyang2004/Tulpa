@@ -115,7 +115,7 @@ sealed class DesktopWindow:Form {
                 ready=Path.Combine(Program.Root,".tmp","desktop-ready-"+Guid.NewGuid().ToString("N")+".json");
                 var start=new ProcessStartInfo(Path.Combine(Program.Root,"runtime","python.exe"),"-X utf8 -B desktop/serve.py "+Path.GetFileName(ready));
                 start.WorkingDirectory=Program.Root;start.UseShellExecute=false;start.CreateNoWindow=true;start.RedirectStandardOutput=true;start.RedirectStandardError=true;
-                foreach(string key in new[]{"PYTHONHOME","PYTHONPATH","API_KEY","API_BASE","MODEL","REPLY_ONEBOT_URL","REPLY_ONEBOT_TOKEN","REPLY_ONEBOT_WS_URL","REPLY_ONEBOT_WS_TOKEN","DSH_HOME","DEEPSEEK_HARNESS_RUNTIME_MODE"})start.EnvironmentVariables.Remove(key);
+                foreach(string key in new[]{"PYTHONHOME","PYTHONPATH","API_KEY","API_BASE","MODEL","REPLY_ONEBOT_URL","REPLY_ONEBOT_TOKEN","REPLY_ONEBOT_WS_URL","REPLY_ONEBOT_WS_TOKEN","REPLY_ONEBOT_WS_TOKEN_MODE","DSH_HOME","DEEPSEEK_HARNESS_RUNTIME_MODE"})start.EnvironmentVariables.Remove(key);
                 start.EnvironmentVariables["CHATWEAVE_SESSION_TOKEN"]=token;
                 start.EnvironmentVariables["PYTHONUTF8"]="1";
                 start.EnvironmentVariables["PYTHONDONTWRITEBYTECODE"]="1";
@@ -165,6 +165,18 @@ sealed class DesktopWindow:Form {
             };
             view.CoreWebView2.NewWindowRequested+=(s,e)=>{e.Handled=true;Uri uri;if(Uri.TryCreate(e.Uri,UriKind.Absolute,out uri)&&(uri.Scheme=="https"||uri.Scheme=="http"))Process.Start(new ProcessStartInfo(uri.AbsoluteUri){UseShellExecute=true});};
             view.CoreWebView2.PermissionRequested+=(s,e)=>{e.State=CoreWebView2PermissionState.Deny;};
+            await view.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("window.TULPA_FOLDER_PICKER=true;");
+            view.CoreWebView2.WebMessageReceived+=(s,e)=>{
+                Uri source;if(!Uri.TryCreate(e.Source,UriKind.Absolute,out source)||source.GetLeftPart(UriPartial.Authority)!=service)return;
+                string command;try{command=e.TryGetWebMessageAsString();}catch{return;}
+                const string prefix="tulpa-pick-snowluma-folder:";
+                if(command==null||!command.StartsWith(prefix)||command.Length>150)return;
+                string requestId=command.Substring(prefix.Length),selected="";
+                using(var picker=new FolderBrowserDialog{Description="选择已解压的 SnowLuma 文件夹",ShowNewFolderButton=false}){
+                    if(picker.ShowDialog(this)==DialogResult.OK)selected=picker.SelectedPath;
+                }
+                view.CoreWebView2.PostWebMessageAsJson(json.Serialize(new {kind="snowluma-folder",requestId=requestId,path=selected}));
+            };
 #if QA
             view.CoreWebView2.WebMessageReceived+=(s,e)=>{if(e.Source.StartsWith(service+"/")){var command=e.TryGetWebMessageAsString();if(command=="chatweave-qa-close"){exitRequested=true;Close();}else if(command=="tulpa-qa-hide")Close();else if(command=="tulpa-qa-show")ShowWindow();}};
 #endif

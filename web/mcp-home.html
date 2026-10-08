@@ -2,7 +2,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">
 <title>Tulpa MCP</title><link rel="icon" href="/ui/tulpa-logo.png">
 <link rel="stylesheet" href="/ui/app.css"><link rel="stylesheet" href="/ui/desktop.css"><link rel="stylesheet" href="/ui/mcp.css"><link rel="stylesheet" href="/ui/mcp-home.css">
-<script src="/ui/mcp-home.js" defer></script><script src="/ui/chat.js" defer></script><script src="/ui/data.js" defer></script><script src="/ui/live.js" defer></script><script src="/ui/voice.js" defer></script><script src="/ui/artifacts.js" defer></script><script src="/ui/mcp.js" defer></script>
+<script src="/ui/snowluma.js" defer></script><script src="/ui/mcp-home.js" defer></script><script src="/ui/chat.js" defer></script><script src="/ui/data.js" defer></script><script src="/ui/live.js" defer></script><script src="/ui/voice.js" defer></script><script src="/ui/artifacts.js" defer></script><script src="/ui/mcp.js" defer></script>
 </head><body>
 <!-- shared-forms -->
 <div class="shell">
@@ -22,8 +22,10 @@
 <p id="lite-error" role="alert"></p></main></div>
 <dialog id="lite-onebot" class="desktop-config"><div class="dialog-head"><h2>OneBot 与后台服务</h2><button class="close-dialog icon-button" aria-label="关闭设置">×</button></div><div class="desktop-config-body">
 <p>连接你已启动的本机 OneBot 服务。聊天查询不依赖 OneBot；当前群资料、发送和管理需要它。</p>
+<div id="lite-snowluma"></div>
+<details id="lite-onebot-manual"><summary>高级设置：手动配置连接</summary>
 <form id="lite-onebot-form"><label>本机 OneBot 地址<input id="lite-onebot-url" type="url" placeholder="http://127.0.0.1:3000"></label><label>访问 Token<input id="lite-onebot-token" type="password" autocomplete="new-password" placeholder="留空保留已存 Token"></label><label>实时事件地址 · 持续群聊<input id="lite-events-url" type="url" placeholder="ws://127.0.0.1:3001"></label><small>在 SnowLuma 开启正向 WebSocket 服务。持续群聊不需要导入聊天或开启数据库实时读取。</small>
 <label>事件 Token<input id="lite-events-token" type="password" autocomplete="new-password" placeholder="WebSocket 节点的 Token"></label><small>可能与 HTTP Token 不同。留空保留；尚未设置时使用 HTTP Token。</small><button type="submit">保存并检测</button><button id="lite-onebot-test" type="button">检测连接</button></form>
-<p id="lite-onebot-result" role="status"></p><label id="lite-background-label"><input id="lite-background" type="checkbox">关闭窗口后留在托盘，继续服务</label><p><a href="/api/desktop/diagnostics" download="Tulpa-diagnostics.json">导出运行诊断</a></p></div></dialog>
+<p id="lite-onebot-result" role="status"></p></details><p id="lite-onebot-current" class="config-intro"></p><label id="lite-background-label" class="desktop-check"><input id="lite-background" type="checkbox">关闭窗口后留在托盘，继续服务</label><p><a href="/api/desktop/diagnostics" download="Tulpa-diagnostics.json">导出运行诊断</a></p></div></dialog>
 <div id="toast" role="status" hidden></div>
 </body></html>

@@ -49,7 +49,9 @@ engineering this component under its own license.
 `scripts/install_readers.py` fetches the pinned upstream modules and their licenses;
 `scripts/reader_patches.py` contains the reproducible local adaptations. The reader
 manifest records both original and installed hashes. QQ adaptations preserve long
-text and use the isolated SQLite runtime; the WeChat adaptation adds bounded legacy
+text, use the isolated SQLite runtime, honor an explicit per-install data root,
+and use bounded, chunked passive Windows key scanning with unchanged page-HMAC
+acceptance (`scripts/qq_passive_keys.py`). The WeChat adaptation adds bounded legacy
 key recovery. The modified WeChat file carries a modification notice. Reader
 licenses remain in `tools/qq-reader/LICENSE` and `tools/wechat-reader/LICENSE`.
 

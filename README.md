@@ -24,16 +24,16 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 
 连接 OneBot 并授予相应权限后，MCP 还可提供 QQ 发送、群管理，以及使用自定义人格的持续群聊和表情包互动。不同客户端的工具审批与持续运行机制各有差异，接入实测范围以上表为准。
 
-[Agent 配置教程](doc/AGENT_SETUP.md) · [MCP 能力与权限](doc/MCP.md) · [轻量版说明](doc/MCP_LITE.md) · [持续群聊与人格](doc/MCP_CHAT.md) · [验证记录](doc/VALIDATION.md)
+[Agent 配置教程](doc/AGENT_SETUP.md) · [MCP 能力与权限](doc/MCP.md) · [轻量版说明](doc/MCP_LITE.md) · [持续群聊与人格](doc/MCP_CHAT.md) · [表情收藏与候选](doc/MCP_STICKERS.md) · [验证记录](doc/VALIDATION.md)
 
 ## 开始使用
 
-0.5.2 同时提供两个版本，使用相同的 QQ / 微信读取器和 MCP 权限机制：
+0.5.3 同时提供两个版本，使用相同的 QQ / 微信读取器和 MCP 权限机制：
 
 | 下载包 | 适合谁 | 包含内容 |
 | --- | --- | --- |
-| `Tulpa-0.5.2-win-x64.zip` 完整版 | 在 Tulpa 内直接聊天、回复、使用记忆和工作区 | 内置 Harness、MCP、本地 OCR / 语音 / Office 解析和固定 WebView2 |
-| `Tulpa-MCP-0.5.2-win-x64.zip` 轻量版 | 使用 Codex、Claude Code、DeepSeek Harness、Antigravity、WorkBuddy 等外部 Agent | 导入、实时读取、聊天浏览、原文件下载、OneBot 和 MCP；语音模型按需安装，使用系统 WebView2 |
+| `Tulpa-0.5.3-win-x64.zip` 完整版 | 在 Tulpa 内直接聊天、回复、使用记忆和工作区 | 内置 Harness、MCP、本地 OCR / 语音 / Office 解析和固定 WebView2 |
+| `Tulpa-MCP-0.5.3-win-x64.zip` 轻量版 | 使用 Codex、Claude Code、DeepSeek Harness、Antigravity、WorkBuddy 等外部 Agent | 导入、实时读取、聊天浏览、原文件下载、OneBot 和 MCP；语音模型按需安装，使用系统 WebView2 |
 
 1. 在 [Releases](https://github.com/fumingyang2004/Tulpa/releases/latest) 选择一个 ZIP。GitHub 自动提供的 `Source code` 不是桌面安装包。两个版本请放在各自的文件夹中，不要混合覆盖程序文件。
 2. **完整解压**到有写入权限的本地目录，打开 `Tulpa/Tulpa.exe`。不要单独取出 EXE，也不要直接从压缩包内运行。
@@ -58,7 +58,7 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 | 工作区 | 围绕一个目标持续调查，产出 Markdown / CSV，查看差异、审批修改、保留版本并回退 |
 | 证据集合 | 组织消息、媒体、文件片段及群资料的引用，保留来源 |
 | QQ 扩展 | 连接 OneBot 后按需读公告、精华和群文件；批准回复发送；按账号权限管理群 |
-| 持续群聊与表情包（MCP） | 小鲸鱼预设或自定义 Markdown 人格，热发现；独立接收 OneBot 消息，按语境接话、看图和选择表情，可随时停止 |
+| 持续群聊与表情包（MCP） | 小鲸鱼、龙娘或自定义 Markdown 人格，热发现；实时接话、引用与 @；看图、收藏和笔记、跨会话表情候选，可随时停止 |
 | 外部 Agent / MCP | 让 Codex 等客户端直接查询授权的聊天与文件，复用本地检索；无需 Tulpa 模型配置；可为连接持续授权 QQ 发送和群管理 |
 
 完整行为和限制见 [FEATURES.md](doc/FEATURES.md)。
@@ -67,9 +67,11 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 
 需要后台提供 MCP 时，可勾选关闭窗口后留在托盘。托盘菜单支持打开窗口、开机启动（默认关闭）和彻底退出。只有彻底退出才会停止托盘模式中的服务；移动程序目录后应重新设置开机启动。
 
-轻量版的文件链路是 **OneBot 下载原文件 → 返回本机路径 → 外部 Agent 用自己的工具读取**，不要求先解析 Office 文件。使用方式见 [MCP 轻量版](doc/MCP_LITE.md)，版本变化见 [0.5.2 发布说明](doc/releases/0.5.2.md)。
+轻量版的文件链路是 **OneBot 下载原文件 → 返回本机路径 → 外部 Agent 用自己的工具读取**，不要求先解析 Office 文件。使用方式见 [MCP 轻量版](doc/MCP_LITE.md)，版本变化见 [0.5.3 发布说明](doc/releases/0.5.3.md)。
 
-持续群聊可直接对外部 Agent 说：**“用小鲸鱼预设在测试群持续聊天，直到我停止。”** 先在连接中授予持续群聊与发送权限，并配置 OneBot 实时事件。自定义人格放入当前安装目录的 `chatlocal/prompts/mcp_chat/`；新增或修改后让 Agent 列出人格即可，无需重启。具体步骤见 [水群人格与接话](doc/MCP_CHAT.md)。
+持续群聊可直接对外部 Agent 说：**“用小鲸鱼预设在测试群持续聊天，直到我停止。”** 先在连接中授予持续群聊与发送权限，并配置 OneBot 实时事件。自定义人格放入当前安装目录的 `chatlocal/prompts/mcp_chat/`；新增或修改后让 Agent 列出人格即可，无需重启。0.5.3 随包提供维护者最新调整的 **小鲸鱼**（`little_whale`）和新增的 **龙娘**（`dragon_girl`）。也可以说：“先列出人格，再用 `dragon_girl` 在测试群持续聊天，直到我停止。”人物卡只改变角色表达，不会替换外部 Agent 的模型。已有会话保留旧人格快照，体验新版设定需要停止后重新开启。具体步骤见 [水群人格与接话](doc/MCP_CHAT.md)。
+
+表情包可以看完直接发送，也可以在已有授权内收藏并记下理解。后续会话会收到少量可用的语境、常用和轮换候选，由 Agent 决定发图、配文、纯文字或沉默；没有固定发图频率。QQ 收藏、本地原件和笔记分别报告结果，发送成功才累计用量。见 [表情链路说明](doc/MCP_STICKERS.md)。
 
 ## 发送和群管理
 
@@ -79,7 +81,7 @@ Tulpa 是面向 Windows 的个人通信工作台。聊天和资料保存在本�
 
 MCP 连接的发送与群管理使用独立授权：界面勾选后为持续允许，外部 Agent 直接执行，不用返回 Tulpa 逐项批准；默认关闭，可以撤销，记录保存在本机。
 
-这些扩展需要独立运行的本机 OneBot HTTP 服务。Tulpa 不附带 SnowLuma，不代填账号或 Token；按 [从零取得 URL 和 Token](doc/SNOWLUMA_SETUP.md) 操作。
+这些扩展需要独立运行的本机 OneBot HTTP 服务。Tulpa 不附带 SnowLuma；0.5.3 支持选择已有 SnowLuma 文件夹、账号和节点，检测后导入 HTTP / WebSocket 连接，并保留手动填写入口，详见 [OneBot 连接教程](doc/SNOWLUMA_SETUP.md)。
 
 ## 数据与模型调用
 
@@ -125,4 +127,5 @@ Tulpa 自有代码采用 [MIT License](LICENSE)。第三方组件、模型和客
 ## 致谢
 
 - 感谢 [qq-bridge](https://github.com/Derpyu520/qq-bridge) 对群聊交互、提示词组织和表情包使用的探索。Tulpa 的 MCP 持续群聊借鉴了其设计，小鲸鱼人格基于其角色卡并由 Tulpa 维护者按需修改；来源与 MIT 许可保留在项目中。
+- 感谢 [QQ-agent](https://github.com/K0nd1us/QQ-agent) 对表情收藏、语义笔记、候选准备和用量反馈的设计探索；Tulpa 按自己的授权与媒体校验机制独立实现。
 - 感谢 [SnowLuma](https://github.com/SnowLuma/SnowLuma) 提供 QQ / OneBot 接入能力，支持 Tulpa 的实时事件、消息发送和群资料功能。SnowLuma 是独立项目，需另行安装并遵循其许可。

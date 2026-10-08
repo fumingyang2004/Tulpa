@@ -3,6 +3,7 @@ import base64
 import copy
 import io
 import json
+import sqlite3
 import threading
 import time
 from dataclasses import replace
@@ -306,22 +307,28 @@ class MCPTools:
     def chat_media_call(self, grant, token, name, arguments, cancel):
         media=self.chat.media
         if not media.slots.acquire(blocking=False):
+            media.library.diagnose(arguments.get('session_id',''),'media_busy')
             return self.result(dict(error='表情处理通道繁忙；消息接收和普通工具仍可使用。',error_code='media_busy'))
         began=time.monotonic();call_id=None;status='error'
         try:
+            if name=='send_chat_sticker':media.library.observe_send(grant,arguments['session_id'])
             call_id=self.access.begin_call(grant['id'],name)
             data,images=media.call(grant,name,arguments,cancel)
             # Preserve durable write receipts even if cancellation follows dispatch.
             if name not in MEDIA_WRITES:
                 media.guard(grant,arguments['session_id'],name,cancel)
-            status='ok'
+            status=data.get('state','ok').lower()
+            media.library.diagnose(arguments['session_id'],name+'_'+status,dict(elapsed_ms=round((time.monotonic()-began)*1000,2)))
             return self.result(data,images)
         except RateLimited as exc:
+            media.library.diagnose(arguments.get('session_id',''),name+'_rate_limited')
             return self.result(dict(error=str(exc),error_code='rate_limited'))
         except ValueError as exc:
+            media.library.diagnose(arguments.get('session_id',''),name+'_rejected')
             return self.result(dict(error=str(exc),error_code='chat_media_rejected'))
-        except (OSError,RuntimeError):
-            return self.result(dict(error='表情处理暂不可用；消息接收和普通工具不受影响。',error_code='chat_media_failed'))
+        except (OSError,RuntimeError,sqlite3.Error):
+            media.library.diagnose(arguments.get('session_id',''),name+'_failed')
+            return self.result(dict(error='表情处理暂不可用；外部操作可能已有结果，请用原幂等编号核对，勿换编号重发。消息接收和普通工具不受影响。',error_code='chat_media_failed'))
         finally:
             if call_id is not None:self.access.finish_call(call_id,status,time.monotonic()-began)
             media.slots.release()

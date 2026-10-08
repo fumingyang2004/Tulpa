@@ -188,6 +188,13 @@ html #reply-reject:not(:disabled):hover {background:transparent;color:var(--dang
 .desktop-config details {margin-top:23px;color:var(--muted);font-size:12px}
 .desktop-config .config-foot {display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:24px}
 .desktop-config .config-error {font-size:12px;white-space:pre-wrap}
+.snowluma-setup h3 {font-size:16px;color:var(--text);margin:22px 0 10px}
+.snowluma-setup .snow-folder {display:flex;gap:8px;align-items:center}
+.snowluma-setup .snow-folder input {flex:1;min-width:0}
+.snowluma-setup button {margin-top:12px;border:1px solid var(--line);border-radius:8px;padding:9px 12px}
+.snowluma-setup .snow-folder button {margin-top:0;white-space:nowrap}
+.snowluma-setup select {width:100%;padding:10px;font:inherit;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:7px}
+.snowluma-setup .snow-preview,.snowluma-setup [role=status] {white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;font-size:13px}
 .desktop-storage {font-size:11px;overflow-wrap:anywhere;color:var(--muted);border-top:1px solid var(--line);padding-top:16px;margin-top:22px}
 html .desktop-ready {color:var(--success)}
 html .tulpa-status,html .tulpa-empty,html .tulpa-intro,html .tulpa-card small {color:var(--muted)}

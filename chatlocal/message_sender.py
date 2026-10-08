@@ -47,7 +47,7 @@ class QQSender:
             raise SendError('发送接口必须是不含凭据参数的 localhost HTTP(S) 地址。')
 
     def call(self,action,payload,*,sending=False):
-        allowed={'get_login_info','get_group_info','get_group_member_info','get_friend_list','get_group_msg_history','get_friend_msg_history'}
+        allowed={'get_login_info','get_group_info','get_group_member_info','get_friend_list','get_group_msg_history','get_friend_msg_history','get_msg'}
         if action not in (allowed|({'send_group_msg','send_private_msg'} if sending else set())):raise SendError('接口不在发送适配器白名单中。')
         try:
             with httpx.Client(timeout=httpx.Timeout(20,connect=4),trust_env=False,follow_redirects=False,transport=self.transport) as client:
@@ -140,20 +140,68 @@ class QQSender:
         address=self.check_target(target)
         return dict(address,quote_id=self.quote_id(target,address) if quote else None)
 
+    def chat_targets(self,address,response_target,quote,mentions):
+        """Verify a cached live event against OneBot, never a local M/NT ID.
+
+        The caller resolves the event in its own authorized session. OneBot
+        lookups are repeated before dispatch to reject stale mappings/members.
+        """
+        if address['kind']!='group':raise SendError('原生引用和 @ 仅用于当前持续群聊，未发送。')
+        if response_target and response_target.get('conversation_id')!=f'{address["account"]}:group:{address["peer"]}':
+            raise SendError('回应目标不属于当前账号和群，未发送。')
+        quote_id=None
+        if quote:
+            if not response_target:raise SendError('显示引用需要本会话已读取的回应目标，未发送。')
+            mid=response_target['onebot_message_id']
+            digits=mid[1:] if isinstance(mid,str) and mid.startswith('-') else mid
+            if (not isinstance(digits,str) or not digits.isascii() or not digits.isdigit()
+                    or len(mid)>11 or str(int(mid))!=mid or not -(2**31)<=int(mid)<2**31 or int(mid)==0):
+                raise SendError('原消息没有有效的 OneBot 消息编号，未发送。')
+            info=self.call('get_msg',dict(message_id=int(mid)))
+            sender=info.get('sender') if isinstance(info,dict) and isinstance(info.get('sender'),dict) else {}
+            if (not isinstance(info,dict) or str(info.get('message_id'))!=mid
+                    or info.get('message_type')!='group' or str(info.get('group_id'))!=address['peer']
+                    or ('self_id' in info and str(info['self_id'])!=address['account'])
+                    or str(sender.get('user_id'))!=response_target['sender_id']
+                    or type(info.get('time')) is not int or info['time']!=response_target['timestamp']//1000
+                    or any(info.get(k) for k in ('recalled','is_recalled','deleted','is_deleted'))):
+                raise SendError('无法核对引用目标的账号、群、发送者和时间，或原消息已撤回；未发送。')
+            quote_id=int(mid)
+        for uid in mentions:
+            info=self.call('get_group_member_info',dict(group_id=int(address['peer']),user_id=int(uid),no_cache=True))
+            if not isinstance(info,dict) or str(info.get('group_id'))!=address['peer'] or str(info.get('user_id'))!=uid:
+                raise SendError('无法核对 @ 对象仍是当前群的指定成员，未发送。')
+        return quote_id
+
+    def prepare_chat(self,target,*,response_target=None,quote=False,mention_user_ids=()):
+        address=self.check_target(target)
+        return dict(address,chat_send=True,response_target=response_target,mention_user_ids=list(mention_user_ids),
+                    quote_id=self.chat_targets(address,response_target,quote,mention_user_ids))
+
     def send(self,target,text,prepared,*,guard=None):
         address=self.check_target(target)
         if any(address[k]!=prepared[k] for k in ('account','kind','peer','name')):raise SendError('目标会话信息已变化，请重新确认，未发送。')
         quote_id=prepared.get('quote_id')
-        if quote_id is not None and self.quote_id(target,address)!=quote_id:raise SendError('引用原消息已变化，请重新确认，未发送。')
-        segments=[dict(type='text',data=dict(text=text))]
+        mentions=prepared.get('mention_user_ids',[]) if prepared.get('chat_send') else []
+        if prepared.get('chat_send'):
+            if self.chat_targets(address,prepared.get('response_target'),quote_id is not None,mentions)!=quote_id:
+                raise SendError('引用原消息已变化，未发送。')
+        elif quote_id is not None and self.quote_id(target,address)!=quote_id:raise SendError('引用原消息已变化，请重新确认，未发送。')
+        segments=[dict(type='at',data=dict(qq=uid)) for uid in mentions]+[dict(type='text',data=dict(text=text))]
         if quote_id is not None:segments.insert(0,dict(type='reply',data=dict(id=str(quote_id))))
         group=address['kind']=='group';key='group_id' if group else 'user_id'
         if guard:guard()
         data=self.call('send_group_msg' if group else 'send_private_msg',{key:int(address['peer']),'message':segments},sending=True)
         if not isinstance(data,dict) or type(data.get('message_id')) is not int:
             raise SendUncertain('接口未返回可靠消息编号，请到 QQ 核对，本条不会自动重发。')
-        return dict(message_id=data['message_id'],conversation_id=target['conversation_id'],timestamp=time.time(),content=text,
+        receipt=dict(message_id=data['message_id'],conversation_id=target['conversation_id'],timestamp=time.time(),content=text,
                     quote_message_id=quote_id,platform='qq',note='OneBot 已返回发送成功回执。协议发送可能不写入桌面 QQ 的本地记录；此回执不代表客户端已同步。')
+        if prepared.get('chat_send'):
+            receipt.update(message_segments=segments,mention_user_ids=mentions,
+                           reply_to_event_id=(prepared.get('response_target') or {}).get('event_id'),
+                           segment_source='submitted_to_onebot',
+                           display_note='以上为程序提交的消息段。引用是否由 OneBot / QQ 额外显示 @，以实际客户端为准。')
+        return receipt
 
 
 def sender_for(platform):

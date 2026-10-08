@@ -1,5 +1,22 @@
 # 验证说明
 
+## 0.5.3 发布验证（2026-10-08）
+
+- 本机完成 30 项 Python 检查及 5 项前端检查，均使用隔离夹具；未发送真实 QQ 消息、收藏图片或调用付费模型。覆盖原有 MCP、聊天浏览、回复、记忆、工作区、升级，以及 SnowLuma 导入、原生引用 / @ 和表情持久链路。
+- 人格回归读取开发区完整的 `little_whale.md` 和 `dragon_girl.md`，验证热发现、全文进入 prompt、会话快照及通用表情工具提示。小鲸鱼来源记录的 SHA256 随维护者本次修改更新，不将角色卡退回旧版。
+- 旧 QQ 修复回归曾依赖本机已删除的 0.5.1 安装目录。已改为默认复制源码与读取器，放入合成的 0.5.1 安装清单；1,201 条合成消息的导入、失败重试及其他数据保留通过。可另用 `--package` 检查真正的旧安装，不把默认夹具说成旧二进制实测。
+- Windows CI 在 main 与版本 tag 上运行这些检查。SnowLuma 浏览器夹具通过测试专用的 Playwright Core 加载实际 full / lite 页面，所有 API 均为模拟；不依赖作者的运行服务或私人安装包。
+- 发布门槛包括：两个包由同一干净提交构建；分别用随包 Python 验证 MCP、表情、引用 / @、读取器与增量；新目录启动检查；ZIP 文件清单、CRC、隐私边界及 SHA256 校验。具体构建提交、文件哈希与下载结果见 [0.5.3 Release](https://github.com/fumingyang2004/Tulpa/releases/tag/v0.5.3) 和包内 `build-manifest.json`。
+- [此前表情链路的详细隔离验收](MCP_STICKERS_VALIDATION.md) 保留样本规模、成本和未覆盖项。mock 与新安装启动不能替代用户真实群聊的长期自然程度、全版本客户端兼容或旧媒体可达性。
+
+## SnowLuma 文件夹导入（2026-10-06，开发版，未发布）
+
+- `scripts/check_snowluma_setup.py`：隔离目录中的脱敏配置配合真实本机 HTTP / WS 测试服务，通过干净配置、已有手动值保留、多个账号 / 节点、snapshot / overlay、自定义端口和路径、独立 / 空 Token、禁用节点、API-only WS、坏 JSON、缺少账号配置、配置变化、重复导入与并发保存检查。HTTP 认证 / 路径 / 连接失败、WS 认证 / 握手 / 身份 / 心跳失败均不覆盖原连接；账号授权与同源检查通过。
+- `scripts/check_snowluma_ui.cjs`：Edge 无头浏览器加载完整版与轻量版的实际 HTML 和设置脚本，使用隔离 API 数据验证高级设置默认折叠、取消文件夹选择、多账号 / 多节点明确选择、错误保留、重复打开 / 保存、双击防重和仅 HTTP 提示。原生文件夹选择的回传在此测试中为模拟事件，不冒充 Windows 对话框实点验收。
+- `check_desktop.py`、`check_mcp_onebot.py`、`check_mcp_chat.py`、`check_group_admin.py`、`check_mcp_ui.cjs` 回归通过。完整版和 MCP 轻量版 C# 启动器均编译通过；未重新打包发布，也未覆盖当前使用的 EXE。
+- 本机已有授权连接的只读验收：仅使用与 Tulpa 已存连接完全匹配的 SnowLuma v1.14.20 账号 / 节点，HTTP `get_login_info` 与 WS 元事件身份核对均成功，来源 / 现有 MCP 授权账号一致。没有发送消息、查询聊天正文或改权限；核对 Tulpa `.env` 和 SnowLuma 配置前后字节一致。
+- 自动识别仅启用已核对的 SnowLuma v1.14.19 / v1.14.20 配置格式；未来版本和其他 OneBot 实现保留手动入口。未在第二台电脑或全新 SnowLuma 首次安装上实测，首次协议、密码、登录与加载 QQ 仍由用户在 SnowLuma 中完成。使用步骤见 [连接教程](SNOWLUMA_SETUP.md)。
+
 ## 外部客户端接入补充（2026-10-06）
 
 - Claude Code（VS Code 扩展 `2.1.289`）：用户自行配置后确认功能正常。本轮只读核对 `.claude.json` 中项目作用域的 HTTP / Bearer 配置，凭据对应有效的 Tulpa 授权，并对照官方文档整理跨项目配置方法。当前授权与另一客户端共用，服务端调用记录不能独立归因给 Claude Code；本轮未重复执行发送或群管理验收。

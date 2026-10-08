@@ -83,6 +83,19 @@ def main():
     assert hashlib.sha256(whale.encode()).hexdigest()==source['sha256_utf8_lf'], 'Distributed role card and provenance differ'
     assert source['modified'] is True and source['upstream_sha256_utf8_lf'] != source['sha256_utf8_lf']
     assert next(item for item in p.personas() if item['id']=='little_whale')['source']==source
+    # Ship the maintainer's entire new card, without truncation or whale voice.
+    dragon = (p.ROOT/'dragon_girl.md').read_text('utf-8-sig')
+    catalog = p.persona_catalog()
+    assert not catalog['warnings']
+    assert {'little_whale','dragon_girl'} <= {item['id'] for item in catalog['personas']}
+    assert p.resolve_persona(preset='dragon_girl') == dragon
+    dragon_row = dict(row,persona=dragon,persona_preset='dragon_girl')
+    dragon_packet = p.packet(dragon_row,[],[],full=True,scope={'chat_images':True,'chat_sticker_collect':True})
+    assert dragon_packet['persona'] == dragon
+    assert '白龙娘' in dragon_packet['persona_name']
+    assert '小鲸鱼' not in json.dumps(dragon_packet['examples'],ensure_ascii=False)
+    assert any('collect_chat_sticker' in hint for hint in dragon_packet['reminders'])
+    assert p.version(dragon_row) != p.version(row)
     assert p.resolve_persona('  自定义语气  ')=='自定义语气'
     for custom,preset in [('', ''), ('x','arbitrary-path')]:
         try:p.resolve_persona(custom,preset)
@@ -110,6 +123,11 @@ def main():
     assert not full['examples'] and '角色卡' in full['examples_source']
     assert len(json.dumps(compact,ensure_ascii=False))<4000
     assert len(json.dumps(full,ensure_ascii=False))<12000
+    with patch.object(p.time,'time',return_value=1010):
+        distances=p.packet(row,recent,recent)['response_targets']['items']
+    assert distances[0]==dict(event_id=1,sender_id='111',seconds_ago=9,observed_messages_after=5,observed_speakers_after=1,recalled=False)
+    assert distances[-1]['observed_messages_after']==0 and distances[-1]['seconds_ago']==4
+    assert len(p.packet(row,[msg(i) for i in range(100)],[])['response_targets']['items'])==8
     assert any('短窗口' in hint for hint in compact['reminders'])
     idle=p.packet(row,[],[],event='idle')
     assert not idle['examples'] and any('没有新消息' in s for s in idle['reminders'])
@@ -127,6 +145,9 @@ def main():
     media=p.packet(row,[],[msg(11,'[图片]',segments=[{'type':'image','image_index':0}])],scope={'chat_images':True})
     assert media['social_context']['image_events']==[{'event_id':11,'index':0}]
     assert not media['examples']
+    collect=p.packet(row,[],[],scope={'chat_images':True,'chat_sticker_collect':True})
+    assert not collect['examples'] and any('collect_chat_sticker' in hint for hint in collect['reminders'])
+    assert any('单发图' in hint and '不凑' in hint for hint in collect['reminders'])
     assert p.packet(dict(row,persona_preset=''),[],[msg(11,'[图片]')],scope={'chat_images':True})['examples'][0]['id']=='sticker'
     assert media['capabilities']['chat_sticker_send'] is False
     # Group text is matched as data; it cannot choose a preset, replace a persona,

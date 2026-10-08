@@ -155,6 +155,13 @@ def main():
                     assert data('send_chat_sticker',**unknown)['state']=='UNKNOWN'
                     assert data('send_chat_sticker',**unknown)['state']=='UNKNOWN' and len(StickerBot.sent)==2
                     unknown=dict(send,idempotency_key='unknown-collect')
+                    # A new request key cannot duplicate an already confirmed QQ collection.
+                    dedup=data('collect_chat_sticker',**unknown)
+                    assert dedup['state']=='SUCCEEDED' and dedup['result']['qq']['deduplicated']
+                    assert len(StickerBot.collected)==1
+                    with patch('chatlocal.mcp_chat_media.download',return_value=fixture_image(False)):
+                        newaid=data('read_chat_image',session_id=sid,event_id=add(893))['sticker_id']
+                    unknown=dict(session_id=sid,sticker_id=newaid,idempotency_key='unknown-collect-new')
                     assert data('collect_chat_sticker',**unknown)['state']=='UNKNOWN'
                     assert data('collect_chat_sticker',**unknown)['state']=='UNKNOWN' and len(StickerBot.collected)==2
                     StickerBot.uncertain=False
@@ -169,9 +176,12 @@ def main():
                     assert not call('send_chat_message',session_id=sid,text='ordinary still works',idempotency_key='ordinary-send').isError
                     add(892)
                     assert data('wait_chat_messages',session_id=sid,quiet_seconds=0,timeout_seconds=1)['messages']
-                    began=time.monotonic();assert data('stop_chat_session',session_id=sid)['event']=='stopped';assert time.monotonic()-began<1
+                    began=time.monotonic();assert data('stop_chat_session',session_id=sid)['event']=='stopped'
+                    stop_seconds=time.monotonic()-began
+                    assert stop_seconds<1,dict(stop_seconds=stop_seconds,image_downloads_released=release.is_set())
                     release.set();assert all(t.result(5).isError for t in tasks)
-                # New session retains model notes but never inherits proof of viewing.
+                # A freshly listed remote favorite still needs a read. Verified library
+                # handles are a separate path (covered by check_mcp_sticker_library).
                 sid=start('media-new-session')
                 eventually(lambda:tools.chat.receiver.status()['state']=='connected')
                 with patch('chatlocal.mcp_chat_media.download',return_value=animated):

@@ -86,6 +86,7 @@ def main():
         (folder/'qq-snapshot-info.json').write_text(json.dumps(dict(account='test',source=str(folder))),'utf-8')
         reader=Reader('qq');reader.open=lambda *a:db
         reader.maps_at=time.monotonic();reader.buddy={};reader.group={};reader.names={10:'测试群'};reader.own='self'
+        reader.label_status={}  # Fixture bypasses qq_maps(), which normally sets this field.
         reader.media=parser;reader.media_at=time.monotonic();reader.media_stickers=False
         # Never consult the personal database for background media retries.
         from chatlocal.store import Store

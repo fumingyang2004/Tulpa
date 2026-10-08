@@ -1,6 +1,7 @@
 """Local product configuration. Keys are write-only; no secret enters responses."""
 import os
 import json
+import hashlib
 import tempfile
 import threading
 from pathlib import Path
@@ -13,7 +14,7 @@ from .config import ROOT
 
 from .version import VERSION
 _settings_lock=threading.Lock()
-_fields=('API_BASE','API_KEY','MODEL','REPLY_ONEBOT_URL','REPLY_ONEBOT_TOKEN','REPLY_ONEBOT_WS_URL','REPLY_ONEBOT_WS_TOKEN')
+_fields=('API_BASE','API_KEY','MODEL','REPLY_ONEBOT_URL','REPLY_ONEBOT_TOKEN','REPLY_ONEBOT_WS_URL','REPLY_ONEBOT_WS_TOKEN','REPLY_ONEBOT_WS_TOKEN_MODE')
 
 
 def read_product_settings(root=ROOT):
@@ -26,7 +27,13 @@ def read_product_settings(root=ROOT):
         environment_overrides=[k for k in _fields if k in os.environ])
 
 
-def save_product_settings(body,root=ROOT):
+def settings_revision(root):
+    path=root/'.env'
+    content=path.read_bytes() if path.exists() else b''
+    return hashlib.sha256(content+json.dumps({k:os.environ[k] for k in _fields if k in os.environ},sort_keys=True).encode()).hexdigest()
+
+
+def save_product_settings(body,root=ROOT,*,replace_onebot_secrets=False,expected_revision=None):
     if not isinstance(body,dict) or set(body)-{'api_base','model','api_key','sender_url','sender_token','events_url','events_token'}:
         raise ValueError('模型配置字段无效。')
     update={}
@@ -35,7 +42,7 @@ def save_product_settings(body,root=ROOT):
         value=body[key]
         if not isinstance(value,str) or len(value)>4096 or any(ord(c)<32 for c in value):raise ValueError('配置中不能包含换行或控制字符。')
         value=value.strip()
-        if key in ('api_key','sender_token','events_token') and not value:continue  # Blank means keep existing, never expose a mask as the key.
+        if key in ('api_key','sender_token','events_token') and not value and not (replace_onebot_secrets and key!='api_key'):continue
         if key=='events_url' and value:
             from .onebot_events import validate_url
             validate_url(value)
@@ -50,7 +57,10 @@ def save_product_settings(body,root=ROOT):
         if key=='model' and len(value)>200:raise ValueError('模型名称过长。')
         update[env]=value
     if not update:raise ValueError('没有需要保存的设置。')
+    if replace_onebot_secrets:update['REPLY_ONEBOT_WS_TOKEN_MODE']='independent'
     with _settings_lock:
+        if expected_revision is not None and settings_revision(root)!=expected_revision:
+            raise ValueError('Tulpa 设置在检测期间已发生变化，未覆盖；请重新打开设置并导入。')
         path=root/'.env'
         existing=dotenv_values(path)
         if set(update) & {'API_BASE','API_KEY','MODEL'} and not update.get('API_KEY',os.environ.get('API_KEY',existing.get('API_KEY') or '')):
@@ -70,11 +80,14 @@ def save_product_settings(body,root=ROOT):
 
 
 def install_desktop_routes(app,root=ROOT):
+    from .snowluma_setup import SetupSessions,SetupError,test_connection,check_account_scope
+    snowluma=SetupSessions()
+    importing=threading.Lock()
     def local(request,write=False):
         if request.client and request.client.host not in ('127.0.0.1','::1','testclient'):raise HTTPException(403)
         if urlparse(str(request.base_url)).hostname not in ('127.0.0.1','localhost','::1','testserver'):raise HTTPException(403)
         origin=request.headers.get('origin')
-        if origin and origin!=str(request.base_url).rstrip('/'):raise HTTPException(403,'只允许本机同源操作。')
+        if (origin and origin!=str(request.base_url).rstrip('/')) or request.headers.get('sec-fetch-site')=='cross-site':raise HTTPException(403,'只允许本机同源操作。')
         if write and (request.headers.get('x-chatweave-ui')!='1' or request.headers.get('content-type','').split(';')[0]!='application/json'):
             raise HTTPException(403,'请通过模型设置保存。')
 
@@ -152,30 +165,47 @@ def install_desktop_routes(app,root=ROOT):
     def test_onebot(request:Request,body:dict):
         local(request,True)
         if body:raise HTTPException(400,'检测使用已保存的 OneBot 配置。')
-        from .onebot import Client,configuration,OneBotError,invalidate_availability
+        from .onebot import configuration,invalidate_availability
+        from .onebot_events import configuration as events_configuration
         config=configuration(root)
         invalidate_availability()
         if not config['url']:return dict(ok=False,message='尚未配置 OneBot；本地聊天查询仍可使用。')
+        service=getattr(app.state,'tulpa_mcp',None)
+        if service:
+            with service.tools.qq_lock:service.tools.qq_at=0
+        return test_connection(config,events_configuration(root),service=service)
+
+    @app.post('/api/desktop/snowluma/inspect')
+    def inspect_snowluma(request:Request,body:dict):
+        local(request,True)
+        if set(body)!={'folder'}:raise HTTPException(400,'请选择 SnowLuma 文件夹。')
+        try:return dict(ok=True,**snowluma.inspect(body['folder']))
+        except SetupError as exc:return dict(ok=False,code=exc.code,message=str(exc))
+
+    @app.post('/api/desktop/snowluma/import')
+    def import_snowluma(request:Request,body:dict):
+        local(request,True)
+        if not importing.acquire(blocking=False):raise HTTPException(409,'已有连接正在检测，请稍候。')
         try:
-            account=Client(config,timeout=3).login()
-            # Invalidate cached availability after saving/testing a new endpoint.
+            revision=settings_revision(root)
+            account,http,ws=snowluma.select(body)
+            result=test_connection(http,ws,expected_account=account,service=getattr(app.state,'tulpa_mcp',None))
+            if not result['ok']:return dict(result,saved=False,message=result['message']+' 未保存，原连接保持不变。')
+            # Configuration may have changed while a network request was pending.
+            account2,http2,ws2=snowluma.select(body)
+            if (account,http,ws)!=(account2,http2,ws2):raise ValueError('SnowLuma 配置已变化，请重新检测。')
+            check_account_scope(getattr(app.state,'tulpa_mcp',None),account)
+            settings=save_product_settings(dict(sender_url=http['url'],sender_token=http['token'],events_url=ws['url'],events_token=ws['token']),
+                root,replace_onebot_secrets=True,expected_revision=revision)
+            from .onebot import invalidate_availability
+            invalidate_availability()
             service=getattr(app.state,'tulpa_mcp',None)
             if service:
                 with service.tools.qq_lock:service.tools.qq_at=0
-            from .onebot_events import configuration as events_configuration
-            event_note='持续群聊还需填写下方 WebSocket 事件地址。'
-            receiver=None
-            if service and events_configuration(root)['url']:
-                import time
-                service.tools.chat.receiver.start()
-                deadline=time.monotonic()+5
-                while time.monotonic()<deadline:
-                    receiver=service.tools.chat.receiver.status()
-                    if receiver['state'] in ('connected','auth_error','account_mismatch'):break
-                    time.sleep(.05)
-                event_note=receiver['note']
-            return dict(ok=True,account=account,receiver=receiver,message='QQ HTTP 接口已连接 '+account+'。'+event_note)
-        except OneBotError as exc:return dict(ok=False,message=str(exc))
+            return dict(result,saved=True,settings=settings,message=result['message']+' 已保存到 Tulpa；SnowLuma 配置未改动。')
+        except SetupError as exc:return dict(ok=False,saved=False,code=exc.code,message=str(exc))
+        except (OSError,ValueError):return dict(ok=False,saved=False,code='save_conflict',message='读取或保存未完成，可能配置已变化或目录不可写。请重新检测；未自动替换其他账号或节点。')
+        finally:importing.release()
 
     @app.get('/api/desktop/diagnostics')
     def diagnostics(request:Request):

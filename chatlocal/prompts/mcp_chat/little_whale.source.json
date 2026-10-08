@@ -3,10 +3,10 @@
   "revision": "9df6a7e7fc5abcb36793337f778483bd442a3d2d",
   "path": "roles/小鲸鱼.md",
   "url": "https://github.com/Derpyu520/qq-bridge/blob/9df6a7e7fc5abcb36793337f778483bd442a3d2d/roles/小鲸鱼.md",
-  "sha256_utf8_lf": "8d8ae105481b9593bcab51601d2820f77b78eaf354167ca776aa58aab47d2285",
+  "sha256_utf8_lf": "eab7f1cbaa202a2f12e22a93c5ed3e051665d1475fc131f74e96b414f7b15639",
   "license": "MIT",
   "modified": true,
   "upstream_sha256": "aed72910150f66926c81246b1566c14acdfa03b14a6e750ab4358c49660c4154",
   "upstream_sha256_utf8_lf": "237dce15331b4839fb0d9edb2b362017bffe6b99a732925bcb5d40a47c0c3386",
-  "modifications": "Tulpa maintainer adaptations to phrasing, banter, repetition and reply examples; upstream identity and role structure retained."
+  "modifications": "Tulpa maintainer adaptations to phrasing, banter, repetition, reply examples, appearance and sticker usage; updated for 0.5.3 on 2026-10-08. Upstream provenance retained."
 }

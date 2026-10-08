@@ -32,6 +32,8 @@
       </form>
     </details>
     <details id="desktop-onebot-section"><summary>QQ 扩展 / OneBot（可选）</summary>
+      <div id="desktop-snowluma"></div>
+      <details id="desktop-onebot-manual"><summary>高级设置：手动配置连接</summary>
       <form id="desktop-onebot-form" autocomplete="off">
         <p class="config-intro">这份配置同时用于 QQ 回复、群管理和已授权的 MCP 群资料读取。OneBot 服务须独立运行；本地聊天检索不依赖它。</p>
         <label for="desktop-sender-url">本机 OneBot 地址</label><input id="desktop-sender-url" type="url" placeholder="http://127.0.0.1:3000" maxlength="2048">
@@ -41,6 +43,8 @@
         <div class="config-foot"><button type="button" id="desktop-onebot-test">检测已保存的连接</button><button type="submit" class="primary-button" id="desktop-onebot-save">保存并检测</button></div>
         <p id="desktop-onebot-status" role="status"></p>
       </form>
+      </details>
+      <p id="desktop-onebot-current" class="config-intro"></p>
     </details>
     <label class="desktop-check" id="desktop-background-label"><input id="desktop-background" type="checkbox">关闭窗口后留在托盘，继续提供 MCP 和实时读取</label>
     <small id="desktop-tray-hint">托盘菜单可以打开窗口、设置开机启动或彻底退出。退出会停止本机服务。</small>
@@ -48,6 +52,12 @@
     <p id="desktop-config-error" class="config-error" role="status"></p>
   </div>`;
   document.body.append(dialog);
+  function fillOnebot(s){
+    el('desktop-sender-url').value=s.sender_url;el('desktop-sender-token').value='';el('desktop-sender-token').placeholder=s.has_sender_token?'已保存 · 留空保留':'访问 Token（如接口需要）';
+    el('desktop-events-url').value=s.events_url||'';el('desktop-events-token').value='';el('desktop-events-token').placeholder=s.has_events_token?'已保存 · 留空保留':'WebSocket 节点 Token';
+    el('desktop-onebot-current').textContent=s.sender_url?'当前保存的 HTTP：'+s.sender_url+(s.events_url?'；事件：'+s.events_url:'；未配置事件连接。'):'尚未配置 OneBot。';
+  }
+  const snow=window.TulpaSnowLuma.mount(el('desktop-snowluma'),{prefix:'desktop',onSaved:fillOnebot});
   async function api(path,method='GET',body){
     const r=await fetch('/api/desktop/'+path,{method,cache:'no-store',headers:{'Content-Type':'application/json','X-ChatWeave-UI':'1'},body:body===undefined?undefined:JSON.stringify(body)});
     const data=await r.json();if(!r.ok)throw Error(data.detail||'设置操作失败。');return data;
@@ -57,8 +67,7 @@
     el('desktop-api-base').value=s.api_base;el('desktop-model').value=s.model;el('desktop-api-key').value='';el('desktop-api-key').required=!s.has_api_key;
     el('desktop-api-key').placeholder=s.has_api_key?'已保存 · 留空保留现有密钥':'输入你的 API Key';
     el('desktop-key-hint').textContent=s.has_api_key?'密钥已保存在本机，不会回显。':'密钥不会随发布包分发。';
-    el('desktop-sender-url').value=s.sender_url;el('desktop-sender-token').value='';el('desktop-sender-token').placeholder=s.has_sender_token?'已保存 · 留空保留':'访问 Token（如接口需要）';
-    el('desktop-events-url').value=s.events_url||'';el('desktop-events-token').value='';el('desktop-events-token').placeholder=s.has_events_token?'已保存 · 留空保留':'WebSocket 节点 Token';
+    fillOnebot(s);
     el('desktop-model-status').textContent=s.configured?'已配置':prefs.mode==='mcp'?'外部 Agent':'设置';
     el('model-label').textContent=s.configured?s.model:'未配置模型';
     el('desktop-background').checked=prefs.background;
@@ -67,6 +76,7 @@
     return {s,prefs};
   }
   async function open(section){
+    snow.reset();el('desktop-onebot-manual').open=false;
     el('desktop-config-error').textContent='';
     try{await load();}catch(e){el('desktop-config-error').textContent=e.message;}
     if(section)el('desktop-'+section+'-section').open=true;
@@ -79,7 +89,7 @@
   el('desktop-open-mcp').onclick=()=>{dialog.close();el('open-mcp').click();};
   el('desktop-open-data').onclick=()=>{dialog.close();el('open-data').click();};
   async function testOneBot(){const result=await api('onebot/test','POST',{});el('desktop-onebot-status').textContent=result.message;}
-  async function action(button,fn){button.disabled=true;el('desktop-config-error').textContent='';try{await fn();}catch(e){el('desktop-config-error').textContent=e.message;}finally{button.disabled=false;}}
+  async function action(button,fn){if(button.disabled)return;button.disabled=true;el('desktop-config-error').textContent='';try{await fn();}catch(e){el('desktop-config-error').textContent=e.message;}finally{button.disabled=false;}}
   el('desktop-config-form').onsubmit=event=>{
     event.preventDefault();action(el('desktop-config-save'),async()=>{
       await api('settings','PUT',{api_base:el('desktop-api-base').value,api_key:el('desktop-api-key').value,model:el('desktop-model').value});
@@ -94,7 +104,7 @@
   };
   el('desktop-onebot-test').onclick=()=>action(el('desktop-onebot-test'),testOneBot);
   el('desktop-background').onchange=()=>action(el('desktop-background'),async()=>{await api('preferences','PUT',{background:el('desktop-background').checked});});
-  dialog.addEventListener('close',()=>{el('desktop-api-key').value='';el('desktop-sender-token').value='';el('desktop-events-token').value='';});
+  dialog.addEventListener('close',()=>{snow.reset();el('desktop-api-key').value='';el('desktop-sender-token').value='';el('desktop-events-token').value='';});
   const welcome=document.createElement('dialog');welcome.id='desktop-onboarding';welcome.className='desktop-config';
   welcome.innerHTML=`<div class="dialog-head"><h2>从哪里开始？</h2><button type="button" class="icon-button" id="desktop-onboarding-close" aria-label="关闭使用向导">${icon('close')}</button></div>
     <div class="desktop-config-body"><p class="config-intro">资料留在本机。选择一种方式开始，稍后也可以同时使用。</p>

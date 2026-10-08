@@ -12,7 +12,7 @@
 
 ## 自己执行
 
-1. 从 [Releases](https://github.com/fumingyang2004/Tulpa/releases/tag/v0.5.2) 下载与你现用版本类型对应的 ZIP 和 `SHA256SUMS.txt`。用 PowerShell `Get-FileHash 下载的ZIP -Algorithm SHA256` 与文件中的值核对。
+1. 从 [Releases](https://github.com/fumingyang2004/Tulpa/releases/tag/v0.5.3) 下载与你现用版本类型对应的 ZIP 和 `SHA256SUMS.txt`。用 PowerShell `Get-FileHash 下载的ZIP -Algorithm SHA256` 与文件中的值核对。
 2. 完整解压到**新临时目录**，不要在里面启动 Tulpa。找出**原来已经导入聊天、创建授权的安装目录**，确认其中有 `Tulpa.exe`、`build-manifest.json` 和自己的 `data`。不要误选空白包或开发仓库。
 3. 在 Codex / DSH 停止持续聊天任务，在 Tulpa 托盘右键选择 **彻底退出**。只关闭窗口可能仍在托盘提供服务。QQ、微信和 SnowLuma 可以保持运行。
 4. 例如，新包在 `C:\Tulpa-new\Tulpa`，原来的安装在 `C:\Tulpa`。打开 PowerShell，先执行检查：
@@ -35,7 +35,7 @@
 
 ## 自定义人格如何保留
 
-升级前检查原目录 `chatlocal/prompts/mcp_chat/`。自己新增、与新版随包文件不重名的 `.md` 不在旧发布清单中，升级工具会保留。若你改过随包的 `little_whale.md`，先在原目录另存为 `我的小鲸鱼.md`，再运行升级；随包预设属于程序文件，会更新为新版。Agent 代为升级时也应先检查并完成这一步。被替换的旧文件仍保留在升级备份中。
+升级前检查原目录 `chatlocal/prompts/mcp_chat/`。自己新增、与新版随包文件不重名的 `.md` 不在旧发布清单中，升级工具会保留。若你改过随包的 `little_whale.md`，或自己创建过与新版 `dragon_girl.md` 同名的卡片，先在原目录另存为 `我的小鲸鱼.md` / `我的龙娘.md`，再运行升级；随包预设属于程序文件，会更新为新版。Agent 代为升级时也应先检查并完成这一步。被替换的旧文件仍保留在升级备份中。
 
 升级后让 Agent 调用 `list_chat_personas`，选择保留的卡片；已有聊天会话继续使用创建时的人格快照，要用新卡须停止旧会话并重新开启。
 

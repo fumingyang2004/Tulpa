@@ -11,7 +11,9 @@ from .config import ROOT
 
 
 class OneBotError(ValueError):
-    pass
+    def __init__(self, message, code='http_query_failed'):
+        super().__init__(message)
+        self.code = code
 
 
 class OneBotUncertain(OneBotError):
@@ -71,7 +73,19 @@ class Client:
         except OneBotError:
             raise
         except (httpx.ConnectError, httpx.ConnectTimeout):
-            raise OneBotError('未连接到本机 OneBot，请保持 QQ 和接入程序运行。') from None
+            raise OneBotError('未连接到本机 OneBot，请核对节点地址、启用状态和接入程序是否运行。', 'http_unreachable') from None
+        except httpx.HTTPStatusError as exc:
+            if writing:
+                raise OneBotUncertain('未取得可靠回执，操作结果未知。请在 QQ 核对，不会自动重试。') from None
+            if exc.response.status_code in (401, 403):
+                raise OneBotError('HTTP 认证被拒绝，请核对所选 HTTP 节点自己的 Token。', 'http_auth_error') from None
+            if exc.response.status_code == 404:
+                raise OneBotError('HTTP 接口路径不存在，请核对节点的端口和 path。', 'http_path_error') from None
+            raise OneBotError('HTTP 服务返回错误，未取得 OneBot 成功回执。', 'http_response_error') from None
+        except httpx.TimeoutException:
+            if writing:
+                raise OneBotUncertain('未取得可靠回执，操作结果未知。请在 QQ 核对，不会自动重试。') from None
+            raise OneBotError('HTTP 检测超时，请检查该节点和 QQ 连接状态。', 'http_timeout') from None
         except (httpx.HTTPError, ValueError, TypeError):
             if writing:
                 raise OneBotUncertain('未取得可靠回执，操作结果未知。请在 QQ 核对，不会自动重试。') from None
@@ -80,7 +94,7 @@ class Client:
     def login(self):
         data = self.call('get_login_info', {})
         if not isinstance(data, dict) or not str(data.get('user_id', '')).isdigit():
-            raise OneBotError('OneBot 尚未返回有效的已登录 QQ 账号。')
+            raise OneBotError('OneBot 尚未返回有效的已登录 QQ 账号。', 'http_identity_missing')
         return str(data['user_id'])
 
 

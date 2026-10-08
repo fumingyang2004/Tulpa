@@ -9,7 +9,7 @@ from urllib.request import urlopen
 ROOT=Path(__file__).resolve().parent.parent
 sys.path.insert(0,str(ROOT))
 from chatlocal.config import local_path
-from reader_patches import patch_qq_proxy,patch_wechat_db,patch_qq_helper
+from reader_patches import patch_qq_proxy,patch_wechat_db,patch_qq_helper,patch_qq_configured_root,patch_qq_passive_scan
 
 QQ_COMMIT='b55675779e50edec913fab9d891e4185c8f7c9ac'
 WX_COMMIT='492a8fb70b95865613d6d8d9740323233dbfa197'
@@ -34,6 +34,8 @@ def download(job):
         if data.count(original)!=2:
             raise ValueError('Upstream QQ reader changed; review text truncation patch')
         data=data.replace(original,b'return " ".join(out)')
+        data=patch_qq_configured_root(data)
+        data=patch_qq_passive_scan(data)
     target=local_path(ROOT/'tools'/directory/relative)
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_bytes(data)
@@ -46,6 +48,11 @@ def main():
     jobs += [('fanyuantaier/wechatauto-replica',WX_COMMIT,p,'wechat-reader') for p in ['LICENSE','wechatauto/db.py','wechatauto/media.py']]
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         manifest=list(pool.map(download,jobs))
+    helper=ROOT/'scripts/qq_passive_keys.py'
+    target=ROOT/'tools/qq-reader/chatlog_keeper/_tulpa_passive_keys.py'
+    target.write_bytes(helper.read_bytes())
+    manifest.append(dict(file=str(target.relative_to(ROOT)),source='scripts/qq_passive_keys.py',
+        installed_sha256=hashlib.sha256(target.read_bytes()).hexdigest()))
     package=ROOT/'tools'/'wechat-reader'/'wechatauto'
     (package/'__init__.py').write_text('# Only the upstream read-only database module is loaded.\n',encoding='utf-8')
     (package/'logger.py').write_text("import logging\nwxlog = logging.getLogger('wechat-reader')\nwxlog.addHandler(logging.NullHandler())\nwxlog.propagate = False\n",encoding='utf-8')

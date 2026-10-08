@@ -20,7 +20,10 @@ def configuration(root=None):
     values = dotenv_values(root / '.env')
     def value(key):
         return str(os.environ.get(key, values.get(key) or '')).strip()
-    return dict(url=value('REPLY_ONEBOT_WS_URL'), token=value('REPLY_ONEBOT_WS_TOKEN') or onebot.configuration(root)['token'])
+    token = value('REPLY_ONEBOT_WS_TOKEN')
+    if value('REPLY_ONEBOT_WS_TOKEN_MODE') != 'independent':
+        token = token or onebot.configuration(root)['token']
+    return dict(url=value('REPLY_ONEBOT_WS_URL'), token=token)
 
 
 def validate_url(url):
@@ -32,9 +35,10 @@ def validate_url(url):
 
 
 class EventReceiver:
-    def __init__(self, on_event, on_change, *, config_factory=configuration, client_factory=onebot.Client):
+    def __init__(self, on_event, on_change, *, config_factory=configuration, client_factory=onebot.Client, metadata_only=False):
         self.on_event, self.on_change = on_event, on_change
         self.config_factory, self.client_factory = config_factory, client_factory
+        self.metadata_only = metadata_only
         self.lock = threading.RLock()
         self.halt = threading.Event()
         self.thread = None
@@ -110,10 +114,17 @@ class EventReceiver:
                             continue
                         if not isinstance(event, dict) or 'post_type' not in event:
                             continue
+                        if self.metadata_only and (event.get('post_type') != 'meta_event' or event.get('meta_event_type') not in ('lifecycle', 'heartbeat')):
+                            continue  # Setup discards messages; only lifecycle/heartbeat proves identity.
                         if str(event.get('self_id', '')) != account:
                             self.update('account_mismatch', 'HTTP 与事件通道的 QQ 账号不一致，已停止接收。', account='')
                             raise ValueError('account_mismatch')
                         last_packet = time.monotonic()
+                        if self.metadata_only and event.get('meta_event_type') == 'heartbeat':
+                            status = event.get('status')
+                            if isinstance(status, dict) and (status.get('online') is False or status.get('good') is False):
+                                self.update('upstream_offline', 'WS 已连接，但 QQ 心跳报告接收链路不健康。', account=account)
+                                continue
                         if not verified:
                             verified = True
                             self.update('connected', 'SnowLuma 实时事件已连接。', account=account, connected_at=time.time())
@@ -132,8 +143,11 @@ class EventReceiver:
                                     last_event_at=time.time())
                         if healthy:
                             self.on_event(event)
-            except InvalidStatus:
-                self.update('auth_error', '事件连接被拒绝，请核对 WebSocket 地址及其独立 Token。', account='')
+            except InvalidStatus as exc:
+                auth = exc.response.status_code in (401, 403)
+                self.update('auth_error' if auth else 'handshake_error',
+                            'WS 认证被拒绝，请核对该事件节点自己的 Token。' if auth else
+                            'WS 握手失败，请核对正向 WebSocket 节点的端口、path 和启用状态。', account='')
             except Exception:
                 # Exception strings can include a handshake URL or Authorization.
                 if self.status()['state'] != 'account_mismatch':
@@ -142,3 +156,24 @@ class EventReceiver:
                 self.halt.wait(delay)
                 delay = min(15, delay*2)
         self.update('stopped', '实时事件接收已停止。', account='')
+
+
+def probe_connection(http, ws, expected_account, timeout=5):
+    """Bounded isolated use of the real receiver; no persistence or chat callback."""
+    receiver = EventReceiver(lambda event: None, lambda state: None,
+        config_factory=lambda: dict(ws), client_factory=lambda **kw: onebot.Client(http, **kw), metadata_only=True)
+    receiver.start()
+    try:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            status = receiver.status()
+            if status['state'] in ('connected', 'upstream_offline', 'account_mismatch', 'auth_error', 'handshake_error', 'disconnected'):
+                if status['state'] == 'connected' and status['account'] != expected_account:
+                    return dict(state='account_mismatch', note='WS 与 HTTP 的账号不一致。')
+                if status['state'] == 'disconnected':
+                    return dict(state='disconnected', note='WS 未取得可核对的事件连接，请检查节点地址及运行状态。')
+                return dict(state=status['state'], note=status['note'])
+            time.sleep(.04)
+        return dict(state='unverified', note='WS 未在检测时间内返回可核对账号的生命周期或心跳事件；尚未确认连接可用，请稍后重新检测。')
+    finally:
+        receiver.stop()

@@ -41,7 +41,7 @@ def create_app():
 
     @app.get('/ui/{name}')
     def asset(name:str):
-        allowed={'app.css','desktop.css','mcp.css','mcp.js','mcp-home.js','mcp-home.css','chat.js','data.js','live.js','voice.js','artifacts.js','tulpa-logo.png'}
+        allowed={'app.css','desktop.css','snowluma.js','mcp.css','mcp.js','mcp-home.js','mcp-home.css','chat.js','data.js','live.js','voice.js','artifacts.js','tulpa-logo.png'}
         if name not in allowed:raise HTTPException(404)
         return FileResponse(web/name,headers={'Cache-Control':'no-cache'})
     return app

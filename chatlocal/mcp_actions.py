@@ -56,16 +56,23 @@ class MCPActions:
             raise ValueError('目标不在连接允许的会话和日期范围内。')
         return dict(row)
 
-    def prepare(self, grant, cid, kind, params, *, target_resolver=None):
+    def prepare(self, grant, cid, kind, params, *, target_resolver=None, send_preparer=None):
         row = (target_resolver or self.scoped_target)(grant, cid, kind)
         if kind == 'send':
             text = params.get('text')
             if not isinstance(text, str) or not text.strip() or len(text) > 4000 or any(ord(c)<32 and c not in '\n\t' for c in text):
                 raise ValueError('请提供 1–4000 字的实际发送文本。')
-            if set(params) != {'text'}:
+            if send_preparer:
+                address = send_preparer(self.sender_factory(), row, params)
+            elif set(params) != {'text'}:
                 raise ValueError('发送参数无效。')
-            address = self.sender_factory().prepare(row, False)
-            return address, f'QQ {address["account"]} → {"群" if address["kind"]=="group" else "好友"}「{address["name"]}」（{address["peer"]}）\n发送：\n{text}', row
+            else:
+                address = self.sender_factory().prepare(row, False)
+            labels = []
+            if address.get('quote_id') is not None:labels.append('引用 QQ 消息 '+str(address['quote_id']))
+            if address.get('mention_user_ids'):labels.append('@ '+', '.join(address['mention_user_ids']))
+            detail = ('\n'+'；'.join(labels)) if labels else ''
+            return address, f'QQ {address["account"]} → {"群" if address["kind"]=="group" else "好友"}「{address["name"]}」（{address["peer"]}）{detail}\n发送：\n{text}', row
         allowed = {'action','user_id','duration_seconds','group_name','request_id','approve','reason'}
         if set(params)-allowed or params.get('action') not in ('mute','unmute','kick','rename','request'):
             raise ValueError('群管理参数无效。')
@@ -94,7 +101,7 @@ class MCPActions:
             rows = db.execute('SELECT o.id,g.name FROM operations o JOIN grants g ON o.grant_id=g.id ORDER BY o.created DESC LIMIT 100').fetchall()
         return [dict(self.get(r['id']), connection_name=r['name']) for r in rows]
 
-    def execute(self, grant, kind, args, cancel, *, guard=None, target_resolver=None):
+    def execute(self, grant, kind, args, cancel, *, guard=None, target_resolver=None, send_preparer=None):
         cid, key = args['conversation_id'], args['idempotency_key']
         params = {k:v for k,v in args.items() if k not in ('conversation_id','idempotency_key')}
         signature = hashlib.sha256(dump([kind,cid,params]).encode()).hexdigest()
@@ -108,7 +115,7 @@ class MCPActions:
                 if old['signature'] != signature:
                     raise ValueError('同一个幂等编号不能用于不同内容。')
                 return self.get(old['id'], grant['id'])
-            prepared, summary, target = self.prepare(grant, cid, kind, params, target_resolver=target_resolver)
+            prepared, summary, target = self.prepare(grant, cid, kind, params, target_resolver=target_resolver, send_preparer=send_preparer)
             self.access.by_id(grant['id'], source=target_resolver is None)
             if guard:guard()
             if cancel.is_set():
