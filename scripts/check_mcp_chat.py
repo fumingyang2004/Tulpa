@@ -14,6 +14,7 @@ from unittest.mock import patch
 from websockets.sync.server import serve
 from websockets.exceptions import ConnectionClosed
 
+sys.path.insert(0,str(Path(__file__).resolve().parent))
 ROOT=Path(sys.argv[sys.argv.index('--package')+1]).resolve() if '--package' in sys.argv else Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from fastapi import FastAPI
@@ -185,6 +186,8 @@ def main():
             native_add(999,'FORBIDDEN')
             (folder/'.env').write_text(f'REPLY_ONEBOT_URL=http://127.0.0.1:{upstream.server_port}\nREPLY_ONEBOT_WS_URL=ws://127.0.0.1:{events.port}\nREPLY_ONEBOT_WS_TOKEN=event-fixture\n','utf-8')
             app=FastAPI();service=install_mcp_routes(app,store);access=service.access;tools=service.tools;headers={'X-ChatWeave-UI':'1'}
+            from chat_adapter_fixture import use_adapter_layer
+            use_adapter_layer(tools)  # Adapter regressions; turn protocol has its own integration suite.
             with patch('chatlocal.onebot.ROOT',folder),patch('chatlocal.message_sender.ROOT',folder),patch.object(prompts,'ROOT',persona_dir),TestClient(app) as ui:
                 invalidate_availability()
                 with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
@@ -272,6 +275,7 @@ def main():
                     db.execute('ALTER TABLE chat_sessions DROP COLUMN persona_preset')
                     db.execute('ALTER TABLE chat_sessions DROP COLUMN persona_name')
                 tools.chat=MCPChat(access,tools.actions)
+                use_adapter_layer(tools)
                 assert tools.chat.listed(g['id'])[0]['state']=='waiting_agent'
                 legacy=call('start_chat_session',**payload)
                 assert legacy['session']['id']==sid and legacy['session']['persona_preset']==''
@@ -362,6 +366,7 @@ def main():
                 # A brand-new portable app has zero imported messages. Live chat
                 # still works, including a real MCP call while Store is forbidden.
                 empty=Store(folder/'empty.sqlite3');app2=FastAPI();svc2=install_mcp_routes(app2,empty)
+                use_adapter_layer(svc2.tools)
                 with socket.socket() as sock:sock.bind(('127.0.0.1',0));port2=sock.getsockname()[1]
                 svc2.access.configure(True,port2)
                 with TestClient(app2) as ui2:

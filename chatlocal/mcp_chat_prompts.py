@@ -134,7 +134,7 @@ def version(row):
 def selected_examples(messages, *, preset='', idle=False, images=False):
     # The upstream card already supplies its own examples. Do not blend our
     # rewritten character/voice into it or into an unrelated custom persona.
-    if preset == 'little_whale':
+    if preset in ('little_whale','little_whale_v2'):
         return []
     candidates = [e for e in EXAMPLES if e['id'] in ('third_party', 'unfinished', 'quiet', 'sticker')]
     if not images:

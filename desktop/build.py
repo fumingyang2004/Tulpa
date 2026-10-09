@@ -92,7 +92,7 @@ def build(no_zip=False,qa=False,output=None,lite=False):
     for name in (('chatlocal','web') if lite else ('chatlocal','web','harness')):tree(ROOT/name,name)
     # Only tracked scripts: omit private probes and user chats in ignored paths.
     scripts=subprocess.check_output(['git','ls-files','scripts'],cwd=ROOT,text=True).splitlines()
-    source_only={'prepare_reader_runtime.py','package_qq_source_fix.py','fix_qq_source.py',
+    source_only={'chat_adapter_fixture.py','prepare_reader_runtime.py','package_qq_source_fix.py','fix_qq_source.py',
                  'napcat_qq_probe.py','napcat_qq_fixture.py','bench_napcat_qq_fixture.py'}
     for name in scripts:
         if Path(name).suffix=='.py' and not Path(name).name.startswith(('check_','probe_')) and Path(name).name not in source_only:copy(ROOT/name,name)
@@ -125,6 +125,7 @@ def build(no_zip=False,qa=False,output=None,lite=False):
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_sticker_library.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_chat_targets.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_reactions.py'),'--package',str(out)],check=True)
+    subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_chat_turns.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_downloads.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_upgrade.py')],check=True)
     tree(ROOT/'tools/whispercpp/Release','tools/whispercpp/Release')

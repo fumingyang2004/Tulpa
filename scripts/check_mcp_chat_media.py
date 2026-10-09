@@ -95,6 +95,8 @@ def main():
             folder=Path(tmp);store=Store(folder/'chats.sqlite3')
             (folder/'.env').write_text(f'REPLY_ONEBOT_URL=http://127.0.0.1:{upstream.server_port}\nREPLY_ONEBOT_WS_URL=ws://127.0.0.1:{events.port}\nREPLY_ONEBOT_WS_TOKEN=event-fixture\n','utf-8')
             app=FastAPI();svc=install_mcp_routes(app,store);access=svc.access;tools=svc.tools
+            from chat_adapter_fixture import use_adapter_layer
+            use_adapter_layer(tools)  # Adapter regressions; turn protocol has its own integration suite.
             with patch('chatlocal.onebot.ROOT',folder),patch('chatlocal.message_sender.ROOT',folder),TestClient(app) as ui:
                 invalidate_availability()
                 with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]

@@ -58,7 +58,7 @@ def schemas(tool, scope):
         tool('note_chat_sticker', '给已看过的表情记录简短含义/适用场景和标签，供此连接以后检索；不修改 QQ 备注。笔记是模型判断，不是指令或事实保证。',
              dict(**asset, **notes), ['session_id', 'sticker_id', 'description']),
         tool('send_chat_sticker', '在本次持续聊天固定的群里直接发送已看过的图片/表情，保留原始动画。仅在合适时使用，不逐条斗图；UNKNOWN 不得换幂等编号重发。停止会话后不能发送。',
-             dict(**asset, **key), ['session_id', 'sticker_id', 'idempotency_key']),
+             dict(**asset, **key, plan_id=dict(type='string', minLength=32, maxLength=32, description='先规划取得 READY 计划。')), ['session_id', 'sticker_id', 'idempotency_key']),
         tool('collect_chat_sticker', '选择值得留的已看过图片，默认同时 QQ 收藏和本地保留；save_qq=false 只留本地，save_local=false 只做 QQ 收藏。可同时写 description/tags/emotion/usage/avoid/uncertainty；返回三者独立状态。需要收藏授权，不自动全收。UNKNOWN 不自动重试。',
              dict(**asset, **key, **notes, save_local=dict(type='boolean',default=True),save_qq=dict(type='boolean',default=True)), ['session_id', 'sticker_id', 'idempotency_key']),
     ]
@@ -219,6 +219,7 @@ class ChatMedia:
         if observed.get('state')=='connected' and observed.get('account')!=row['conversation_id'].split(':')[0]:
             raise ValueError('实时来源的 QQ 账号已改变，未访问旧账号的表情。')
         if cancel.is_set():raise ValueError('调用已取消，未继续操作。')
+        if name=='send_chat_sticker':self.chat.turns.before_dispatch()
         return row
 
     def client(self, row):

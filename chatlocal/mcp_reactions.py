@@ -55,6 +55,7 @@ def schema(tool, catalog):
         '只使用 event_id 和以下目录 id，不传 QQ 原始编号或任意表情。'
         '成功即可继续等待，不必补发文字；UNKNOWN 禁止换编号重试。候选资料：'+dump(catalog),
         dict(session_id=dict(type='string', minLength=32, maxLength=32),
+             plan_id=dict(type='string', minLength=32, maxLength=32, description='先规划取得 READY 计划。'),
              event_id=dict(type='integer', minimum=1, maximum=2**63-1),
              reaction_id=dict(type='string', minLength=1, maxLength=48),
              operation=dict(type='string', enum=['add','remove']),
@@ -274,6 +275,7 @@ class ChatReactions:
             _,_,last_config=self.guard(gid,sid,cancel)
             if candidate not in last_config['candidates'] or self.epoch!=epoch or not self.chat.receiver.matches_client(client) or self.target(row,args['event_id'])!=selected:
                 raise Rejected('preflight_changed','派发前连接、表情或消息引用变化，未执行回应。')
+            self.chat.turns.before_dispatch()
             dispatched=True
             client.call('set_msg_emoji_like',payload,approved=True)
             state='SUCCEEDED'
