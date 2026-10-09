@@ -45,11 +45,11 @@
       <p><button id="mcp-test" type="button">检测连接与工具</button></p><p id="mcp-test-result" role="status"></p>
       <p>下方是将写入本机 Codex 的配置。点击写入会备份原文件、保留其他设置；已有同名连接时不会覆盖。写入后请在 Codex 的 MCP 设置中重新连接，必要时重启 Codex。</p><textarea id="mcp-config" readonly rows="5" aria-label="Codex MCP 连接配置"></textarea><button id="mcp-install-codex" type="button">写入本机 Codex 配置</button> <button id="mcp-copy" type="button">复制 Codex 配置</button><p id="mcp-install-result" role="status"></p><small class="mcp-muted">其他客户端：选择 Streamable HTTP，填写上方地址，添加 Authorization: Bearer Token。OneBot 的密钥不需要填入客户端。</small></section>
       <h3>已授权连接</h3><div id="mcp-connections"></div>
-      <section class="mcp-step" id="mcp-chat-panel"><h3>持续群聊 · 外部 Agent</h3>
-        <p class="mcp-muted">在专用的外部 Agent 对话中说“用小鲸鱼预设在某群持续聊天，直到我停止”即可；也可以提供自定义人格或补充语气要求，无需设置时长。先给连接勾选持续群聊和发送权限。此处不调用内置模型。</p>
-        <p class="mcp-muted">新人格可保存为 UTF-8 .md 文件，放入当前安装目录的 chatlocal/prompts/mcp_chat/。让 Agent 查看人格列表即可发现，无需重启；已经开启的群聊继续使用原人格。</p>
-        <p class="mcp-muted">保持 QQ、SnowLuma WebSocket 事件服务和外部 Agent 运行。新消息直接来自 OneBot，不依赖聊天导入或数据库实时读取。外部客户端结束任务后需接续，Tulpa 不会自动启动模型。</p>
-        <p id="mcp-event-status" role="status" class="mcp-muted"></p><button id="mcp-chat-refresh" type="button">刷新聊天状态</button> <button id="mcp-chat-stop-all" type="button" disabled>停止全部群聊</button>
+      <section class="mcp-step" id="mcp-chat-panel"><h3>持续水群</h3><button id="mcp-chat-start" type="button" class="mcp-primary">开始持续水群</button><p>在当前机器人 QQ 和群聊中边聊边学。潜水也会积累；停止后重新开始，原群的学习记录仍在。</p>
+        <p class="mcp-muted">在已连接的 Agent 中说“用小鲸鱼2号在某群持续聊天”即可自动开始聊天与学习，无需另抄学习指令。也可先在这里开启会话，再让 Agent 接续。</p>
+        <details><summary>运行与人物说明</summary><p class="mcp-muted">新人格可保存为 UTF-8 .md 文件，放入当前安装目录的 chatlocal/prompts/mcp_chat/。让 Agent 查看人格列表即可发现，无需重启；已经开启的群聊继续使用原人格。</p>
+        <p class="mcp-muted">保持 QQ、OneBot WebSocket 事件服务和外部 Agent 运行。外部客户端结束任务后需接续，Tulpa 不会自动启动模型。未接续时显示等待 Agent。</p></details>
+        <p id="mcp-event-status" role="status" class="mcp-muted"></p><details id="mcp-chat-advanced"><summary>高级操作</summary><button id="mcp-chat-refresh" type="button">刷新聊天状态</button> <button id="mcp-chat-stop-all" type="button" disabled>停止全部群聊</button></details>
         <p id="mcp-chat-status" role="status" aria-live="polite"></p><div id="mcp-chat-sessions"></div>
       </section>
       <details id="mcp-advanced"><summary>高级服务设置</summary><p class="mcp-muted">通常无需修改。停用服务会断开外部 Agent；修改端口后，需要同步修改客户端的连接地址。</p><div class="mcp-service"><label><input id="mcp-enabled" type="checkbox">启用本机 MCP 服务</label><label>端口 <input id="mcp-port" type="number" min="1024" max="65535" value="18777"></label><button id="mcp-save-service" type="button">应用高级设置</button></div></details>
@@ -57,11 +57,15 @@
       <details id="mcp-operation-history"><summary>QQ 操作记录</summary><p class="mcp-muted">按连接授权直接执行的发送和群管理回执。结果未知时先到 QQ 核对，不自动重试。</p><div id="mcp-operations"></div></details>
       <p id="mcp-error" role="alert"></p>
     </div>`;
+  dialog.querySelector(".mcp-body").prepend(dialog.querySelector("#mcp-chat-panel"));
   document.body.append(dialog);
   let current, credential=null, busy=false, createError='', platformsInitialized=false, selected = new Map(), page = 0, searchVersion = 0, searchTimer, chatTimer, chatRefreshing=false, liveGroups=null;
   async function api(path, method='GET', body) {
-    const response = await fetch('/api/mcp'+path, {method, cache:'no-store', headers: {'Content-Type':'application/json','X-ChatWeave-UI':'1'}, body: body===undefined ? undefined : JSON.stringify(body)});
-    const data = await response.json(); if (!response.ok) throw Error(data.detail || '连接设置操作失败。'); return data;
+    let response,data;
+    try{response=await fetch('/api/mcp'+path, {method, cache:'no-store', headers: {'Content-Type':'application/json','X-ChatWeave-UI':'1'}, body: body===undefined ? undefined : JSON.stringify(body)});}
+    catch{throw Error('无法连接本机服务，请确认 Tulpa 仍在运行。');}
+    try{data=await response.json();}catch{throw Error('本机服务暂时没有返回可读取的结果，请稍后重试。');}
+    if (!response.ok) throw Error(data.detail || '连接设置操作失败。'); return data;
   }
   function node(tag, value, cls) {const n=document.createElement(tag);n.textContent=value;if(cls)n.className=cls;return n;}
   function renderService() {
@@ -111,62 +115,131 @@
     page=data.next_offset;$('mcp-more').hidden=!data.has_more;selection();
   }
   async function action(fn){$('mcp-error').textContent='';try{await fn();}catch(e){$('mcp-error').textContent=e.message;}}
-  async function openLearning(row){
-    const panel=node('dialog','');panel.className='mcp-dialog mcp-body mcp-learning';
-    const heading=node('h2',row.name+' · 实时语言学习'),close=node('button','关闭');
-    close.type='button';close.onclick=()=>panel.close();panel.append(heading,close);
-    panel.append(node('p','仅收集开启后此机器人账号、此群的实时他人文本，不读取历史库。材料交给本连接现有 Agent 分阶段学习；没有活跃宿主时不会自动调用模型。'));
-    panel.append(node('p','开启后此 MCP 连接固定在当前账号与群。切号或切群需新建 MCP 连接，并打开新的 Agent 对话，避免沿用旧上下文。','mcp-muted'));
-    const enabled=node('input',''),quality=node('input','');enabled.type=quality.type='checkbox';
-    const label=node('label',''),qualityLabel=node('label','');label.append(enabled,document.createTextNode(' 开启当前账号、当前群的实时学习'));
-    qualityLabel.append(quality,document.createTextNode(' 允许聊天使用顺序审核结果（上下文独立性降级）'));
-    panel.append(label,qualityLabel,node('p','首版提取和审核分次执行，但顺序宿主可能记得前文。默认只积累、不使用这些降级结果；人工修订的黑话可用。','mcp-muted'));
-    const save=node('button','保存学习设置'),refresh=node('button','刷新状态'),status=node('p',''),error=node('p',''),records=node('div','');
-    save.type=refresh.type='button';panel.append(save,refresh,status,error,records);
-    async function load(){
-      const data=await api('/chats/'+row.id+'/learning');enabled.checked=data.enabled;quality.checked=data.allow_degraded;
-      status.textContent=data.enabled?'表达 '+data.expression_count+' 条（可用 '+data.usable_expressions+'） · 黑话 '+data.jargon_count+' 条（确认 '+data.confirmed_jargon+'） · 本小时领取 '+data.calls_last_hour+'/'+data.hourly_call_budget+' 次 · 最近学习 '+(data.last_learned?new Date(data.last_learned*1000).toLocaleString():'尚无')+' · 待办 '+data.pending.map(x=>x.stage+': '+x.state).join('，')+' · 最近错误 '+(data.last_failure||'无'):'实时学习已关闭；原学习库保留。';
-      records.replaceChildren();
-      for(const kind of ['expressions','jargon'])for(const item of data[kind]||[]){
-        const line=node('div','', 'mcp-connection');line.append(node('p',kind==='expressions'?item.situation+' → '+item.style:item.term+'：'+(item.meaning||'待积累核验')));
-        line.append(node('small','批次命中 '+item.count+' · '+(item.manual?'人工释义':item.independence),'mcp-muted'));
-        const toggle=node('button',item.enabled?'停用此条':'启用此条');toggle.type='button';
-        toggle.onclick=()=>run(async()=>{await api('/chats/'+row.id+'/learning/record','POST',{kind,id:item.id,enabled:!item.enabled});await load();});line.append(toggle);
-        if(kind==='jargon'){
-          const meaning=node('textarea',''),edit=node('button','保存人工释义');meaning.value=item.meaning||'';meaning.maxLength=600;meaning.setAttribute('aria-label',item.term+' 的人工释义');edit.type='button';
-          edit.onclick=()=>run(async()=>{await api('/chats/'+row.id+'/learning/record','POST',{kind,id:item.id,meaning:meaning.value});await load();});line.append(meaning,edit);
+  const dateText=value=>value?new Date(value*1000).toLocaleString():'未记录';
+  const thresholdText=lib=>lib.checked_expressions<10?`${lib.checked_expressions}/10，继续积累后才用于聊天`:`${lib.checked_expressions} 条已通过检查，可按语境使用`;
+  function popup(title,cls=''){
+    const panel=node('dialog','');panel.className='mcp-dialog mcp-body '+cls;
+    const head=node('div','', 'mcp-panel-head'),close=node('button','关闭');close.type='button';close.onclick=()=>panel.close();
+    head.append(node('h2',title),close);panel.append(head);panel.addEventListener('close',()=>panel.remove(),{once:true});
+    document.body.append(panel);panel.showModal();return panel;
+  }
+  async function openStart(group){
+    const panel=popup('开始持续水群','mcp-chat-start-dialog'),info=node('p','正在读取当前连接与群…'),form=node('form',''),error=node('p','', 'mcp-warning');
+    panel.append(info,form,error);
+    try{
+      const [state,groups,catalog]=await Promise.all([api(''),api('/live-groups'),api('/chat-personas')]);
+      const connections=state.connections.filter(c=>!c.revoked&&c.scope.chat&&c.scope.send);
+      if(!connections.length)throw Error('还没有有效的持续群聊连接。请先在下方创建连接，勾选持续群聊与发送权限。');
+      const connection=node('select',''),target=node('select',''),persona=node('select','');
+      for(const c of connections){const option=node('option',c.name+' · QQ '+(c.scope.chat_account||''));option.value=c.id;connection.append(option);}
+      if(group?.connection_id)connection.value=group.connection_id;
+      for(const p of catalog.personas){const option=node('option',p.name);option.value=p.id;persona.append(option);}
+      if(catalog.personas.some(p=>p.id==='little_whale_v2'))persona.value='little_whale_v2';
+      const scope=node('p','', 'mcp-scope-note');
+      function fillGroups(){
+        const c=connections.find(c=>c.id===connection.value);target.replaceChildren();
+        const allow=(c.scope.conversations||[]).map(p=>typeof p==='string'?JSON.parse(p):p);
+        for(const g of groups.items.filter(g=>g.conversation_id.split(':')[0]===c.scope.chat_account&&(!allow.length||allow.some(p=>p[0]==='qq'&&p[1]===g.conversation_id)))){
+          const option=node('option',g.name+' · '+g.conversation_id.split(':')[2]);option.value=g.conversation_id;target.append(option);
         }
-        records.append(line);
+        if(group&&[...target.options].some(o=>o.value===group.conversation_id))target.value=group.conversation_id;
+        target.dispatchEvent(new Event('change'));
       }
-    }
-    async function run(fn){error.textContent='';try{await fn();}catch(e){error.textContent=e.message;}}
-    save.onclick=()=>run(async()=>{await api('/chats/'+row.id+'/learning','PUT',{enabled:enabled.checked,allow_degraded:quality.checked});await load();});
-    refresh.onclick=()=>run(load);panel.addEventListener('close',()=>panel.remove(),{once:true});document.body.append(panel);panel.showModal();await run(load);
+      target.onchange=()=>{const p=target.value.split(':');scope.textContent=p.length===3?`机器人 QQ ${p[0]} · 群号 ${p[2]}。仅在这个账号和群聊中边聊边学。`:'此连接没有可用群，请检查范围或选择另一连接。';};
+      connection.onchange=fillGroups;fillGroups();
+      for(const [title,input] of [['使用连接',connection],['聊天群',target],['人物',persona]]){const label=node('label',title);input.setAttribute('aria-label',title);label.append(input);form.append(label);}
+      const start=node('button','开始持续水群');start.type='submit';start.className='mcp-primary';
+      form.append(scope,node('p','只积累启用后的实时消息，不读取历史库。接续这个群已有的积累与暂停偏好；高级设置可随时暂停学习。','mcp-muted'),start);
+      info.textContent='外部 Agent 负责聊天和学习。尚未接续时会显示“等待 Agent”，不会自行启动模型。';
+      const key='ui-start-'+crypto.randomUUID();
+      form.onsubmit=async event=>{event.preventDefault();start.disabled=true;error.textContent='';
+        try{if(!target.value||!persona.value)throw Error('请先选择可用的群和人物。');
+          const result=await api('/chats/start','POST',{connection_id:connection.value,conversation_id:target.value,persona_preset:persona.value,idempotency_key:key});
+          info.textContent=result.note;form.hidden=true;await refreshChats();
+        }catch(e){error.textContent=e.message;start.disabled=false;}
+      };
+    }catch(e){info.textContent='暂时无法开始';error.textContent=e.message;}
+  }
+  async function openLearning(group){
+    const panel=popup(group.name+' · 学习记录','mcp-learning'),summary=node('p','正在加载学习记录…'),error=node('p','', 'mcp-warning'),records=node('div','');
+    panel.append(node('p',`机器人 QQ ${group.account} · 群号 ${group.group}`,'mcp-muted'),summary,error,records);
+    const advanced=node('details',''),advancedTitle=node('summary','高级设置与检查详情'),label=node('label',''),paused=node('input','');paused.type='checkbox';
+    label.append(paused,document.createTextNode(' 暂停这个账号和群的学习（保留已有积累）'));
+    const technical=node('pre','');advanced.append(advancedTitle,label,node('p','通过检查的表达默认可用。提取与自检分次调用，但模型可能记得前文，并非独立核验；不保证每条语义判断正确。','mcp-muted'),technical);panel.append(advanced);
+    const budgetLabel=node('label','这个账号和群每小时最多学习阶段'),budget=node('input',''),budgetSave=node('button','保存预算');budget.type='number';budget.min='2';budget.max='100';budget.setAttribute('aria-label','每小时学习阶段预算');budgetSave.type='button';budgetLabel.append(budget);advanced.insertBefore(budgetLabel,technical);advanced.insertBefore(budgetSave,technical);
+    let loading=false,changing=false;
+    const query='/chat-library?'+new URLSearchParams({conversation_id:group.conversation_id});
+    async function change(body){changing=true;error.textContent='';try{await api('/chat-library','POST',{conversation_id:group.conversation_id,change:body});await load(true);await refreshChats();}catch(e){error.textContent=e.message+' 可稍后重试。';}finally{changing=false;}}
+    paused.onchange=()=>change({enabled:!paused.checked});
+    budgetSave.onclick=()=>change({hourly_calls:Number(budget.value)});
+    async function load(force=false){if(loading)return;loading=true;try{
+      const data=await api(query),lib=data.library;
+      summary.textContent=`表达：${thresholdText(lib)}。黑话：已掌握 ${lib.known_jargon}，待观察 ${lib.observing_jargon}。最近完成学习：${dateText(lib.last_completed_at)}。`;
+      if(document.activeElement!==paused)paused.checked=!data.enabled;
+      if(document.activeElement!==budget)budget.value=data.hourly_call_budget;
+      technical.textContent=JSON.stringify({independence:data.independence,run:data.run,calls_last_hour:data.calls_last_hour,hourly_call_budget:data.hourly_call_budget,last_failure:data.last_failure},null,2);
+      error.textContent='';
+      if(!force&&records.contains(document.activeElement))return;
+      records.replaceChildren();
+      for(const [kind,title] of [['expressions','表达方式'],['jargon','群内用语']]){
+        const section=node('section','');section.append(node('h3',title));
+        if((kind==='expressions'?data.expression_count:data.jargon_count)>30)section.append(node('p','显示最近更新的 30 条记录。完整库仍保留，数量统计包含全部条目。','mcp-muted'));
+        if(!(data[kind]||[]).length)section.append(node('p','还没有记录，聊天中会逐步积累。','mcp-muted'));
+        for(const item of data[kind]||[]){
+          const line=node('article','', 'mcp-learning-record');
+          if(kind==='expressions')line.append(node('h4',item.situation),node('p',item.style),node('small',item.enabled?'已通过检查':'已停用','mcp-muted'));
+          else line.append(node('h4',item.term),node('p',item.meaning||'还需观察用法，暂不作为确定释义'),node('small',!item.enabled?'已停用':item.manual?'人工释义':item.is_jargon?'已掌握':'待观察','mcp-muted'));
+          const toggle=node('button',item.enabled?'停用此条':'启用此条');toggle.type='button';toggle.onclick=()=>change({kind,id:item.id,enabled:!item.enabled});line.append(toggle);
+          const details=node('details','');details.append(node('summary','检查详情'),node('p',`有效批次命中 ${item.count} · 上下文独立性 ${item.independence}`));
+          if(kind==='jargon'){
+            const meaning=node('textarea',''),save=node('button','保存人工释义');meaning.value=item.meaning||'';meaning.maxLength=600;meaning.setAttribute('aria-label',item.term+' 的人工释义');save.type='button';save.onclick=()=>change({kind,id:item.id,meaning:meaning.value});details.append(meaning,save);
+          }
+          line.append(details);section.append(line);
+        }records.append(section);
+      }
+    }catch(e){error.textContent=e.message+' 保留已显示记录，将自动重试。';}finally{loading=false;}}
+    await load();const timer=setInterval(()=>{if(panel.open&&!document.hidden&&!changing)void load();},3000);
+    panel.addEventListener('close',()=>clearInterval(timer),{once:true});
   }
   async function refreshChats(){
     if(chatRefreshing)return;chatRefreshing=true;
     try{
-      const data=await api('/chats'),host=$('mcp-chat-sessions');
-      $('mcp-event-status').textContent=data.receiver?'实时消息来源：SnowLuma WebSocket · '+data.receiver.note:'';
-      const opened=new Set([...host.querySelectorAll('details[open]')].map(el=>el.dataset.session));
-      const focused=document.activeElement?.dataset.chatStop;host.replaceChildren();
-      const labels={stopped:'已停止',service_offline:'MCP 服务已离线',waiting_messages:'Agent 正在等待消息',agent_connected:'Agent 最近已连接',waiting_agent:'等待外部 Agent 接续'};
-      const active=data.sessions.filter(s=>s.active).length;$('mcp-chat-stop-all').disabled=!active;
-      $('mcp-chat-status').textContent=active?active+' 个持续聊天会话 · 无总时长限制':'暂无持续聊天。';
-      for(const row of data.sessions){
-        const card=node('div','', 'mcp-connection');card.append(node('strong',row.name+' · '+(labels[row.state]||row.state)),node('p',row.connection_name+' · '+({quiet:'安静',natural:'自然',active:'活跃'}[row.participation]||row.participation),'mcp-muted'));
-        const details=node('details',''),summary=node('summary','人格与会话进度');details.dataset.session=row.id;details.open=opened.has(row.id);details.append(summary,node('p',row.persona_name||'自定义人格'),node('pre',row.persona));
-        if(row.note)details.append(node('p','当前话题：'+row.note));
-        details.append(node('p','会话编号：'+row.id+' · 已处理事件 '+row.cursor,'mcp-muted'));card.append(details);
-        if(row.gap_note)card.append(node('p',row.gap_note,'mcp-muted'));
-        if(row.stop_reason)card.append(node('p',row.stop_reason,'mcp-muted'));
-        if(row.active){const button=node('button','停止聊天');button.type='button';button.dataset.chatStop=row.id;button.onclick=()=>action(async()=>{button.disabled=true;try{await api('/chats/'+encodeURIComponent(row.id)+'/stop','POST',{});await refreshChats();}finally{button.disabled=false;}});card.append(button);
-          const learning=node('button','实时语言学习');learning.type='button';learning.onclick=()=>action(()=>openLearning(row));card.append(learning);}
-        host.append(card);
-        if(focused===row.id)card.querySelector('[data-chat-stop]')?.focus({preventScroll:true});
+      const data=await api('/chat-overview'),host=$('mcp-chat-sessions');
+      $('mcp-event-status').textContent=data.receiver?'实时连接：'+data.receiver.note:'';
+      const opened=new Set([...host.querySelectorAll('details[open]')].map(el=>el.dataset.key)),focused=document.activeElement?.dataset.chatStop;
+      const active=data.groups.reduce((n,g)=>n+g.active.length,0);$('mcp-chat-stop-all').disabled=!active;
+      $('mcp-chat-status').textContent=active?`${active} 个持续聊天会话 · 潜水时也继续积累`:'暂无正在运行的群聊。开始后接续原账号、原群的积累。';host.replaceChildren();
+      if(!data.groups.length)host.append(node('p','还没有持续水群记录。选择已授权的账号和群即可开始。','mcp-empty'));
+      for(const group of data.groups){
+        const card=node('article','', 'mcp-group-card');card.dataset.group=group.conversation_id;
+        const head=node('div','', 'mcp-group-heading');head.append(node('h3',group.name),node('span',group.active.length?'进行中':'已停止','mcp-status-pill'));card.append(head,node('p',`机器人 QQ ${group.account} · 群号 ${group.group}`,'mcp-muted'));
+        for(const row of group.active){
+          const phase=row.turn_process?.phase,chatState=['REPLYING','SENDING'].includes(phase)?'准备回复':'潜水';
+          const line=node('div','', 'mcp-active-run');line.append(node('p',`${chatState} · ${row.persona_name||'自定义人格'} · 会话 ${row.id.slice(0,8)}`));
+          const stop=node('button','停止持续水群');stop.type='button';stop.dataset.chatStop=row.id;
+          stop.onclick=()=>action(async()=>{stop.disabled=true;try{await api('/chats/'+encodeURIComponent(row.id)+'/stop','POST',{});await refreshChats();}finally{stop.disabled=false;}});line.append(stop);card.append(line);
+        }
+        const learning=group.learning,lib=learning?.library;
+        if(lib){
+          const stats=node('div','', 'mcp-learning-stats');
+          stats.append(node('p','学习 · '+group.learning_state),node('p','表达 · '+thresholdText(lib)),node('p',`黑话 · 已掌握 ${lib.known_jargon} · 待观察 ${lib.observing_jargon}`));card.append(stats);
+          card.append(node('p','本群最近完成学习：'+dateText(lib.last_completed_at),'mcp-muted'));
+          if(group.active.length)card.append(node('p',`本次运行：已完成 ${learning.run.completed_batches} 批 · 正在积累 ${learning.run.buffered} 条新消息`,'mcp-muted'));
+          else if(lib.checked_expressions||lib.known_jargon||lib.observing_jargon)card.append(node('p','重新开始会接续已有积累，不会清空记录。','mcp-muted'));
+        }else card.append(node('p',group.error||'暂时无法读取学习状态，请检查连接。','mcp-warning'));
+        const actions=node('div','', 'mcp-group-actions');
+        if(!group.active.length){const start=node('button','开始持续水群');start.type='button';start.disabled=!group.can_start;start.onclick=()=>openStart(group);actions.append(start);}
+        const view=node('button','查看学习记录');view.type='button';view.disabled=!learning;view.onclick=()=>openLearning(group);actions.append(view);card.append(actions);
+        const history=node('details','');history.dataset.key='history:'+group.conversation_id;history.open=opened.has(history.dataset.key);history.append(node('summary',`历史会话（${group.history.length}）`));
+        for(const row of group.history){const entry=node('p',`${row.persona_name||'自定义人格'} · ${row.connection_name} · 已停止 · ${dateText(row.updated)}`);history.append(entry);}
+        const details=node('details','');details.dataset.key='active:'+group.conversation_id;details.open=opened.has(details.dataset.key);details.append(node('summary','当前会话详情'));
+        for(const row of group.active)details.append(node('p',row.connection_name+' · '+row.id),node('pre',row.persona),node('p',row.gap_note||''));
+        if(group.active.length)card.append(details);if(group.history.length)card.append(history);host.append(card);
       }
-    }catch(e){$('mcp-chat-status').textContent='聊天状态读取失败：'+e.message;}finally{chatRefreshing=false;}
+      if(focused)host.querySelector('[data-chat-stop="'+CSS.escape(focused)+'"]')?.focus({preventScroll:true});
+    }catch(e){$('mcp-chat-status').textContent='暂时无法更新状态：'+e.message+'。已有记录保留，稍后自动重试。';}finally{chatRefreshing=false;}
   }
+
   async function desktop(path,method='GET',body){const r=await fetch('/api/desktop/'+path,{method,cache:'no-store',headers:{'Content-Type':'application/json','X-ChatWeave-UI':'1'},body:body===undefined?undefined:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw Error(data.detail||'设置操作失败。');return data;}
   $('open-mcp').onclick=()=>{if(!dialog.open)dialog.showModal();clearInterval(chatTimer);chatTimer=setInterval(()=>{if(dialog.open&&!document.hidden)void refreshChats();},3000);void refreshChats();action(async()=>{await refresh();await chats();const [prefs,status]=await Promise.all([desktop('preferences'),desktop('status')]);$('mcp-background-label').hidden=!status.owned;$('mcp-background').checked=prefs.background;});};
   $('mcp-close').onclick=()=>dialog.close();
@@ -175,6 +248,7 @@
   dialog.addEventListener('close',clearSecret);
   dialog.addEventListener('close',()=>clearInterval(chatTimer));
   $('mcp-live-groups').onclick=()=>action(async()=>{liveGroups=(await api('/live-groups')).items;$('mcp-qq').checked=true;if(!current?.data_platforms?.wechat)$('mcp-wechat').checked=false;await chats();});
+  $('mcp-chat-start').onclick=()=>openStart();
   $('mcp-chat-refresh').onclick=()=>void refreshChats();
   $('mcp-chat-stop-all').onclick=()=>action(async()=>{await api('/chats/all/stop','POST',{});await refreshChats();});
   function mediaPermissions(){

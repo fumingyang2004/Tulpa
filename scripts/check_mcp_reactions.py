@@ -123,7 +123,11 @@ def main():
                         return tools.call(connection['token'],name,args,threading.Event()).structuredContent
                     def start(group,key):
                         return call('start_chat_session',conversation_id=f'111:group:{group}',persona_preset='little_whale',idempotency_key=key)['session']['id']
-                    sid=start(222,'reaction-main-session');sid2=start(223,'reaction-other-session')
+                    sid=start(222,'reaction-main-session')
+                    # Isolate reaction wake policy from the separately tested
+                    # learning_ready wake channel, using the public pause UI.
+                    assert ui.put(f'/api/mcp/chats/{sid}/learning',json=dict(enabled=False),headers=headers).status_code==200
+                    sid2=start(223,'reaction-other-session')
                     def stored(mid,session=sid):
                         with access.connect() as db:
                             row=db.execute('SELECT * FROM chat_inbox WHERE session_id=? AND message_id=?',(session,str(mid))).fetchone()

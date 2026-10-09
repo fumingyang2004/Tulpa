@@ -164,6 +164,8 @@ def main():
         # Failure budgets, evidence expiry and durable restart cancellation.
         add(10,'timeout');t=claim();assert t
         store.submit(binding,t['job_id'],t['lease'],'timeout-1',failure='timeout')
+        assert claim() is None
+        clock.advance(store.cfg['retry_seconds'])
         retry=claim();assert retry['job_id']==t['job_id'] and retry['lease']!=t['lease']
         store.submit(binding,retry['job_id'],retry['lease'],'timeout-2',failure='invalid_json')
         assert not claim()
@@ -220,15 +222,16 @@ def main():
         assert len(store.context(binding,'max-words',[' '.join(f'term{i}' for i in range(12))],'intent')['jargon'])==10
         store.configure(binding,enabled=True,allow_degraded=False)
         ctx=store.context(binding,'quality', ['云朵开机'],'intent')
-        assert ctx['candidates']==[] and ctx['jargon'][0]['meaning']=='人工固定定义'
+        assert ctx['candidates'] and ctx['jargon'][0]['meaning']=='人工固定定义'
         store.configure(binding,enabled=False)
-        assert store.status(binding,records=True)==dict(enabled=False,independence='degraded',allow_degraded=False)
+        paused=store.status(binding,records=True)
+        assert not paused['enabled'] and paused['expressions'] and paused['independence']=='degraded'
         rejected('learning_disabled',lambda:claim())
         store.configure(binding,enabled=True)
         clock.advance(30);add(10,'empty-extraction');t=claim()
         assert submit(t,dict(expressions=[],jargon=[]))['state']=='completed'
         assert not claim()
-        print('PASS 4/8/25/100, manual precedence, max10/casefold, quality opt-in, disable')
+        print('PASS 4/8/25/100, manual precedence, max10/casefold, default self-check usability, pause retains library')
 
 
 if __name__ == '__main__': main()

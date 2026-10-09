@@ -125,6 +125,53 @@ def install_mcp_routes(app, store=None):
         local(request)
         return dict(sessions=service.tools.chat.listed(),receiver=service.tools.chat.receiver.status())
 
+    @app.get('/api/mcp/chat-overview')
+    def chat_overview(request: Request):
+        local(request)
+        return service.tools.chat.learning.overview()
+
+    @app.get('/api/mcp/chat-library')
+    def chat_library(request: Request,conversation_id: str):
+        local(request)
+        try:return service.tools.chat.learning.library(conversation_id,records=True)
+        except ValueError as exc:raise HTTPException(400,'无法读取该群的学习记录，请检查当前 QQ 连接与群授权。') from exc
+
+    @app.post('/api/mcp/chat-library')
+    def change_library(request: Request,body: dict):
+        local(request,True)
+        cid=body.get('conversation_id');change=body.get('change')
+        if set(body)!={'conversation_id','change'} or not isinstance(cid,str) or not isinstance(change,dict):raise HTTPException(400,'学习设置无效')
+        try:return service.tools.chat.learning.library_change(cid,change)
+        except ValueError as exc:
+            message=('预算须为 2–100 的整数；其他设置请检查是否有效。' if str(exc)=='invalid_setting'
+                     else '未能保存，请检查当前群授权和条目是否仍存在。')
+            raise HTTPException(400,message) from exc
+
+    @app.get('/api/mcp/chat-personas')
+    def chat_personas(request: Request):
+        local(request)
+        from .mcp_chat_prompts import persona_catalog
+        return persona_catalog()
+
+    @app.post('/api/mcp/chats/start')
+    def start_chat(request: Request,body: dict):
+        local(request,True)
+        if set(body)!={'connection_id','conversation_id','persona_preset','idempotency_key'}:raise HTTPException(400,'开始参数无效')
+        try:
+            import threading
+            grant=access.by_id(body['connection_id'],source=False)
+            with access.connect() as db:
+                existing={r['id']:r['last_contact'] for r in db.execute('SELECT id,last_contact FROM chat_sessions WHERE active=1')}
+            result=service.tools.chat.start(grant,{k:v for k,v in body.items() if k!='connection_id'},threading.Event())
+            # A click starts a server session, not an external model heartbeat.
+            sid=result['session']['id']
+            with access.connect() as db:db.execute('UPDATE chat_sessions SET last_contact=? WHERE id=?',(existing.get(sid,0),sid))
+            state=service.tools.chat.learning.status(sid,grant['id'])
+            note='已开启会话并接续原群积累。请在已连接的 Agent 中开始或继续该群聊天；无须另开学习或粘贴学习指令。'
+            if not state['enabled']:note+=' 这个账号和群此前已暂停学习，仍保持关闭，可在学习记录的高级设置恢复。'
+            return dict(session_id=sid,note=note)
+        except ValueError as exc:raise HTTPException(400,str(exc)) from None
+
     @app.get('/api/mcp/live-groups')
     def live_groups(request: Request):
         local(request)

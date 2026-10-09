@@ -29,7 +29,8 @@ async def wire(service,token,sid):
                 await client.initialize()
                 assert TOOLS<={t.name for t in (await client.list_tools()).tools}
                 out=(await client.call_tool('get_chat_learning',dict(session_id=sid,records=True))).structuredContent
-                assert out['enabled'] and out['expression_count']==3 and not out['usable_expressions']
+                assert out['enabled'] and out['expression_count']==3 and out['usable_expressions']==3
+                assert not out['library']['expressions_in_use']
                 assert 'source_id' not in json.dumps(out)
                 return 'discovery and scoped state over real MCP HTTP passed'
 
@@ -58,7 +59,7 @@ def main():
                     sid=call('start_chat_session',conversation_id='111:group:222',persona_preset='little_whale_v2',idempotency_key='fixture-start')['session']['id']
                     learning=tools.chat.learning;timer=[time.time()];learning.store.clock=lambda:timer[0]
                     path=f'/api/mcp/chats/{sid}/learning';headers={'X-ChatWeave-UI':'1'}
-                    assert not call('get_chat_learning',session_id=sid)['enabled']
+                    assert call('get_chat_learning',session_id=sid)['enabled']
                     assert ui.put(path,json=dict(enabled=True,allow_degraded=False)).status_code==403
                     assert ui.put(path,json=dict(enabled=True,allow_degraded=False),headers=headers).json()['enabled']
                     def size():
@@ -87,18 +88,26 @@ def main():
                         with access.connect() as db:db.execute("DELETE FROM chat_turn_plans WHERE id='priority'")
                         assert t['stage']=='extract' and len(t['material']['messages'])==10
                         def submit(task,result,inv):return call('submit_chat_learning',session_id=sid,job_id=task['job_id'],lease=task['lease'],invocation_id=inv,result=result)
+                        def resume_wait():
+                            read=call('wait_chat_messages',session_id=sid,timeout_seconds=1,quiet_seconds=0)
+                            if read['messages']:
+                                read=call('wait_chat_messages',session_id=sid,timeout_seconds=1,quiet_seconds=0,acknowledge_through_id=read['read_through_id'])
+                            return read
                         ids=[m['source_id'] for m in t['material']['messages']]
                         result=dict(expressions=[dict(situation='情境'+str(i),style='抽象方式'+str(i),source_id=ids[i]) for i in range(3)],jargon=[dict(term='云朵开机',source_id=ids[0])])
                         assert submit(t,result,'actual-call-1')['state']=='stage_completed'
+                        assert resume_wait()['event']=='learning_ready'
                         t=call('claim_chat_learning',session_id=sid,context_id='new-host-context')['task']
                         assert t['stage']=='review'
                         assert submit(t,dict(reviews=[dict(index=i,accept=True,reason='来源确实支持且可复用') for i in range(3)]),'actual-call-2')['state']=='completed'
-                        assert call('get_chat_learning',session_id=sid)['usable_expressions']==0
+                        assert call('get_chat_learning',session_id=sid)['usable_expressions']==3
                     assert asyncio.run(wire(service,created['token'],sid))
                     # Server-authoritative binding: knowing another SID or
                     # choosing a new cid cannot inspect the old partition.
                     denied=call('start_chat_session',conversation_id='111:group:223',persona_preset='little_whale_v2',idempotency_key='fixture-other')
-                    assert 'session' not in denied
+                    other_sid=denied['session']['id']
+                    assert call('get_chat_learning',session_id=other_sid)['error_code']=='new_host_context_required'
+                    call('stop_chat_session',session_id=other_sid)
                     bad=call('claim_chat_learning',session_id=sid,context_id='fresh-context',account_id='999')
                     assert bad['error_code']=='invalid_arguments'
                     data=ui.get(path).json();eid=data['expressions'][0]['id']
@@ -108,6 +117,7 @@ def main():
                     # later cannot make old results valid again.
                     timer[0]+=31
                     for i in range(10):receive(-200-i,f'新批合成 {i}')
+                    assert resume_wait()['event']=='learning_ready'
                     t=call('claim_chat_learning',session_id=sid,context_id='new-host-context')['task']
                     tools.chat.source_changed('disconnected')
                     denied=submit(t,result,'late-model-call')
@@ -118,7 +128,7 @@ def main():
                     print(json.dumps(dict(status='passed',transport='MCP HTTP + loopback WS',observations=10,
                         model_calls='2 simulated separate invocations',historical_db_reads=0,external_writes=0,
                         checks=['scope and grant pin','API opt-in and CSRF','SELF/history/synthetic/foreign filter','extract-review-persist',
-                                'default degraded not used','tool discovery','disable record','disconnect/stop late result rejected']),ensure_ascii=False))
+                                'default self-check usable with 10-expression threshold','tool discovery','disable record','disconnect/stop late result rejected']),ensure_ascii=False))
     finally:
         server.shutdown();events.close()
 

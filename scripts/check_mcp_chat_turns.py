@@ -84,6 +84,10 @@ def main():
                         nonlocal counter
                         counter+=1;return f'fixture-key-{counter:04}'
                     sid=call('start_chat_session',conversation_id='111:group:222',persona_preset='little_whale_v2',idempotency_key=key())['session']['id']
+                    # This suite checks the supported paused-learning chat mode.
+                    # Automatic learning/idle wakes have a dedicated wire suite.
+                    paused=ui.put(f'/api/mcp/chats/{sid}/learning',json=dict(enabled=False),headers={'X-ChatWeave-UI':'1'})
+                    assert paused.status_code==200 and not paused.json()['enabled']
                     def stored(mid):
                         with access.connect() as db:
                             r=db.execute('SELECT id FROM chat_inbox WHERE session_id=? AND message_id=?',(sid,str(mid))).fetchone()
@@ -134,11 +138,14 @@ def main():
                     early=plan(eid);assert early.get('error_code')=='needs_wait',early
                     policy.write_text(fast_policy,'utf-8')
                     drained=call('wait_chat_messages',session_id=sid,timeout_seconds=1,quiet_seconds=0)
+                    # Real Windows SQLite commits + synthetic WS delivery can
+                    # exceed 150 ms under CI load; use an explicit bounded
+                    # collection window rather than race machine throughput.
                     with ThreadPoolExecutor() as pool:
-                        waiting=pool.submit(call,'wait_chat_messages',session_id=sid,timeout_seconds=2,acknowledge_through_id=drained['read_through_id'])
+                        waiting=pool.submit(call,'wait_chat_messages',session_id=sid,timeout_seconds=3,quiet_seconds=.6,acknowledge_through_id=drained['read_through_id'])
                         time.sleep(.04);add('第一段')
                         time.sleep(.06);add('第二段');time.sleep(.06);last=add('第三段')
-                        batch=waiting.result(3)
+                        batch=waiting.result(5)
                     assert [m['content'] for m in batch['messages']]==['第一段','第二段','第三段']
                     assert batch['input_batch']['collection']['reason']=='quiet'
                     assert len(batch['input_batch']['bursts'][0]['event_ids'])==3
@@ -199,8 +206,9 @@ def main():
 
                     clear_budget();time.sleep(.18);prior=len(ReactionBot.sent)
                     assert plan(action='silence')['state']=='SILENT'
-                    assert plan(action='wait',wait_seconds=1)['state']=='WAITING'
-                    assert plan()['error_code']=='needs_wait'
+                    wait_batch=read()
+                    assert plan(action='wait',wait_seconds=1,batch=wait_batch)['state']=='WAITING'
+                    assert plan(batch=wait_batch)['error_code']=='needs_wait'
                     call('wait_chat_messages',session_id=sid,timeout_seconds=2)
                     time.sleep(1)
                     assert len(ReactionBot.sent)==prior
