@@ -136,6 +136,26 @@ def install_mcp_routes(app, store=None):
                                for r in rows if isinstance(r,dict) and str(r.get('group_id','')).isdigit()])
         except ValueError as exc:raise HTTPException(400,str(exc)) from None
 
+    @app.get('/api/mcp/chats/{sid}/learning')
+    def learning_status(sid: str, request: Request):
+        local(request)
+        try:
+            row=service.tools.chat.row(sid)
+            return service.tools.chat.learning.status(sid,row['grant_id'],records=True)
+        except ValueError as exc:raise HTTPException(400,str(exc)) from None
+
+    @app.put('/api/mcp/chats/{sid}/learning')
+    def learning_configure(sid: str, request: Request, body: dict):
+        local(request,True)
+        try:return service.tools.chat.learning.configure(sid,body)
+        except ValueError as exc:raise HTTPException(400,str(exc)) from None
+
+    @app.post('/api/mcp/chats/{sid}/learning/record')
+    def learning_record(sid: str, request: Request, body: dict):
+        local(request,True)
+        try:return service.tools.chat.learning.manage(sid,body)
+        except ValueError as exc:raise HTTPException(400,str(exc)) from None
+
     @app.post('/api/mcp/chats/{sid}/stop')
     def stop_chat(sid: str, request: Request, body: dict):
         local(request, True)

@@ -12,7 +12,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
   try{
     const page=await browser.newPage({viewport:{width:1100,height:920}}),errors=[];
     page.on('pageerror',e=>errors.push(e.message));
-    let state,requests,mode,failList=false,delayCreate=false,sessions=[];
+    let state,requests,mode,failList=false,delayCreate=false,sessions=[],learning={enabled:false,allow_degraded:false};
     await page.route('http://127.0.0.1:39879/**',async route=>{
       const r=route.request(),url=new URL(r.url()),method=r.method();
       if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:html});
@@ -27,7 +27,15 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
       if(url.pathname==='/api/desktop/preferences')return reply({background:false});
       if(url.pathname==='/api/desktop/status')return reply({owned:true});
       if(url.pathname==='/api/mcp/chats'&&method==='GET')return reply({sessions,receiver:{state:'connected',note:'SnowLuma 实时事件已连接。'}});
+      if(url.pathname.endsWith('/learning')&&method==='GET')return reply(learning);
       const body=r.postDataJSON();requests.push({path:url.pathname,method,body});
+      if(url.pathname.endsWith('/learning')&&method==='PUT'){
+        learning={...learning,...body,expression_count:1,usable_expressions:body.allow_degraded?1:0,jargon_count:0,confirmed_jargon:0,pending:[],last_learned:0,calls_last_hour:2,hourly_call_budget:20,
+          expressions:[{id:'synthetic-expression',situation:'<img src=x onerror=alert(1)>',style:'合成抽象表达',count:1,enabled:true,independence:'degraded'}]};return reply(learning);
+      }
+      if(url.pathname.endsWith('/learning/record')&&method==='POST'){
+        learning.expressions[0].enabled=body.enabled;return reply(learning);
+      }
       if(url.pathname.startsWith('/api/mcp/chats/')&&method==='POST'){
         const sid=url.pathname.split('/')[4];sessions=sessions.map(s=>sid==='all'||s.id===sid?{...s,active:false,state:'stopped'}:s);return reply({stopped:1});
       }
@@ -110,11 +118,20 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-status','1 个');
     await page.locator('#mcp-chat-sessions summary').click();assert.equal(await page.locator('#mcp-chat-sessions img').count(),0);
     await page.locator('#mcp-chat-refresh').click();await page.waitForTimeout(100);assert.equal(await page.locator('#mcp-chat-sessions details').getAttribute('open'),'');
+    await page.getByRole('button',{name:'实时语言学习',exact:true}).click();
+    const learningDialog=page.locator('dialog.mcp-learning');await learningDialog.waitFor({state:'visible'});
+    assert.equal(await learningDialog.getByRole('checkbox').first().isChecked(),false);
+    await learningDialog.getByRole('checkbox').first().check();await learningDialog.getByRole('button',{name:'保存学习设置'}).click();
+    await learningDialog.getByText('停用此条',{exact:true}).waitFor();assert.equal(await learningDialog.locator('img').count(),0);
+    assert.equal(await learningDialog.getByRole('checkbox').nth(1).isChecked(),false);
+    await learningDialog.getByRole('button',{name:'停用此条'}).click();await learningDialog.getByRole('button',{name:'启用此条'}).waitFor();
+    if(process.env.LEARNING_UI_SCREENSHOT)await learningDialog.screenshot({path:process.env.LEARNING_UI_SCREENSHOT});
+    await learningDialog.getByRole('button',{name:'关闭',exact:true}).click();
     await page.locator('[data-chat-stop]').click();await waitText('mcp-chat-sessions','已停止');
     assert.equal(await page.locator('#mcp-chat-stop-all').isEnabled(),false);
     sessions[0]={...sessions[0],active:true,state:'waiting_agent'};await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-sessions','等待外部 Agent 接续');
     await page.locator('#mcp-chat-stop-all').click();await waitText('mcp-chat-sessions','已停止');
     assert.deepEqual(errors,[]);
-    console.log('PASS: real Edge + actual MCP UI; service/creation regressions, chat permission, literal persona, stable details, independent stop/all. API fixtures only.');
+    console.log('PASS: real Edge + actual MCP UI; service/creation, chat permission, literal persona/learned data, scoped learning opt-in, degraded off, record disable, stable details, stop/all. API fixtures only.');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

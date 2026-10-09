@@ -194,6 +194,9 @@ class ChatTurns:
                     next='同一 Agent 组织表达后调用 send_chat_reply' if p['state']=='READY' else '继续 wait_chat_messages；旧队列尾部不会恢复')
         if p['state']=='READY':
             result['next_call']=dict(tool='send_chat_reply',arguments=dict(session_id=p['session_id'],plan_id=p['id']),requires=['bubbles'])
+            if hasattr(self.chat,'learning'):
+                context=self.chat.learning.plan_context(p)
+                if context:result['learned_language']=context
         elif p['state'] in ('WAITING','SILENT','SUCCEEDED'):
             result['next_call']=self.chat.continuation(p['session_id'],through=data['watermark'])
         else:

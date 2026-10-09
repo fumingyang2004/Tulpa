@@ -111,6 +111,38 @@
     page=data.next_offset;$('mcp-more').hidden=!data.has_more;selection();
   }
   async function action(fn){$('mcp-error').textContent='';try{await fn();}catch(e){$('mcp-error').textContent=e.message;}}
+  async function openLearning(row){
+    const panel=node('dialog','');panel.className='mcp-dialog mcp-body mcp-learning';
+    const heading=node('h2',row.name+' · 实时语言学习'),close=node('button','关闭');
+    close.type='button';close.onclick=()=>panel.close();panel.append(heading,close);
+    panel.append(node('p','仅收集开启后此机器人账号、此群的实时他人文本，不读取历史库。材料交给本连接现有 Agent 分阶段学习；没有活跃宿主时不会自动调用模型。'));
+    panel.append(node('p','开启后此 MCP 连接固定在当前账号与群。切号或切群需新建 MCP 连接，并打开新的 Agent 对话，避免沿用旧上下文。','mcp-muted'));
+    const enabled=node('input',''),quality=node('input','');enabled.type=quality.type='checkbox';
+    const label=node('label',''),qualityLabel=node('label','');label.append(enabled,document.createTextNode(' 开启当前账号、当前群的实时学习'));
+    qualityLabel.append(quality,document.createTextNode(' 允许聊天使用顺序审核结果（上下文独立性降级）'));
+    panel.append(label,qualityLabel,node('p','首版提取和审核分次执行，但顺序宿主可能记得前文。默认只积累、不使用这些降级结果；人工修订的黑话可用。','mcp-muted'));
+    const save=node('button','保存学习设置'),refresh=node('button','刷新状态'),status=node('p',''),error=node('p',''),records=node('div','');
+    save.type=refresh.type='button';panel.append(save,refresh,status,error,records);
+    async function load(){
+      const data=await api('/chats/'+row.id+'/learning');enabled.checked=data.enabled;quality.checked=data.allow_degraded;
+      status.textContent=data.enabled?'表达 '+data.expression_count+' 条（可用 '+data.usable_expressions+'） · 黑话 '+data.jargon_count+' 条（确认 '+data.confirmed_jargon+'） · 本小时领取 '+data.calls_last_hour+'/'+data.hourly_call_budget+' 次 · 最近学习 '+(data.last_learned?new Date(data.last_learned*1000).toLocaleString():'尚无')+' · 待办 '+data.pending.map(x=>x.stage+': '+x.state).join('，')+' · 最近错误 '+(data.last_failure||'无'):'实时学习已关闭；原学习库保留。';
+      records.replaceChildren();
+      for(const kind of ['expressions','jargon'])for(const item of data[kind]||[]){
+        const line=node('div','', 'mcp-connection');line.append(node('p',kind==='expressions'?item.situation+' → '+item.style:item.term+'：'+(item.meaning||'待积累核验')));
+        line.append(node('small','批次命中 '+item.count+' · '+(item.manual?'人工释义':item.independence),'mcp-muted'));
+        const toggle=node('button',item.enabled?'停用此条':'启用此条');toggle.type='button';
+        toggle.onclick=()=>run(async()=>{await api('/chats/'+row.id+'/learning/record','POST',{kind,id:item.id,enabled:!item.enabled});await load();});line.append(toggle);
+        if(kind==='jargon'){
+          const meaning=node('textarea',''),edit=node('button','保存人工释义');meaning.value=item.meaning||'';meaning.maxLength=600;meaning.setAttribute('aria-label',item.term+' 的人工释义');edit.type='button';
+          edit.onclick=()=>run(async()=>{await api('/chats/'+row.id+'/learning/record','POST',{kind,id:item.id,meaning:meaning.value});await load();});line.append(meaning,edit);
+        }
+        records.append(line);
+      }
+    }
+    async function run(fn){error.textContent='';try{await fn();}catch(e){error.textContent=e.message;}}
+    save.onclick=()=>run(async()=>{await api('/chats/'+row.id+'/learning','PUT',{enabled:enabled.checked,allow_degraded:quality.checked});await load();});
+    refresh.onclick=()=>run(load);panel.addEventListener('close',()=>panel.remove(),{once:true});document.body.append(panel);panel.showModal();await run(load);
+  }
   async function refreshChats(){
     if(chatRefreshing)return;chatRefreshing=true;
     try{
@@ -128,7 +160,8 @@
         details.append(node('p','会话编号：'+row.id+' · 已处理事件 '+row.cursor,'mcp-muted'));card.append(details);
         if(row.gap_note)card.append(node('p',row.gap_note,'mcp-muted'));
         if(row.stop_reason)card.append(node('p',row.stop_reason,'mcp-muted'));
-        if(row.active){const button=node('button','停止聊天');button.type='button';button.dataset.chatStop=row.id;button.onclick=()=>action(async()=>{button.disabled=true;try{await api('/chats/'+encodeURIComponent(row.id)+'/stop','POST',{});await refreshChats();}finally{button.disabled=false;}});card.append(button);}
+        if(row.active){const button=node('button','停止聊天');button.type='button';button.dataset.chatStop=row.id;button.onclick=()=>action(async()=>{button.disabled=true;try{await api('/chats/'+encodeURIComponent(row.id)+'/stop','POST',{});await refreshChats();}finally{button.disabled=false;}});card.append(button);
+          const learning=node('button','实时语言学习');learning.type='button';learning.onclick=()=>action(()=>openLearning(row));card.append(learning);}
         host.append(card);
         if(focused===row.id)card.querySelector('[data-chat-stop]')?.focus({preventScroll:true});
       }
@@ -190,7 +223,7 @@
       $('mcp-secret').hidden=false;$('mcp-url').value=current.url;$('mcp-token').value=result.token;
       $('mcp-config').value='[mcp_servers.tulpa]\nurl = '+JSON.stringify(current.url)+'\nhttp_headers = { Authorization = '+JSON.stringify('Bearer '+result.token)+' }\ntool_timeout_sec = 240\n';
       for(const [flag,tool] of [['send','send_qq_message'],['manage','manage_qq_group']])if(body[flag])$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = \"approve\"\n';
-      if(body.chat)for(const tool of ['start_chat_session','get_chat_session','list_chat_sessions','wait_chat_messages','plan_chat_reply','send_chat_reply','send_chat_message','stop_chat_session','list_chat_groups','list_chat_personas'])$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = "approve"\n';
+      if(body.chat)for(const tool of ['start_chat_session','get_chat_session','list_chat_sessions','wait_chat_messages','plan_chat_reply','send_chat_reply','send_chat_message','stop_chat_session','list_chat_groups','list_chat_personas','get_chat_learning','claim_chat_learning','submit_chat_learning','select_chat_expressions'])$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = "approve"\n';
       for(const [flag,names] of [['chat_reactions',['react_to_chat_message']],['chat_images',['read_chat_image','list_chat_stickers','read_chat_sticker','note_chat_sticker']],['chat_sticker_send',['send_chat_sticker']],['chat_sticker_collect',['collect_chat_sticker']]])if(body[flag])for(const tool of names)$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = "approve"\n';
       $('mcp-secret').scrollIntoView({block:'nearest'});
       // Show the one-time credential before refreshing the surrounding lists.
