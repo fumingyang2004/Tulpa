@@ -45,6 +45,11 @@ class EventReceiver:
         self.state = dict(state='stopped', account='', last_event_at=0, last_message_at=0, connected_at=0,
                           note='事件接收尚未启动。')
         self.log = logging.getLogger('tulpa.onebot.events')
+        self.http_binding = None  # Private in-memory binding; never in status/logs.
+
+    def matches_client(self, client):
+        with self.lock:
+            return self.http_binding == (client.url, client.token)
 
     def status(self):
         with self.lock:
@@ -86,7 +91,10 @@ class EventReceiver:
                 validate_url(cfg['url'])
                 self.update('connecting', '正在连接 SnowLuma 实时事件…', account='')
                 # Independent identity check before accepting the WS self_id.
-                account = self.client_factory(timeout=3).login()
+                http_client = self.client_factory(timeout=3)
+                account = http_client.login()
+                with self.lock:
+                    self.http_binding = (http_client.url, http_client.token)
                 with connect(cfg['url'], additional_headers={'Authorization':'Bearer '+cfg['token']} if cfg['token'] else {},
                              proxy=None, open_timeout=3, close_timeout=1, max_size=1024*1024,
                              max_queue=16, ping_interval=20, ping_timeout=20) as ws:

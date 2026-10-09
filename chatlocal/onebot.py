@@ -11,9 +11,10 @@ from .config import ROOT
 
 
 class OneBotError(ValueError):
-    def __init__(self, message, code='http_query_failed'):
+    def __init__(self, message, code='http_query_failed', *, retcode=None, http_status=None):
         super().__init__(message)
         self.code = code
+        self.retcode, self.http_status = retcode, http_status
 
 
 class OneBotUncertain(OneBotError):
@@ -24,7 +25,7 @@ READS = frozenset(('get_login_info', 'get_version_info', 'get_group_info', 'get_
     'get_group_member_info', 'get_group_member_list', 'get_group_system_msg',
     '_get_group_notice', 'get_essence_msg_list', 'get_group_file_system_info',
     'get_group_root_files', 'get_group_files_by_folder', 'get_group_file_url', 'get_image', 'fetch_custom_face_detail'))
-WRITES = frozenset(('set_group_ban', 'set_group_kick', 'set_group_name', 'set_group_add_request', 'add_custom_face'))
+WRITES = frozenset(('set_group_ban', 'set_group_kick', 'set_group_name', 'set_group_add_request', 'add_custom_face', 'set_msg_emoji_like'))
 
 
 def configuration(root=None):
@@ -66,8 +67,24 @@ class Client:
                             raise ValueError('oversize')
             result = json.loads(raw)
             if not isinstance(result, dict) or result.get('status') not in ('ok', 'failed') or type(result.get('retcode')) is not int:
+                if action=='set_msg_emoji_like':
+                    code=result.get('retcode') if isinstance(result,dict) else None
+                    raise OneBotUncertain('回应回执格式不明确，结果未知；不得自动重试。','protocol_error',retcode=code if type(code) is int else None)
                 raise ValueError('invalid receipt')
             if result['status'] != 'ok' or result['retcode'] != 0:
+                if action == 'set_msg_emoji_like':
+                    # Classify known adapter errors, never expose raw server text:
+                    # wording may contain credentials or unrelated message content.
+                    detail = ' '.join(str(result.get(k, '')) for k in ('message','wording','error')).lower()
+                    reasons = [('sequence', 'target_sequence_missing', '原消息没有可信 QQ sequence，未执行回应。'),
+                        ('message not found', 'target_missing', 'OneBot 缓存已找不到原消息，未执行回应。'),
+                        ('permission', 'permission_denied', 'QQ 拒绝了此账号的回应权限。'),
+                        ('unsupported', 'emoji_unsupported', 'QQ 或当前接入服务不支持该表情回应。'),
+                        ('not supported', 'emoji_unsupported', 'QQ 或当前接入服务不支持该表情回应。'),
+                        ('rate', 'remote_rate_limited', 'QQ 接口限制了操作频率，请稍后核对。')]
+                    code, message = next(((c,m) for needle,c,m in reasons if needle in detail),
+                                         ('remote_rejected','QQ 接口拒绝回应，请核对目标、表情与账号权限。'))
+                    raise OneBotError(message, code, retcode=result['retcode'])
                 raise OneBotError('OneBot 拒绝了操作；请检查账号权限、目标和客户端状态。')
             return result.get('data')
         except OneBotError:
@@ -75,8 +92,14 @@ class Client:
         except (httpx.ConnectError, httpx.ConnectTimeout):
             raise OneBotError('未连接到本机 OneBot，请核对节点地址、启用状态和接入程序是否运行。', 'http_unreachable') from None
         except httpx.HTTPStatusError as exc:
+            if action == 'set_msg_emoji_like' and exc.response.status_code in (401,403,404,429):
+                code, message = {401:('http_auth_error','HTTP 认证被拒绝，请检查节点 Token。'),
+                    403:('permission_denied','HTTP 接口拒绝此操作。'),
+                    404:('action_unavailable','当前节点没有消息回应接口。'),
+                    429:('remote_rate_limited','HTTP 接口限流，未执行回应。')}[exc.response.status_code]
+                raise OneBotError(message,code,http_status=exc.response.status_code) from None
             if writing:
-                raise OneBotUncertain('未取得可靠回执，操作结果未知。请在 QQ 核对，不会自动重试。') from None
+                raise OneBotUncertain('未取得可靠回执，操作结果未知。请在 QQ 核对，不会自动重试。', 'http_response_unknown', http_status=exc.response.status_code) from None
             if exc.response.status_code in (401, 403):
                 raise OneBotError('HTTP 认证被拒绝，请核对所选 HTTP 节点自己的 Token。', 'http_auth_error') from None
             if exc.response.status_code == 404:
@@ -84,7 +107,7 @@ class Client:
             raise OneBotError('HTTP 服务返回错误，未取得 OneBot 成功回执。', 'http_response_error') from None
         except httpx.TimeoutException:
             if writing:
-                raise OneBotUncertain('未取得可靠回执，操作结果未知。请在 QQ 核对，不会自动重试。') from None
+                raise OneBotUncertain('未取得可靠回执，操作结果未知。请在 QQ 核对，不会自动重试。','http_timeout') from None
             raise OneBotError('HTTP 检测超时，请检查该节点和 QQ 连接状态。', 'http_timeout') from None
         except (httpx.HTTPError, ValueError, TypeError):
             if writing:

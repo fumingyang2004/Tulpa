@@ -92,7 +92,8 @@ async def protocol(service, token, session_ids, add, ui):
             async with ClientSession(read,write) as client:
                 await client.initialize()
                 names={t.name:t for t in (await client.list_tools()).tools}
-                assert CHAT_TOOLS<=names.keys()
+                assert CHAT_TOOLS-{'react_to_chat_message'}<=names.keys()
+                assert 'react_to_chat_message' not in names
                 assert names['send_chat_message'].annotations.openWorldHint
                 waits=[asyncio.create_task(client.call_tool('wait_chat_messages',{'session_id':sid,'timeout_seconds':30,'quiet_seconds':0})) for sid in session_ids]
                 for _ in range(100):
@@ -203,7 +204,8 @@ def main():
                 from chatlocal.mcp_connect import codex_config
                 import tomllib
                 entries=tomllib.loads(codex_config('http://127.0.0.1:18777/mcp','fixture',{'chat':True,'send':True}))['mcp_servers']['tulpa']['tools']
-                assert CHAT_TOOLS<=entries.keys()
+                assert CHAT_TOOLS-{'react_to_chat_message'}<=entries.keys()
+                assert 'react_to_chat_message' not in entries
                 hot=grant(send=True,chat=True)
                 asyncio.run(hot_personas_protocol(service,hot['token'],persona_dir))
                 presets=call('list_chat_personas')['personas']

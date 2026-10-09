@@ -58,7 +58,7 @@ class MCPService:
             self.access.authorize(token, source=False)
             return [types.Tool(name=s['name'], description=s['description'], inputSchema=s['parameters'],
                     annotations=types.ToolAnnotations(readOnlyHint=s['name'] not in CHAT_TOOLS and s['name'] not in MEDIA_WRITES and s['name'] not in ('prepare_file', 'download_file', 'transcribe_voice', 'read_qq_group', 'get_group_knowledge','send_qq_message','manage_qq_group'),
-                        destructiveHint=s['name']=='manage_qq_group', openWorldHint=s['name'] in ('send_qq_message','manage_qq_group','send_chat_message','send_chat_sticker','collect_chat_sticker'))) for s in rows]
+                        destructiveHint=s['name']=='manage_qq_group', openWorldHint=s['name'] in ('send_qq_message','manage_qq_group','send_chat_message','send_chat_sticker','collect_chat_sticker','react_to_chat_message'))) for s in rows]
 
         @protocol.call_tool(validate_input=False)
         async def call_tool(name, arguments):

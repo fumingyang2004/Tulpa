@@ -11,6 +11,7 @@ from .client_accounts import bound_account
 from .retrieval import Plan, date_bound
 
 CHAT_MEDIA_FLAGS = ('chat_images', 'chat_sticker_send', 'chat_sticker_collect')
+CHAT_EXTRA_FLAGS = ('chat_reactions',)
 CHAT_MEDIA_TOOLS = ('read_chat_image','list_chat_stickers','read_chat_sticker','note_chat_sticker','send_chat_sticker','collect_chat_sticker')
 
 DEFAULT_PORT = 18777
@@ -74,7 +75,7 @@ class MCPAccess:
         return {p: bound_account(self.store, p) or '' for p in platforms}
 
     def create(self, body):
-        fields = {'name', 'platforms', 'conversations', 'all_conversations', 'start', 'end', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS}
+        fields = {'name', 'platforms', 'conversations', 'all_conversations', 'start', 'end', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS, *CHAT_EXTRA_FLAGS}
         if not isinstance(body, dict) or set(body) - fields:
             raise ValueError('连接配置字段无效。')
         name = body.get('name', '')
@@ -106,7 +107,7 @@ class MCPAccess:
             selection = json.dumps(pair, ensure_ascii=False)
             if selection not in selections:
                 selections.append(selection)
-        for flag in ('all_conversations', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS):
+        for flag in ('all_conversations', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS, *CHAT_EXTRA_FLAGS):
             if flag in body and type(body[flag]) is not bool:
                 raise ValueError('权限开关必须为布尔值。')
         if body.get('all_conversations'):
@@ -130,11 +131,13 @@ class MCPAccess:
         if start is not None and end is not None and start >= end:
             raise ValueError('开始日期不能晚于截止日期。')
         scope = dict(platforms=sorted(set(platforms)), conversations=selections, **dates,
-                     **{k: body.get(k, False) for k in ('media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS)})
+                     **{k: body.get(k, False) for k in ('media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS, *CHAT_EXTRA_FLAGS)})
         if (scope['send'] or scope['manage']) and 'qq' not in platforms:
             raise ValueError('发送和群管理需要选择 QQ 平台。')
         if scope['chat'] and not scope['send']:
             raise ValueError('持续聊天需要同时允许直接发送 QQ 消息。')
+        if scope['chat_reactions'] and not scope['chat']:
+            raise ValueError('消息表情回应需要开启持续群聊及发送权限。')
         if any(scope[k] for k in CHAT_MEDIA_FLAGS) and not scope['chat']:
             raise ValueError('表情包子功能需要开启持续群聊。')
         if (scope['chat_sticker_send'] or scope['chat_sticker_collect']) and not scope['chat_images']:

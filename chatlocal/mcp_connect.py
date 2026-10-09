@@ -23,6 +23,7 @@ def codex_config(url, token, scope=None):
     if (scope or {}).get('chat') is True:
         from .mcp_chat import CHAT_TOOLS
         for tool in sorted(CHAT_TOOLS):
+            if tool=='react_to_chat_message' and not (scope or {}).get('chat_reactions'):continue
             stanza += f'\n[mcp_servers.tulpa.tools.{tool}]\napproval_mode = "approve"\n'
         from .mcp_chat_media import MEDIA_TOOLS
         for tool,flag in MEDIA_TOOLS.items():

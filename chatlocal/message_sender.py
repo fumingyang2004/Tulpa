@@ -140,6 +140,24 @@ class QQSender:
         address=self.check_target(target)
         return dict(address,quote_id=self.quote_id(target,address) if quote else None)
 
+    def verify_chat_message(self,address,response_target):
+        """Shared native quote/reaction identity check; returns the verified record."""
+        mid=response_target['onebot_message_id']
+        digits=mid[1:] if isinstance(mid,str) and mid.startswith('-') else mid
+        if (not isinstance(digits,str) or not digits.isascii() or not digits.isdigit()
+                or len(mid)>11 or str(int(mid))!=mid or not -(2**31)<=int(mid)<2**31 or int(mid)==0):
+            raise SendError('原消息没有有效的 OneBot 消息编号，未发送。')
+        info=self.call('get_msg',dict(message_id=int(mid)))
+        sender=info.get('sender') if isinstance(info,dict) and isinstance(info.get('sender'),dict) else {}
+        if (not isinstance(info,dict) or str(info.get('message_id'))!=mid
+                or info.get('message_type')!='group' or str(info.get('group_id'))!=address['peer']
+                or ('self_id' in info and str(info['self_id'])!=address['account'])
+                or str(sender.get('user_id'))!=response_target['sender_id']
+                or type(info.get('time')) is not int or info['time']!=response_target['timestamp']//1000
+                or any(info.get(k) for k in ('recalled','is_recalled','deleted','is_deleted'))):
+            raise SendError('无法核对引用目标的账号、群、发送者和时间，或原消息已撤回；未发送。')
+        return info
+
     def chat_targets(self,address,response_target,quote,mentions):
         """Verify a cached live event against OneBot, never a local M/NT ID.
 
@@ -152,21 +170,8 @@ class QQSender:
         quote_id=None
         if quote:
             if not response_target:raise SendError('显示引用需要本会话已读取的回应目标，未发送。')
-            mid=response_target['onebot_message_id']
-            digits=mid[1:] if isinstance(mid,str) and mid.startswith('-') else mid
-            if (not isinstance(digits,str) or not digits.isascii() or not digits.isdigit()
-                    or len(mid)>11 or str(int(mid))!=mid or not -(2**31)<=int(mid)<2**31 or int(mid)==0):
-                raise SendError('原消息没有有效的 OneBot 消息编号，未发送。')
-            info=self.call('get_msg',dict(message_id=int(mid)))
-            sender=info.get('sender') if isinstance(info,dict) and isinstance(info.get('sender'),dict) else {}
-            if (not isinstance(info,dict) or str(info.get('message_id'))!=mid
-                    or info.get('message_type')!='group' or str(info.get('group_id'))!=address['peer']
-                    or ('self_id' in info and str(info['self_id'])!=address['account'])
-                    or str(sender.get('user_id'))!=response_target['sender_id']
-                    or type(info.get('time')) is not int or info['time']!=response_target['timestamp']//1000
-                    or any(info.get(k) for k in ('recalled','is_recalled','deleted','is_deleted'))):
-                raise SendError('无法核对引用目标的账号、群、发送者和时间，或原消息已撤回；未发送。')
-            quote_id=int(mid)
+            info=self.verify_chat_message(address,response_target)
+            quote_id=int(info['message_id'])
         for uid in mentions:
             info=self.call('get_group_member_info',dict(group_id=int(address['peer']),user_id=int(uid),no_cache=True))
             if not isinstance(info,dict) or str(info.get('group_id'))!=address['peer'] or str(info.get('user_id'))!=uid:

@@ -26,6 +26,8 @@
             <label><input id="mcp-onebot" type="checkbox">读取 OneBot 群公告、精华、当前成员和文件目录</label>
             <label><input id="mcp-send" type="checkbox">允许直接发送 QQ 消息（无需逐次审批）</label>
             <label><input id="mcp-chat" type="checkbox">允许外部 Agent 持续群聊（需发送权限，可随时停止）</label>
+            <label><input id="mcp-chat_reactions" type="checkbox" disabled>允许对已读群消息添加 / 撤销小表情回应（无需逐次审批）</label>
+            <small class="mcp-muted">与发送表情包独立，默认每会话冷却 10 秒。旧连接不会自动获得此权限。</small>
             <fieldset class="mcp-chat-media"><legend>持续群聊 · 表情包（可选）</legend>
               <label><input id="mcp-chat_images" type="checkbox" disabled>看群内图片 / 动图，读取此 QQ 账号的收藏表情</label>
               <label><input id="mcp-chat_sticker_send" type="checkbox" disabled>允许在持续聊天的群里直接发送表情</label>
@@ -87,7 +89,7 @@
       const card=node('div','', 'mcp-connection'); card.append(node('strong',row.name+(row.revoked?' · 已撤销':'')));
       const scope=row.scope;
       card.append(node('p',scope.platforms.join(' / ')+' · '+(scope.conversations.length?scope.conversations.length+' 个指定会话':'全部会话')+' · '+(scope.start||'不限起点')+' 至 '+(scope.end||'包括未来消息'), 'mcp-muted'));
-      card.append(node('p','操作权限：'+[scope.send?'QQ 直接发送':'',scope.chat?'持续群聊':'',scope.chat_images?'群聊看图与收藏目录':'',scope.chat_sticker_send?'发送表情':'',scope.chat_sticker_collect?'收藏到 QQ':'',scope.manage?'群管理直接操作':''].filter(Boolean).join('、')+(scope.send||scope.manage?' · 持续授权，可撤销':'仅资料读取'),'mcp-muted'));
+      card.append(node('p','操作权限：'+[scope.send?'QQ 直接发送':'',scope.chat?'持续群聊':'',scope.chat_reactions?'消息表情回应':'',scope.chat_images?'群聊看图与收藏目录':'',scope.chat_sticker_send?'发送表情':'',scope.chat_sticker_collect?'收藏到 QQ':'',scope.manage?'群管理直接操作':''].filter(Boolean).join('、')+(scope.send||scope.manage?' · 持续授权，可撤销':'仅资料读取'),'mcp-muted'));
       card.append(node('p','来源账号：'+Object.entries(row.accounts).map(([p,id])=>p+' '+(id||'当前导入资料')).join(' / ')+' · '+row.calls+' 次调用', 'mcp-muted'));
       if(row.valid===false&&!row.revoked)card.append(node('p','来源账号已改变，请撤销并重新创建连接。','mcp-warning'));
       if(!row.revoked){const button=node('button','撤销连接');button.type='button';button.onclick=()=>action(async()=>{await api('/connections/'+encodeURIComponent(row.id)+'/revoke','POST',{});await refresh();});card.append(button);}
@@ -144,6 +146,7 @@
   $('mcp-chat-stop-all').onclick=()=>action(async()=>{await api('/chats/all/stop','POST',{});await refreshChats();});
   function mediaPermissions(){
     const active=$('mcp-chat').checked&&$('mcp-send').checked;
+    $('mcp-chat_reactions').disabled=!active;if(!active)$('mcp-chat_reactions').checked=false;
     $('mcp-chat_images').disabled=!active;if(!active)$('mcp-chat_images').checked=false;
     for(const flag of ['chat_sticker_send','chat_sticker_collect']){const input=$('mcp-'+flag);input.disabled=!active||!$('mcp-chat_images').checked;if(input.disabled)input.checked=false;}
   }
@@ -170,7 +173,7 @@
     const allowStart=current&&!current.running,port=Number($('mcp-port').value);
     busy=true;createError='';renderService();
     try{const body={name:$('mcp-name').value,platforms:['qq','wechat'].filter(p=>$('mcp-'+p).checked),conversations:[...selected.values()],all_conversations:$('mcp-all').checked,start:$('mcp-start').value,end:$('mcp-end').value};
-      for(const flag of ['media','prepare','voice','onebot','send','manage','chat','chat_images','chat_sticker_send','chat_sticker_collect'])body[flag]=$('mcp-'+flag).checked;
+      for(const flag of ['media','prepare','voice','onebot','send','manage','chat','chat_reactions','chat_images','chat_sticker_send','chat_sticker_collect'])body[flag]=$('mcp-'+flag).checked;
       if(!body.platforms.length)throw Error('请选择允许访问的平台。');
       if(!body.all_conversations&&!body.conversations.length)throw Error('请选择会话，或明确勾选允许所选平台全部会话。');
       if(body.start&&body.end&&body.start>body.end)throw Error('截止日期不能早于开始日期。');
@@ -188,7 +191,7 @@
       $('mcp-config').value='[mcp_servers.tulpa]\nurl = '+JSON.stringify(current.url)+'\nhttp_headers = { Authorization = '+JSON.stringify('Bearer '+result.token)+' }\ntool_timeout_sec = 240\n';
       for(const [flag,tool] of [['send','send_qq_message'],['manage','manage_qq_group']])if(body[flag])$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = \"approve\"\n';
       if(body.chat)for(const tool of ['start_chat_session','get_chat_session','list_chat_sessions','wait_chat_messages','send_chat_message','stop_chat_session','list_chat_groups','list_chat_personas'])$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = "approve"\n';
-      for(const [flag,names] of [['chat_images',['read_chat_image','list_chat_stickers','read_chat_sticker','note_chat_sticker']],['chat_sticker_send',['send_chat_sticker']],['chat_sticker_collect',['collect_chat_sticker']]])if(body[flag])for(const tool of names)$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = "approve"\n';
+      for(const [flag,names] of [['chat_reactions',['react_to_chat_message']],['chat_images',['read_chat_image','list_chat_stickers','read_chat_sticker','note_chat_sticker']],['chat_sticker_send',['send_chat_sticker']],['chat_sticker_collect',['collect_chat_sticker']]])if(body[flag])for(const tool of names)$('mcp-config').value+='\n[mcp_servers.tulpa.tools.'+tool+']\napproval_mode = "approve"\n';
       $('mcp-secret').scrollIntoView({block:'nearest'});
       // Show the one-time credential before refreshing the surrounding lists.
       try{await refresh();}catch{createError='连接已创建，下方凭据可用；连接列表暂时刷新失败。';}

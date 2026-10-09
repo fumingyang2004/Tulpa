@@ -15,6 +15,7 @@ from .agent_tools import ChatTools, SCHEMAS, tool
 from .mcp_access import RateLimited
 from .mcp_chat import MCPChat, CHAT_TOOLS
 from .mcp_chat_media import MEDIA_TOOLS, MEDIA_WRITES, schemas as media_schemas
+from .mcp_reactions import TOOL as REACTION_TOOL, schema as reaction_schema, ChatReactions
 from .retrieval import scope_sql
 
 READ_TOOLS = {
@@ -106,6 +107,8 @@ class MCPTools:
             from .mcp_chat import schemas as chat_schemas
             rows += chat_schemas(tool)
             rows += media_schemas(tool, grant['scope'])
+            if grant['scope'].get('chat_reactions') and self.chat.reactions.policy()['enabled']:
+                rows.append(reaction_schema(tool,self.chat.reactions.policy()['candidates']))
         rows.append(tool('read_message', '按字符分页读一条允许范围内的原始消息，适合被搜索结果截断的长消息。',
                          dict(message_id=dict(type='integer', minimum=1),
                               offset=dict(type='integer', minimum=0),
@@ -138,10 +141,14 @@ class MCPTools:
             # Starting and sending perform their own live identity checks.
             from .mcp_chat import schemas as chat_schemas
             rows = chat_schemas(tool) if grant['scope'].get('chat') and grant['scope'].get('send') else []
+            if rows and grant['scope'].get('chat_reactions') and self.chat.reactions.policy()['enabled']:
+                rows.append(reaction_schema(tool,self.chat.reactions.policy()['candidates']))
         else:
             rows = self.schemas(grant)
         schema = next((s for s in rows if s['name'] == name), None)
         if schema is None:
+            if name==REACTION_TOOL:
+                return self.result(ChatReactions.rejected(arguments,'tool_unavailable','消息回应未启用或本连接尚未授权。'))
             return self.result(dict(error='工具未开放或连接没有该权限。', error_code='tool_unavailable'))
         # Validate before budget, IO or tool-specific paths. Don't echo private args.
         import jsonschema
@@ -291,14 +298,18 @@ class MCPTools:
             call_id=self.access.begin_call(grant['id'],name)
             if cancel.is_set():raise ValueError('调用已取消。')
             data=self.chat.call(grant,name,arguments,cancel)
-            self.access.authorize(token, source=False)
-            if cancel.is_set() and name not in ('send_chat_message','stop_chat_session'):
+            # A revocation after dispatch stops future actions; it cannot turn
+            # this operation's durable receipt into a false "not executed".
+            if name!=REACTION_TOOL:self.access.authorize(token, source=False)
+            if cancel.is_set() and name not in ('send_chat_message','stop_chat_session',REACTION_TOOL):
                 data=dict(event='cancelled',messages=[],note='本次调用已取消；需要结束聊天请停止会话。')
-            status='ok';count=len(data.get('messages',[]))
+            status=data.get('state','ok').lower();count=len(data.get('messages',[]))
             return self.result(data)
         except RateLimited as exc:
+            if name==REACTION_TOOL:return self.result(ChatReactions.rejected(arguments,'rate_limited',str(exc)))
             return self.result(dict(error=str(exc),error_code='rate_limited'))
         except ValueError as exc:
+            if name==REACTION_TOOL:return self.result(ChatReactions.rejected(arguments,'chat_rejected',str(exc)))
             return self.result(dict(error=str(exc),error_code='chat_rejected'))
         finally:
             if call_id is not None:self.access.finish_call(call_id,status,time.monotonic()-started,count)

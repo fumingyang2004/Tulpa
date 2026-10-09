@@ -1,7 +1,9 @@
 // Real browser + actual MCP frontend, isolated API fixtures; no personal grants or model calls.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright-core');
-const root=path.resolve(__dirname,'..');
+const packageArg=process.argv.indexOf('--package');
+if(packageArg>=0&&!process.argv[packageArg+1])throw new Error('--package needs a directory');
+const root=path.resolve(packageArg<0?path.join(__dirname,'..'):process.argv[packageArg+1]);
 const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP UI fixture</title>
 <style>:root{--line:#dcd9d1;--panel:#faf9f5;--text:#292827;--muted:#73716b;--accent:#171717;--warning:#a34e24;--danger:#a12f2f}body{font:15px/1.5 system-ui;background:var(--panel)}</style>
 <link rel="stylesheet" href="/mcp.css"><button id="open-mcp">外部 Agent / MCP</button><button id="open-data">导入</button><script src="/mcp.js"></script></html>`;
@@ -52,7 +54,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     if(process.env.MCP_UI_SCREENSHOT){await page.locator('#mcp-create').scrollIntoViewIfNeeded();await page.screenshot({path:process.env.MCP_UI_SCREENSHOT});}
     await create();
     assert.deepEqual(requests.map(x=>x.method+' '+x.path),['PUT /api/mcp','POST /api/mcp/connections']);
-    assert.deepEqual(requests[1].body,{name:'qqmcp',platforms:['qq','wechat'],conversations:[],all_conversations:true,start:'2026-09-01',end:'2026-10-03',media:false,prepare:false,voice:false,onebot:false,send:false,manage:false,chat:false,chat_images:false,chat_sticker_send:false,chat_sticker_collect:false});
+    assert.deepEqual(requests[1].body,{name:'qqmcp',platforms:['qq','wechat'],conversations:[],all_conversations:true,start:'2026-09-01',end:'2026-10-03',media:false,prepare:false,voice:false,onebot:false,send:false,manage:false,chat:false,chat_reactions:false,chat_images:false,chat_sticker_send:false,chat_sticker_collect:false});
     // Stale offline UI must recheck; it should not reconfigure an already running service.
     await setup();state.running=state.enabled=true;await create();assert.equal(requests.length,1);assert.equal(requests[0].method,'POST');
     // Stale online UI must ask explicitly before turning a now stopped service back on.
@@ -76,18 +78,27 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     // Dedicated permission requires send, and clearing send clears chat.
     await setup(true);assert.equal(await page.locator('#mcp-chat').isChecked(),false);
     assert.equal(await page.locator('#mcp-chat_images').isEnabled(),false);
+    assert.equal(await page.locator('#mcp-chat_reactions').isEnabled(),false);
     await page.locator('#mcp-chat').check();assert.equal(await page.locator('#mcp-send').isChecked(),true);
     assert.equal(await page.locator('#mcp-chat_images').isEnabled(),true);
+    assert.equal(await page.locator('#mcp-chat_reactions').isEnabled(),true);
+    assert.equal(await page.locator('#mcp-chat_reactions').isChecked(),false);
+    await page.locator('#mcp-chat_reactions').check();
     assert.equal(await page.locator('#mcp-chat_sticker_send').isEnabled(),false);
     await page.locator('#mcp-chat_images').check();await page.locator('#mcp-chat_sticker_send').check();await page.locator('#mcp-chat_sticker_collect').check();
     await page.locator('#mcp-send').uncheck();assert.equal(await page.locator('#mcp-chat').isChecked(),false);
     assert.equal(await page.locator('#mcp-chat_sticker_send').isChecked(),false);
+    assert.equal(await page.locator('#mcp-chat_reactions').isChecked(),false);
     assert.equal(await page.locator('#mcp-chat_sticker_collect').isEnabled(),false);
     await page.locator('#mcp-chat').check();await page.locator('#mcp-chat_images').check();await page.locator('#mcp-chat_sticker_send').check();await create();assert.equal(requests[0].body.chat,true);
     assert.equal(requests[0].body.chat_images,true);assert.equal(requests[0].body.chat_sticker_send,true);assert.equal(requests[0].body.chat_sticker_collect,false);
     assert.ok((await page.locator('#mcp-config').inputValue()).includes('tools.stop_chat_session'));
     assert.ok((await page.locator('#mcp-config').inputValue()).includes('tools.send_chat_sticker'));
     assert.ok(!(await page.locator('#mcp-config').inputValue()).includes('tools.collect_chat_sticker'));
+    assert.equal(requests[0].body.chat_reactions,false);
+    await setup(true);await page.locator('#mcp-chat').check();await page.locator('#mcp-chat_reactions').check();await create();
+    assert.equal(requests[0].body.chat_reactions,true);assert.equal(requests[0].body.chat_images,false);
+    assert.ok((await page.locator('#mcp-config').inputValue()).includes('tools.react_to_chat_message'));
     await setup(true);await page.locator('#mcp-all').uncheck();await page.locator('#mcp-live-groups').click();
     await waitText('mcp-chats','未导入的实时群');await page.locator('#mcp-chat-refresh').click();
     await waitText('mcp-event-status','SnowLuma 实时事件已连接');
