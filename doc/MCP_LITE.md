@@ -61,7 +61,7 @@ Windows 10 / 11 x64、.NET Framework 4.8。轻量版使用系统 **Microsoft Edg
 
 已安装项目开发依赖时：`python app_mcp.py`，访问 `http://127.0.0.1:7861/`。完整开发页继续使用原 `start.ps1`。
 
-准备固定读取器和桌面依赖后，执行 `python desktop/build.py --mcp-only`。默认生成 `release/<版本>-mcp/Tulpa/` 与 `release/Tulpa-MCP-<版本>-win-x64.zip`。仅复制 `requirements-mcp.txt` 的实际依赖闭包，不会从使用过的 data 目录打包个人内容。`--qa --no-zip --output release/qa-mcp/Tulpa` 可构建隔离验收版本。构建完整包的原命令保持可用。
+准备固定读取器和桌面依赖后，执行 `python desktop/build.py --mcp-only`。默认生成 `release/<版本>-mcp/Tulpa/` 与 `release/Tulpa-MCP-<版本>-win-x64.zip`。仅复制 `requirements/mcp.txt` 的实际依赖闭包，不会从使用过的 data 目录打包个人内容。`--qa --no-zip --output release/qa-mcp/Tulpa` 可构建隔离验收版本。构建完整包的原命令保持可用。
 
 `scripts/check_mcp_actions.py` 使用隔离 OneBot 服务检查直接授权、会话/日期/角色隔离、撤销、并发重复发送、未知结果不重试和操作记录；测试中的踢人只发生在夹具，不操作真实账号。
 

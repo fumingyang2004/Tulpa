@@ -35,6 +35,6 @@ def main():
         for item in z.infolist():
             if not (archive.parent/item.filename).resolve().is_relative_to(archive.parent.resolve()):raise ValueError('Unsafe archive')
         z.extractall(archive.parent)
-    print('Local voice runtime ready; use requirements-voice.txt for SILK decoder.')
+    print('Local voice runtime ready; use requirements/voice.txt for SILK decoder.')
 
 if __name__=='__main__':main()

@@ -18,7 +18,7 @@
 
 ```powershell
 .\setup.ps1
-.\.venv\Scripts\python.exe -m pip install -r requirements-media.txt -r requirements-voice.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements/media.txt -r requirements/voice.txt
 .\.venv\Scripts\python.exe scripts/setup_voice.py
 .\start.ps1
 ```

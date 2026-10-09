@@ -19,7 +19,9 @@ jobs:
         with:
           python-version: '3.13'
           cache: pip
-          cache-dependency-path: 'requirements*.txt'
+          cache-dependency-path: |
+            requirements.txt
+            requirements/*.txt
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -27,7 +29,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force .tmp,data,imports | Out-Null
-          python -m pip install -r requirements-readers.txt -r requirements-artifacts.txt
+          python -m pip install -r requirements/readers.txt -r requirements/artifacts.txt
           if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
           python scripts/install_readers.py
           if ($LASTEXITCODE -ne 0) { throw 'Reader installation failed' }

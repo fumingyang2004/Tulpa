@@ -1,10 +1,11 @@
 param([int]$QQDays=30, [int]$QQPerChat=500, [int]$WeChatPerChat=500, [switch]$NoStickers)
 $ErrorActionPreference='Stop'
-Set-Location $PSScriptRoot
+$projectRoot=Split-Path -Parent $PSScriptRoot
+Set-Location $projectRoot
 $env:PYTHONUTF8='1'
-$env:TEMP=Join-Path $PSScriptRoot '.tmp'
+$env:TEMP=Join-Path $projectRoot '.tmp'
 $env:TMP=$env:TEMP
-$python=Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
+$python=Join-Path $projectRoot '.venv\Scripts\python.exe'
 $mediaOptions=if ($NoStickers) { @('--no-stickers') } else { @() }
 & $python scripts\export_qq.py --refresh --days $QQDays --per-chat $QQPerChat @mediaOptions
 if ($LASTEXITCODE -ne 0) {throw 'QQ export failed; original imports were retained'}

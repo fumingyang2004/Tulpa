@@ -6,7 +6,7 @@ from packaging.utils import canonicalize_name
 
 
 def distributions(root):
-    queue=[Requirement(line.strip()) for line in (root/'requirements-mcp.txt').read_text().splitlines() if line.strip() and not line.startswith('#')]
+    queue=[Requirement(line.strip()) for line in (root/'requirements/mcp.txt').read_text().splitlines() if line.strip() and not line.startswith('#')]
     selected={};seen=set()
     while queue:
         req=queue.pop();key=(canonicalize_name(req.name),tuple(sorted(req.extras)))

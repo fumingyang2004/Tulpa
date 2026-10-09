@@ -314,7 +314,7 @@ def build_app(store=None,sessions=None):
                         freed=cleanup.get('released_bytes',0)/(1024**3)
                         completed.append(f'QQ 读取缓存已释放 {freed:.2f} GiB。'+cleanup['reason'] if freed else cleanup['reason'])
             except (ValueError,OSError):
-                completed.append(f'{name} 更新失败，原有记录保留。可在终端运行 refresh-data.ps1 查看具体原因。')
+                completed.append(f'{name} 更新失败，原有记录保留。可在终端运行 scripts/refresh-data.ps1 查看具体原因。')
             state,choices=refresh()
             yield '\n'.join(completed),state,choices
 

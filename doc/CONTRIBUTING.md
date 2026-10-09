@@ -2,6 +2,14 @@
 
 使用 Windows x64 和 Python 3.13。安装、运行和构建步骤见 [DESKTOP.md](DESKTOP.md)，测试入口见 [VALIDATION.md](VALIDATION.md)。
 
+## 目录与开发入口
+
+根目录保留 README、许可证、配置示例、`requirements.txt` 和安装、启动、停止入口。`setup.ps1`、`start.ps1`、`stop.ps1` 的用法不变。
+
+- `requirements/`：读取器、MCP 轻量版、图片、文件解析和语音的分类依赖，版本与移动前相同；`readers.txt` 包含根目录的基础依赖。
+- `scripts/`：辅助脚本和检查。手动刷新数据使用 `scripts/refresh-data.ps1`；本地 OneBot 的启停辅助脚本为 `scripts/start-reply-sender.ps1` 和 `scripts/stop-reply-sender.ps1`。
+- `desktop/`：桌面入口和打包流程；`chatlocal/`、`web/`、`harness/`：应用实现；`doc/`：教程与验证记录。
+
 ## 开发约定
 
 - 先改源码、运行对应检查，再从干净提交生成发布包；不要只修改忽略目录里的 release 副本。

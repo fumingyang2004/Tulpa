@@ -6,7 +6,7 @@ QQ / 微信语音消息先登记元数据。用户在聊天窗口播放、点击
 
 默认按需转写；数据设置还支持新语音后台转写和指定范围的历史补转写。失败可重试，资源未下载、已删除或不兼容时显示不可用，不凭语音占位推测内容。
 
-本地解码使用 SILK / FFmpeg，ASR 使用 whisper.cpp 的 CPU 运行时和量化 small 模型。便携包包含运行组件，源码环境需安装 `requirements-voice.txt` 并运行 `scripts/setup_voice.py`。
+本地解码使用 SILK / FFmpeg，ASR 使用 whisper.cpp 的 CPU 运行时和量化 small 模型。便携包包含运行组件，源码环境需安装 `requirements/voice.txt` 并运行 `scripts/setup_voice.py`。
 
 原始音频不上传模型服务。转写文字可作为查询所需上下文发送给配置的模型，显示为机器转写，保留原消息和播放入口。
 
