@@ -1,7 +1,7 @@
 """Scoped, bounded realtime language learning. No model/network/history access.
 
 Mechanisms independently implemented from the MaiBot algorithm; see
-doc/MCP-LANGUAGE-LEARNING.md. A lease is a scheduling boundary, not proof of
+doc/MCP_LANGUAGE_LEARNING.md. A lease is a scheduling boundary, not proof of
 model-context independence. This implementation honestly labels all host work
 degraded. Only a local human can opt into using that work in chat.
 """
@@ -45,6 +45,7 @@ def text(value, size, *, empty=False):
 
 class LanguageStore:
     def __init__(self, path, *, clock=time.time, policy=None):
+        if policy is not None and not isinstance(policy,dict):raise LearningError('invalid_learning_policy')
         self.path=Path(path);self.path.parent.mkdir(parents=True,exist_ok=True)
         self.clock=clock;self.lock=threading.RLock();self.cfg=DEFAULTS | (policy or {})
         self.maintenance_at={}
@@ -71,6 +72,8 @@ class LanguageStore:
                     stage TEXT, state TEXT, lease TEXT DEFAULT '', lease_until REAL DEFAULT 0,
                     attempts INTEGER DEFAULT 0, created REAL, failure TEXT DEFAULT '');
                 CREATE INDEX IF NOT EXISTS job_scope ON jobs(scope,gid,sid,state,created);
+                CREATE UNIQUE INDEX IF NOT EXISTS jargon_job_milestone ON jobs(scope,item_id,milestone) WHERE kind='jargon';
+                CREATE UNIQUE INDEX IF NOT EXISTS batch_job_once ON jobs(scope,gid,batch_id,kind);
                 CREATE TABLE IF NOT EXISTS stages(job_id TEXT, stage TEXT, lease TEXT, result TEXT, signature TEXT,
                     invocation TEXT, at REAL, PRIMARY KEY(job_id,stage));
                 CREATE TABLE IF NOT EXISTS calls(scope TEXT, gid TEXT, at REAL, chars INTEGER);
@@ -323,6 +326,7 @@ class LanguageStore:
             text(result['reason'],300)
 
     def submit(self,b,job_id,lease,invocation_id,result=None,failure=None):
+        if len(dump(result))>self.cfg['material_chars']*2:raise LearningError('invalid_result')
         with self.db() as db:
             self._enabled(db,b);self._maintain(db,b)
             job=db.execute('SELECT * FROM jobs WHERE id=? AND scope=? AND gid=? AND sid=? AND epoch=?',
@@ -344,7 +348,9 @@ class LanguageStore:
             self._validate_result(db,job,result)
             db.execute('INSERT INTO stages VALUES(?,?,?,?,?,?,?)',(job_id,job['stage'],lease,dump(result),signature,invocation,self.clock()))
             stage=job['stage'];next_stage={'extract':'review','with_context':'without_context','without_context':'compare'}.get(stage)
-            if stage=='review':self._apply_batch(db,b,job,result)
+            if stage=='extract' and not result['expressions']:
+                self._apply_batch(db,b,job,dict(reviews=[]));next_stage=None
+            elif stage=='review':self._apply_batch(db,b,job,result)
             elif stage=='compare':self._apply_jargon(db,b,job,result)
             db.execute('UPDATE jobs SET state=?,stage=?,lease=?,attempts=0,failure=? WHERE id=?',
                        ('pending' if next_stage else 'completed',next_stage or stage,'','',job_id))

@@ -74,7 +74,17 @@ def main():
                         for i in range(10):receive(-100-i,f'云朵开机 合成实时内容{i}')
                         assert size()==10
                         timer[0]+=29;assert call('claim_chat_learning',session_id=sid,context_id='new-host-context')['state']=='no_task'
-                        timer[0]+=1;t=call('claim_chat_learning',session_id=sid,context_id='new-host-context')['task']
+                        timer[0]+=1
+                        # Current reply work has priority; abandoned plans
+                        # older than the send TTL cannot block learning forever.
+                        with access.connect() as db:
+                            db.execute("INSERT INTO chat_turn_plans(id,session_id,request_key,signature,payload,state,created,updated) VALUES('priority',?,'priority','fixture','{}','READY',?,?)",(sid,time.time(),time.time()))
+                        assert call('claim_chat_learning',session_id=sid,context_id='new-host-context')['state']=='no_task'
+                        with access.connect() as db:db.execute("UPDATE chat_turn_plans SET state='SENDING',created=0 WHERE id='priority'")
+                        assert call('claim_chat_learning',session_id=sid,context_id='new-host-context')['state']=='no_task'
+                        with access.connect() as db:db.execute("UPDATE chat_turn_plans SET state='READY' WHERE id='priority'")
+                        t=call('claim_chat_learning',session_id=sid,context_id='new-host-context')['task']
+                        with access.connect() as db:db.execute("DELETE FROM chat_turn_plans WHERE id='priority'")
                         assert t['stage']=='extract' and len(t['material']['messages'])==10
                         def submit(task,result,inv):return call('submit_chat_learning',session_id=sid,job_id=task['job_id'],lease=task['lease'],invocation_id=inv,result=result)
                         ids=[m['source_id'] for m in t['material']['messages']]

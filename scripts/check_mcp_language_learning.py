@@ -39,6 +39,7 @@ def main():
             try:fn()
             except LearningError as exc:assert exc.code==code,(exc.code,code)
             else:raise AssertionError('expected '+code)
+        rejected('invalid_learning_policy',lambda:LanguageStore(Path(tmp)/'bad.sqlite3',policy=['wrong']))
         def extraction(t,tag='base',words=True):
             ids=[m['source_id'] for m in t['material']['messages']]
             return dict(expressions=[dict(situation=f'{tag} 情境 {i}',style=f'{tag} 抽象方式 {i}',source_id=ids[i]) for i in range(3)],
@@ -200,6 +201,18 @@ def main():
         with store.db() as db:db.execute('UPDATE jargon SET count=101,complete=0 WHERE id=?',(jid,))
         assert not claim()
         assert store.status(binding,records=True)['jargon'][0]['meaning']=='人工固定定义'
+        # A human correction arriving during the model's compare stage wins.
+        with store.db() as db:
+            db.execute("INSERT INTO jargon(id,scope,term,folded,count,updated) VALUES('manual-race',?,'合成待核词','合成待核词',4,?)",(scope,clock()))
+            db.execute("INSERT INTO jargon_evidence SELECT scope,'manual-race',batch_id,expires,body FROM jargon_evidence WHERE item_id=?",(jid,))
+        t=claim();assert t['stage']=='with_context'
+        submit(t,dict(meaning='模型旧释义',insufficient=False,reason='fixture'))
+        t=claim();submit(t,dict(meaning='通常意义',insufficient=False,reason='fixture'))
+        t=claim();assert t['stage']=='compare'
+        store.manage(binding,'jargon','manual-race',meaning='人工新释义')
+        submit(t,dict(is_similar=False,sufficient=True,reason='迟到模型结果'))
+        protected=next(w for w in store.status(binding,records=True)['jargon'] if w['id']=='manual-race')
+        assert protected['meaning']=='人工新释义' and protected['manual'] and protected['independence']=='manual'
         # Casefold substring match is limited to ten; candidates stay invisible.
         with store.db() as db:
             for i in range(12):
@@ -211,6 +224,10 @@ def main():
         store.configure(binding,enabled=False)
         assert store.status(binding,records=True)==dict(enabled=False,independence='degraded',allow_degraded=False)
         rejected('learning_disabled',lambda:claim())
+        store.configure(binding,enabled=True)
+        clock.advance(30);add(10,'empty-extraction');t=claim()
+        assert submit(t,dict(expressions=[],jargon=[]))['state']=='completed'
+        assert not claim()
         print('PASS 4/8/25/100, manual precedence, max10/casefold, quality opt-in, disable')
 
 

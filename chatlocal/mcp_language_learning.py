@@ -168,7 +168,10 @@ class ChatLearning:
                 if name=='get_chat_learning':return self.store.status(b,records=args.get('records',False))
                 if name=='claim_chat_learning':
                     with self.chat.access.connect() as db:
-                        pending=db.execute("SELECT 1 FROM chat_turn_plans WHERE session_id=? AND state IN ('READY','SENDING') LIMIT 1",(sid,)).fetchone()
+                        # An abandoned, expired READY plan must not starve
+                        # learning forever. Never alter the reply queue here.
+                        cutoff=time.time()-self.chat.turns.policy()['plan_ttl_seconds']
+                        pending=db.execute("SELECT 1 FROM chat_turn_plans WHERE session_id=? AND (state='SENDING' OR (state='READY' AND created>=?)) LIMIT 1",(sid,cutoff)).fetchone()
                     task=self.store.claim(b,args['context_id'],reply_pending=bool(pending))
                     if task:
                         task['submit_call']=dict(tool='submit_chat_learning',arguments=dict(session_id=sid,job_id=task['job_id'],lease=task['lease']),requires=['invocation_id','result or failure'])
