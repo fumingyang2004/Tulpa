@@ -42,7 +42,8 @@ def check(reject):
     receiver = EventReceiver(delivered.append, states.append,
         config_factory=lambda: dict(url=f'ws://127.0.0.1:{server.socket.getsockname()[1]}/',
                                     token='synthetic-event-token'),
-        client_factory=lambda **kw: SimpleNamespace(login=lambda: '111'))
+        client_factory=lambda **kw: SimpleNamespace(login=lambda: '111',
+            url='http://127.0.0.1:1', token='synthetic-http-token'))
     receiver.start()
     try:
         deadline = time.monotonic()+4
