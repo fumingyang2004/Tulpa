@@ -7,6 +7,10 @@ import sqlite3
 import threading
 import time
 from dataclasses import replace
+from functools import lru_cache
+from itertools import islice
+
+import jsonschema
 
 from mcp import types
 
@@ -17,6 +21,36 @@ from .mcp_chat import MCPChat, CHAT_TOOLS
 from .mcp_chat_media import MEDIA_TOOLS, MEDIA_WRITES, schemas as media_schemas
 from .mcp_reactions import TOOL as REACTION_TOOL, schema as reaction_schema, ChatReactions
 from .retrieval import scope_sql
+
+
+@lru_cache(maxsize=128)
+def argument_validator(encoded):
+    # Schema checking is independent of user input. Compile once per exact
+    # schema, including permission-dependent variations; never cache grants.
+    schema=json.loads(encoded)
+    cls=jsonschema.validators.validator_for(schema)
+    cls.check_schema(schema)
+    return cls(schema)
+
+
+def argument_problems(arguments, schema):
+    problems=[]
+    validator=argument_validator(json.dumps(schema,sort_keys=True,separators=(',',':')))
+    for error in islice(validator.iter_errors(arguments),3):
+        path=[];node=schema
+        for part in error.absolute_path:
+            if type(part) is int and 'items' in node:
+                path.append(part);node=node['items']
+            elif part in node.get('properties',{}):
+                path.append(part);node=node['properties'][part]
+            else:break  # Never reflect arbitrary user keys/values in diagnostics.
+        item=dict(path=path,rule=error.validator)
+        if error.validator=='required' and isinstance(error.instance,dict):
+            item['missing']=[k for k in error.validator_value if k not in error.instance]
+        elif error.validator in ('type','enum','minimum','maximum','minLength','maxLength','minItems','maxItems'):
+            item['expected']=error.validator_value
+        problems.append(item)
+    return problems
 
 READ_TOOLS = {
     'get_data_status', 'list_conversations', 'find_people', 'read_person_messages',
@@ -151,11 +185,14 @@ class MCPTools:
                 return self.result(ChatReactions.rejected(arguments,'tool_unavailable','消息回应未启用或本连接尚未授权。'))
             return self.result(dict(error='工具未开放或连接没有该权限。', error_code='tool_unavailable'))
         # Validate before budget, IO or tool-specific paths. Don't echo private args.
-        import jsonschema
         try:
-            jsonschema.validate(arguments, schema['parameters'])
-        except (jsonschema.ValidationError, TypeError):
-            return self.result(dict(error='参数不符合工具格式。', error_code='invalid_arguments'))
+            problems=argument_problems(arguments,schema['parameters'])
+        except TypeError:
+            problems=[dict(path=[],rule='type',expected='object')]
+        if problems:
+            return self.result(dict(error='参数不符合工具格式；按字段提示修正，不要原样反复调用。',
+                error_code='invalid_arguments',argument_errors=problems,
+                recovery=dict(action='correct_arguments',executed=False,repeat_unchanged=False)))
         if name in CHAT_TOOLS:
             return self.chat_call(grant, token, name, arguments, cancel)
         if name in MEDIA_TOOLS:

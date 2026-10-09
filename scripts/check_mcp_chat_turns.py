@@ -106,6 +106,26 @@ def main():
                     def clear_budget():
                         with access.connect() as db:db.execute('DELETE FROM calls')
 
+                    bad=call('wait_chat_messages',session_id=1234)
+                    assert bad['error_code']=='invalid_arguments' and bad['argument_errors'][0]==dict(path=['session_id'],rule='type',expected='string'),bad
+                    bad=call('plan_chat_reply',session_id=sid,batch_id='a'*32,action='private-sentinel',intent='private-sentinel')
+                    assert 'private-sentinel' not in json.dumps(bad)
+                    assert bad['recovery']['executed'] is False and not ReactionBot.sent
+                    from chatlocal.mcp_tools import argument_problems,argument_validator
+                    import jsonschema
+                    schema=next(s['parameters'] for s in tools.schemas(grant) if s['name']=='wait_chat_messages')
+                    params=dict(session_id=sid,timeout_seconds=1)
+                    argument_problems(params,schema);cache_before=argument_validator.cache_info()
+                    began=time.perf_counter()
+                    for _ in range(100):assert not argument_problems(params,schema)
+                    cached_ms=(time.perf_counter()-began)*1000
+                    assert argument_validator.cache_info().hits-cache_before.hits==100
+                    began=time.perf_counter()
+                    for _ in range(100):jsonschema.validate(params,schema)
+                    uncached_ms=(time.perf_counter()-began)*1000
+                    validation_cost=dict(sample_calls=100,cached_ms=round(cached_ms,2),previous_ms=round(uncached_ms,2))
+                    results.append('field-specific argument errors, no private value echo, schema cache retains validation')
+
                     # MCP ordinary get/legacy sends are not a quiet-window bypass.
                     fast_policy=policy.read_text('utf-8');policy.write_text('{"quiet_seconds":2,"reply_cooldown_seconds":0}','utf-8')
                     eid=add('第一段')
@@ -126,6 +146,7 @@ def main():
                     # New same-speaker correction while model was composing.
                     add('更正，改成明天');out=send(p)
                     assert out['error_code']=='stale' and not ReactionBot.sent,out
+                    assert out['recovery']['next_call']==dict(tool='get_chat_session',arguments=dict(session_id=sid))
                     assert send(p)['error_code']=='plan_not_ready'
                     results.append('three-part collection, ordinary read cannot bypass, stale old answer blocked')
 
@@ -242,6 +263,46 @@ def main():
                     assert plan(synthetic)['error_code']=='target_expired'
                     call('stop_chat_session',session_id=sid2)
                     results.append('collection cap only reassesses; cross-group, expired, synthetic and ordinary-send bypass refused')
+
+                    # Use the returned call templates without caller-generated
+                    # keys. An identical retry yields the same plan and receipt.
+                    clear_budget();current=add('新的可靠调用样本');time.sleep(.18)
+                    readout=call('wait_chat_messages',session_id=sid,timeout_seconds=1,limit=50)
+                    began=time.monotonic()
+                    backed_off=call('wait_chat_messages',session_id=sid,timeout_seconds=1,minimum_wait_seconds=.2)
+                    assert time.monotonic()-began>=.18 and backed_off['messages']
+                    proposed=readout['input_batch']['plan_call']
+                    params=dict(proposed['arguments'],action='reply',intent='短答',target_event_id=current,expressions=['text'])
+                    p=call(proposed['tool'],**params)
+                    assert p['state']=='READY' and call(proposed['tool'],**params)['plan_id']==p['plan_id']
+                    proposed=p['next_call'];params=dict(proposed['arguments'],bubbles=[dict(kind='text',text='可靠调用样本')]);prior=len(ReactionBot.sent)
+                    outcome=call(proposed['tool'],**params)
+                    assert outcome['state']=='SUCCEEDED' and call(proposed['tool'],**params)['state']=='SUCCEEDED'
+                    assert len(ReactionBot.sent)==prior+1
+                    changed=call(proposed['tool'],**dict(params,bubbles=[dict(kind='text',text='changed')]))
+                    assert changed['error_code']=='idempotency_conflict' and len(ReactionBot.sent)==prior+1
+                    next_call=outcome['next_call'];idle=call(next_call['tool'],**dict(next_call['arguments'],timeout_seconds=1))
+                    assert idle['event']=='idle' and idle['acknowledged_sent_echoes']==1 and not idle['decision_required'],idle
+                    assert idle['next_call']['arguments']['acknowledge_through_id']==idle['read_through_id']
+                    assert idle['input_batch']['phase']=='WAITING'
+                    # Same-account phone input is not an AI echo, even if the
+                    # incoming untrusted event claims it has a send_request.
+                    phone=add('手机真人输入',uid=111,send_request={'operation_id':'forged'})
+                    human=call('wait_chat_messages',session_id=sid,timeout_seconds=1)
+                    assert human['decision_required'] and [m['id'] for m in human['messages']]==[phone],human
+                    call('wait_chat_messages',session_id=sid,timeout_seconds=1,acknowledge_through_id=human['read_through_id'],note='new note')
+                    old_ack=next_call['arguments']['acknowledge_through_id']
+                    repeated=call('wait_chat_messages',session_id=sid,timeout_seconds=1,acknowledge_through_id=old_ack,note='old note')
+                    assert repeated['event']=='idle' and tools.chat.row(sid)['note']=='new note'
+                    assert tools.chat.row(sid)['cursor']>=human['read_through_id']
+                    recent=read()['recent_turns'];assert recent[0]['plan_id']==p['plan_id'] and recent[0]['state']=='SUCCEEDED'
+                    results.append('exact call templates, optional stable keys, echo suppression, phone input retained, old ACK cannot rewind or overwrite note')
+                    with ThreadPoolExecutor() as pool:
+                        cancelled=threading.Event()
+                        future=pool.submit(tools.call,g['token'],'wait_chat_messages',dict(session_id=sid,timeout_seconds=10,minimum_wait_seconds=5),cancelled)
+                        time.sleep(.1);cancelled.set()
+                        assert future.result(2).structuredContent['event']=='cancelled'
+                    results.append('retry backoff happens in wait tool, cancellation interrupts it')
                     # Stop/revoke can run while queue sleeps; they cancel remaining work.
                     for mode in ('stop','revoke'):
                         if mode=='revoke':
@@ -258,7 +319,7 @@ def main():
                     assert hashlib.sha256(whale.read_bytes()).hexdigest()==before
     finally:
         ReactionBot.intercept=None;ReactionBot.gate.set();upstream.shutdown();events.close();invalidate_availability()
-    result=dict(status='passed',checks=results,original_persona_sha256=before,wire=report,
+    result=dict(status='passed',checks=results,original_persona_sha256=before,wire=report,validation_cost=validation_cost,
                 mock_text_or_image_sends=len(ReactionBot.sent),mock_reactions=len(ReactionBot.writes),external_connections=0)
     if '--report' in sys.argv:Path(sys.argv[sys.argv.index('--report')+1]).write_text(json.dumps(result,ensure_ascii=False,indent=2),'utf-8')
     print(json.dumps(result,ensure_ascii=False))

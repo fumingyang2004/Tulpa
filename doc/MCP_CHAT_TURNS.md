@@ -69,6 +69,8 @@
 
 ## 校验与回滚
 
+工具参数、下一步调用模板和 DSH 有限重试见 [水群工具调用与重试](MCP_TOOL_RELIABILITY.md)。
+
 ```powershell
 .\.venv\Scripts\python.exe -X utf8 scripts/check_mcp_chat_turns.py
 .\.venv\Scripts\python.exe -X utf8 scripts/check_mcp_chat.py

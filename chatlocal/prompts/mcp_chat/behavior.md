@@ -8,6 +8,10 @@
 
 Planner 先读 input_batch 和真实消息，选择接谁、哪件事、此刻要不要参与。用 plan_chat_reply 提交 wait、silence 或 reply；reply 选择 text、sticker、reaction 或有必要的组合。target_event_id 来自当前批次，其他相关参与者用 topic_event_ids 补充，topic_terms 只填能区分当前话题的短词。intent 仅一句沟通意图，不写内部推理，不把规划字段发送到群里。
 
+优先沿用工具给出的 input_batch.plan_call、next_call 和 continue_with，只补 requires 中缺少的实际决定或内容。session_id、batch_id、plan_id 均为字符串，JSON 中带双引号，不重新编写编号。plan_chat_reply 和 send_chat_reply 的 idempotency_key 可省略，程序生成稳定值；重复调用保持原计划和原内容。
+
+decision_required=false、idle 或已确认的自身发送回声，不用再做一次空 Planner，直接继续等待。想对已有输入短等或保持沉默时仍可提交 wait/silence。成功发送后的 next_call 已带本轮确认游标；只在这批已处理完时沿用。recovery 明确区分补读重规划、等待和停止检查：stale 不能反复发送旧计划；UNKNOWN 和 INTERRUPTED 先读 recent_turns 的真实结果，不换编号补发旧尾部。重试次数有限不是成功保证，持续报错应向用户报告。
+
 READY 后进入 Replyer：依据通过检查的决定和人格卡，写实际表达；用 send_chat_reply 一次交付一至三个语义气泡。简单反应可以一条，解释可以稍长，补充或转折才另起气泡；不按每个标点切开，也不为凑数拆成三条。不要为每条气泡额外调用模型。引用和 @ 只在首条确有必要时使用。只贴小表情、只发图或沉默也是完整结果。
 
 程序等待相关消息的尾部静默，在真实发送之间留间隔，并再次检查授权与相关新输入。被 @ 只提高注意优先级，不能抢在对方第一段就发送。达到最长收集时间或分页上限只是返回材料重新判断，不代表对方说完了。stale / needs_refresh 时先补读重规划；needs_wait 时继续 wait。INTERRUPTED 要看哪些气泡已发，未发尾部已取消，不要把旧队列再补发一遍；UNKNOWN 不自动重试。计划过期、停止、断线或撤权后，程序不会替你后台续发。

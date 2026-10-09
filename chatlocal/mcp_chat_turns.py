@@ -28,8 +28,8 @@ class TurnRejected(ValueError):
 
 
 def schema(tool):
-    sid=dict(type='string',minLength=32,maxLength=32)
-    key=dict(type='string',minLength=8,maxLength=80)
+    sid=dict(type='string',minLength=32,maxLength=32,description='原样复制工具返回的字符串；JSON 中必须带双引号。')
+    key=dict(type='string',minLength=8,maxLength=80,description='可省略，由程序按当前批次/计划生成稳定编号；重试不能换参数。')
     event=dict(type='integer',minimum=1,maximum=2**63-1)
     return [tool('plan_chat_reply',
         'Planner 阶段：根据 get/wait 返回的 input_batch.id，决定等待、沉默或参与，指定接谁的话和表达通道。'
@@ -41,7 +41,7 @@ def schema(tool):
              expressions=dict(type='array',maxItems=3,uniqueItems=True,items=dict(type='string',enum=['text','sticker','reaction'])),
              intent=dict(type='string',minLength=1,maxLength=200),
              wait_seconds=dict(type='number',minimum=0,maximum=30)),
-        ['session_id','idempotency_key','batch_id','action','intent']),
+        ['session_id','batch_id','action','intent']),
         tool('send_chat_reply',
         'Replyer 阶段：按 READY 计划一次提交 1–3 个语义气泡，不按标点机械拆句。'
         '程序串行发送、气泡间留间隔并重新检查相关新消息/停止/授权。STALE 需补读重规划，已发不撤回，旧尾部不续发；UNKNOWN 禁止重试。'
@@ -54,7 +54,7 @@ def schema(tool):
                     operation=dict(type='string',enum=['add','remove']),
                     quote=dict(type='boolean'),mention_user_ids=dict(type='array',maxItems=5,uniqueItems=True,
                         items=dict(type='string',pattern='^[1-9][0-9]{0,19}$'))),required=['kind']))),
-        ['session_id','plan_id','idempotency_key','bubbles'])]
+        ['session_id','plan_id','bubbles'])]
 
 
 class ChatTurns:
@@ -102,9 +102,21 @@ class ChatTurns:
     def lock(self,sid):
         with self.locks_guard:return self.locks.setdefault(sid,threading.Lock())
 
-    @staticmethod
-    def rejected(exc):
-        return dict(state='REJECTED',error_code=exc.code,note=str(exc),**exc.details)
+    def rejected(self,exc,sid=None):
+        result=dict(state='REJECTED',error_code=exc.code,note=str(exc),**exc.details)
+        refresh={'stale','needs_refresh','batch_expired','plan_expired','target_expired','plan_missing','plan_not_ready','target_not_in_batch'}
+        if exc.code in refresh:
+            result['recovery']=dict(action='refresh_and_replan',automatic_write_retry=False,
+                next_call=dict(tool='get_chat_session',arguments=dict(session_id=sid)))
+        elif exc.code in {'needs_wait','reply_cooldown','source_unavailable','queue_busy'}:
+            delay=min(30,max(1,exc.details.get('wait_seconds',2)))
+            continuation=self.chat.continuation(sid)
+            continuation['arguments']['minimum_wait_seconds']=delay
+            result['recovery']=dict(action='wait',automatic_write_retry=False,
+                retry_after_seconds=delay,next_call=continuation)
+        else:
+            result['recovery']=dict(action='fix_request_or_stop',automatic_write_retry=False)
+        return result
 
     def batch(self,row,items,collection=None):
         now=time.time();bid=uuid.uuid4().hex;ids=[m['id'] for m in items]
@@ -120,6 +132,8 @@ class ChatTurns:
             bursts[-1]['event_ids'].append(m['id']);bursts[-1]['last_timestamp']=m['timestamp']
         return dict(id=bid,version=max(ids,default=row['cursor']),phase='DECIDING',
                     collection=collection or dict(reason='context_read',ready_to_send=False),bursts=bursts,
+                    plan_call=dict(tool='plan_chat_reply',arguments=dict(session_id=row['id'],batch_id=bid),
+                                   requires=['action','intent'],optional=['target_event_id','expressions']),
                     next='plan_chat_reply；普通读取不豁免静默或发送前检查。')
 
     def status(self,row):
@@ -174,10 +188,20 @@ class ChatTurns:
 
     def public(self,p):
         data=json.loads(p['payload'])
-        return dict(plan_id=p['id'],state=p['state'],phase='REPLYING' if p['state']=='READY' else p['state'],
+        result=dict(plan_id=p['id'],state=p['state'],phase='REPLYING' if p['state']=='READY' else p['state'],
                     decision={k:data[k] for k in ('action','target_event_id','expressions','intent','batch_id','watermark','wait_seconds')},
                     bubbles=json.loads(p['queue']),reason=p['reason'],turn_complete=p['state'] in ('SUCCEEDED','SILENT'),
                     next='同一 Agent 组织表达后调用 send_chat_reply' if p['state']=='READY' else '继续 wait_chat_messages；旧队列尾部不会恢复')
+        if p['state']=='READY':
+            result['next_call']=dict(tool='send_chat_reply',arguments=dict(session_id=p['session_id'],plan_id=p['id']),requires=['bubbles'])
+        elif p['state'] in ('WAITING','SILENT','SUCCEEDED'):
+            result['next_call']=self.chat.continuation(p['session_id'],through=data['watermark'])
+        else:
+            # Neither a pending/unknown queue nor an interrupted tail is a new
+            # write request. Reading the durable receipt is always the next step.
+            result['recovery']=dict(action='inspect_result',automatic_write_retry=False,
+                next_call=dict(tool='get_chat_session',arguments=dict(session_id=p['session_id'])))
+        return result
 
     def save(self,p,state,queue=None,reason=''):
         with self.access.connect() as db:
@@ -224,8 +248,11 @@ class ChatTurns:
 
     def plan(self,grant,args,cancel):
         sid=args['session_id'];self.chat.validate(sid,grant['id'])
+        args=dict(args)
+        if 'idempotency_key' not in args:
+            args['idempotency_key']='auto-'+hashlib.sha256(dump(args).encode()).hexdigest()
         lock=self.lock(sid)
-        if not lock.acquire(False):return dict(state='REJECTED',error_code='queue_busy',note='本会话正在发送，不能并行规划。')
+        if not lock.acquire(False):return self.rejected(TurnRejected('queue_busy','本会话正在发送，不能并行规划。'),sid)
         try:
             signature=hashlib.sha256(dump(args).encode()).hexdigest()
             with self.access.connect() as db:
@@ -274,7 +301,7 @@ class ChatTurns:
                 # bounded independently of immutable native operation receipts.
                 db.execute("DELETE FROM chat_turn_plans WHERE session_id=? AND state IN ('SILENT','CANCELLED','SUCCEEDED','INTERRUPTED') AND id NOT IN (SELECT id FROM chat_turn_plans WHERE session_id=? ORDER BY created DESC LIMIT 200)",(sid,sid))
             return self.public(self.load(pid,sid))
-        except TurnRejected as exc:return self.rejected(exc)
+        except TurnRejected as exc:return self.rejected(exc,sid)
         finally:lock.release()
 
     def before_dispatch(self):
@@ -283,9 +310,9 @@ class ChatTurns:
 
     def submit(self,grant,args,cancel):
         sid=args['session_id'];self.chat.validate(sid,grant['id'])
-        if not args.get('plan_id'):return dict(state='REJECTED',error_code='plan_required',note='先用最新 input_batch 调用 plan_chat_reply；不能跳过 Planner 直接发送。')
+        if not args.get('plan_id'):return self.rejected(TurnRejected('plan_required','先用最新 input_batch 调用 plan_chat_reply；不能跳过 Planner 直接发送。'),sid)
         lock=self.lock(sid)
-        if not lock.acquire(False):return dict(state='REJECTED',error_code='queue_busy',note='同一会话已有发送队列；稍后以原计划查询，勿换编号重发。')
+        if not lock.acquire(False):return self.rejected(TurnRejected('queue_busy','同一会话已有发送队列；稍后以原计划查询，勿换编号重发。'),sid)
         try:
             p=self.load(args['plan_id'],sid);data=json.loads(p['payload']);bubbles=args['bubbles']
             signature=hashlib.sha256(dump(bubbles).encode()).hexdigest()
@@ -358,7 +385,7 @@ class ChatTurns:
         except TurnRejected as exc:
             if 'p' in locals() and exc.code in ('stale','needs_refresh','plan_expired','target_expired'):
                 self.save(p,'CANCELLED',reason=exc.code)
-            return self.rejected(exc)
+            return self.rejected(exc,sid)
         finally:lock.release()
 
     def single(self,grant,name,args,cancel):
