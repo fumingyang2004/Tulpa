@@ -142,6 +142,23 @@ def primitives(root):
     thread=threading.Thread(target=writes);thread.start()
     while thread.is_alive():assert isinstance(read_json(path)['n'],int)
     thread.join();assert not failures,failures
+    assert read_json(path)['n']==149
+    if os.name=='nt':
+        # A genuine reader without DELETE sharing lasts longer than the old
+        # 200ms retry window. It must recover without deleting the old state.
+        handle=path.open('rb')
+        release=threading.Timer(.35,handle.close);release.start()
+        try:atomic_json(path,{'n':150})
+        finally:release.join();handle.close()
+        assert read_json(path)=={'n':150}
+        with path.open('rb') as blocked:
+            started=time.monotonic()
+            try:atomic_json(path,{'n':151})
+            except OSError as exc:assert exc.winerror in (5,32,33)
+            else:raise AssertionError('Permanently held Windows handle bypassed')
+            assert time.monotonic()-started<3
+            assert json.load(blocked)=={'n':150},'Failed replacement changed old state'
+        assert read_json(path)=={'n':150} and not list(root.glob('atomic.json.tmp-*'))
     lock=root/'owner.lock'
     with file_lock(lock):
         rejected('busy',lambda:file_lock(lock,blocking=False).__enter__())

@@ -9,6 +9,7 @@ import subprocess
 import threading
 import time
 from contextlib import contextmanager
+from weakref import WeakValueDictionary
 
 
 class ManagedError(ValueError):
@@ -30,6 +31,40 @@ def local_path(path):
         if part.is_symlink() or (hasattr(part, 'is_junction') and part.is_junction()):
             raise ManagedError('unsafe_path', '托管路径包含链接，已停止以避免写入其他目录。')
     return path
+
+
+_io_guard = threading.Lock()
+_io_locks = WeakValueDictionary()
+
+
+@contextmanager
+def local_io(path):
+    # Path validation itself opens short-lived Windows attribute handles. Keep
+    # same-process polls out of the entire replacement, not only the final read.
+    key = os.path.normcase(os.path.abspath(path))
+    with _io_guard:
+        lock = _io_locks.get(key)
+        if lock is None:
+            lock = threading.RLock()
+            _io_locks[key] = lock
+    with lock:
+        yield local_path(path)
+
+
+def retry_io(operation):
+    # Independent readers/antivirus may still briefly deny a Windows rename.
+    # Bound recovery to one second; permanent ACL failures must surface.
+    deadline = time.monotonic() + 1.0
+    attempt = 0
+    while True:
+        try:
+            return operation()
+        except OSError as exc:
+            remaining = deadline - time.monotonic()
+            if os.name != 'nt' or getattr(exc, 'winerror', None) not in (5, 32, 33) or remaining <= 0:
+                raise
+            time.sleep(min(.02 * 2 ** min(attempt, 3), remaining))
+            attempt += 1
 
 
 def shared_reader(path):
@@ -54,17 +89,12 @@ def shared_reader(path):
 
 
 def read_json(path, default=None):
-    path = local_path(path)
     try:
-        for attempt in range(11):
-            try:
+        with local_io(path) as path:
+            def read():
                 with shared_reader(path) as f:
-                    raw = f.read(1024 * 1024 + 1)
-                break
-            except OSError as exc:
-                if os.name != 'nt' or exc.winerror not in (5, 32, 33) or attempt == 10:
-                    raise
-                time.sleep(.02)
+                    return f.read(1024 * 1024 + 1)
+            raw = retry_io(read)
         if len(raw) > 1024 * 1024:
             raise ValueError()
         value = json.loads(raw)
@@ -73,31 +103,24 @@ def read_json(path, default=None):
         return value
     except FileNotFoundError:
         return {} if default is None else default
+    except ManagedError:
+        raise
     except (OSError, ValueError):
         raise ManagedError('state_damaged', '托管状态无法读取；请恢复备份，原文件未重置。') from None
 
 
 def atomic_bytes(path, raw):
-    path = local_path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + '.tmp-' + secrets.token_hex(8))
-    try:
-        with temp.open('xb') as f:
-            f.write(raw)
-            f.flush()
-            os.fsync(f.fileno())
-        # Windows readers briefly hold handles without FILE_SHARE_DELETE. A
-        # concurrent status poll must not kill the lifecycle owner.
-        for attempt in range(11):
-            try:
-                os.replace(temp, path)
-                break
-            except OSError as exc:
-                if os.name != 'nt' or exc.winerror not in (5, 32, 33) or attempt == 10:
-                    raise
-                time.sleep(.02)
-    finally:
-        temp.unlink(missing_ok=True)
+    with local_io(path) as path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp = path.with_name(path.name + '.tmp-' + secrets.token_hex(8))
+        try:
+            with temp.open('xb') as f:
+                f.write(raw)
+                f.flush()
+                os.fsync(f.fileno())
+            retry_io(lambda: os.replace(temp, path))
+        finally:
+            temp.unlink(missing_ok=True)
 
 
 def atomic_json(path, value):
