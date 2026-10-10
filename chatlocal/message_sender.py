@@ -19,6 +19,11 @@ class MessageSender(Protocol):
 
 
 def sender_config():
+    from .snowluma_managed import connection
+    managed = connection(ROOT)
+    if managed is not None:
+        return dict(REPLY_ONEBOT_URL=managed['url'], REPLY_ONEBOT_TOKEN=managed['token'],
+                    **({'_managed':managed['_managed']} if '_managed' in managed else {}))
     values=dotenv_values(ROOT/'.env')
     return {k:(os.environ.get(k,values.get(k)) or '').strip() for k in ('REPLY_ONEBOT_URL','REPLY_ONEBOT_TOKEN')}
 
@@ -47,6 +52,9 @@ class QQSender:
             raise SendError('发送接口必须是不含凭据参数的 localhost HTTP(S) 地址。')
 
     def call(self,action,payload,*,sending=False):
+        from .snowluma_managed import guard
+        try:guard(self.config)
+        except ValueError:raise SendError('QQ 托管授权、进程或账号绑定已失效，未发送。') from None
         allowed={'get_login_info','get_group_info','get_group_member_info','get_friend_list','get_group_msg_history','get_friend_msg_history','get_msg'}
         if action not in (allowed|({'send_group_msg','send_private_msg'} if sending else set())):raise SendError('接口不在发送适配器白名单中。')
         try:

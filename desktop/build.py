@@ -132,6 +132,8 @@ def build(no_zip=False,qa=False,output=None,lite=False):
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_expression_evidence.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_language_usage.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_jargon_matching.py'),'--package',str(out)],check=True)
+    subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_snowluma_managed.py'),'--package',str(out)],check=True)
+    subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_snowluma_managed_transport.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_mcp_downloads.py'),'--package',str(out)],check=True)
     subprocess.run([str(out/'runtime/python.exe'),str(ROOT/'scripts/check_upgrade.py')],check=True)
     tree(ROOT/'tools/whispercpp/Release','tools/whispercpp/Release')
@@ -183,6 +185,7 @@ def build(no_zip=False,qa=False,output=None,lite=False):
     if lite:
         write('开始使用.txt', 'Tulpa MCP '+VERSION+'\n\n完整解压后双击 Tulpa.exe。此版只提供本机资料服务与 MCP，不含内置模型、Gradio 或 DeepSeek Harness。\n1. 在数据与同步导入 QQ / 微信资料，可开启实时读取。\n2. 在连接外部 Agent 选择范围并创建凭据，连接 Codex、DeepSeek Harness 等 Streamable HTTP 客户端。\n3. OneBot 设置与完整版本相同。发送、群管理默认关闭；勾选对应权限后 Agent 可直接执行，无需逐次审批。可撤销连接，操作记录留在本机。\n4. Windows 10/11 x64，需要系统 Microsoft Edge WebView2 Evergreen Runtime。多数系统已安装；缺少时安装微软官方运行时：https://developer.microsoft.com/microsoft-edge/webview2/ 。\n5. 主包不带语音模型，首页可一键下载约 181 MB，安装后离线转写。Office 原文件通过 download_file 下载后交给外部 Agent；不附带 Office 解析框架或本地 OCR。\n6. 此压缩包不含任何聊天或凭据。数据与完整版本各自独立；不要同时打开两个指向同一数据目录的版本。\n教程：doc/MCP_LITE.md。\n')
     with (out/'开始使用.txt').open('a',encoding='utf-8') as guide:
+        guide.write('\nSnowLuma 托管接入：当前为离线验证预览，自动部署尚未开放，不下载或运行 SnowLuma。已有外部连接仍可使用。协议授权、流程及恢复说明见 doc/SNOWLUMA_MANAGED.md。\n')
         guide.write('\n从旧版本升级：先看 doc/UPGRADE.md。可将该文档交给 Codex 或 DeepSeek Harness，使用新版 scripts/upgrade_installation.py 更新原安装目录，自动保留聊天、附件、MCP 授权和实时进度，无需重新导入。升级前从托盘彻底退出 Tulpa。\n持续群聊和表情包仅向 MCP 开放：OneBot HTTP + 正向 WebSocket，按连接分别授权；完整步骤见 doc/MCP.md。\n')
     tree(ROOT/'desktop/licenses','licenses')
     for name in ('LICENSE','README.md'):

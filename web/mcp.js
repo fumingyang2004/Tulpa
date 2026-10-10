@@ -8,7 +8,7 @@
       <p>让 Codex、DeepSeek Harness 等 MCP 客户端使用你授权的资料与 QQ 操作。无需配置 Tulpa 模型，发送和管理默认关闭；勾选授权后可直接执行，无需逐次审批。</p>
       <section class="mcp-chat-entry"><div><h3>群聊与学习</h3><p id="mcp-chat-summary" class="mcp-muted" role="status">查看会话状态与学习记录</p></div><button id="mcp-chat-open" type="button" aria-haspopup="dialog" aria-controls="mcp-chat-manager">管理</button></section>
       <section class="mcp-step"><h3>1. 准备资料</h3><p id="mcp-data-status" role="status"></p><button id="mcp-open-data" type="button">导入 / 管理聊天</button>
-      <p id="mcp-onebot-status" class="mcp-muted"></p><button id="mcp-open-onebot" type="button">配置 OneBot</button> <button id="mcp-test-onebot" type="button">检测 OneBot</button></section>
+      <p id="mcp-onebot-status" class="mcp-muted"></p><div id="mcp-snowluma-managed"></div><button id="mcp-open-onebot" type="button">已有 OneBot / 高级连接</button> <button id="mcp-test-onebot" type="button">检测 OneBot</button></section>
       <p id="mcp-service-status" role="status"></p>
       <label class="mcp-background" id="mcp-background-label" hidden><input id="mcp-background" type="checkbox">关闭窗口后留在托盘，继续提供服务</label>
       <details id="mcp-create-section" open><summary>2. 选择范围并创建连接</summary>
@@ -64,6 +64,7 @@
       <p id="mcp-chat-status" role="status" aria-live="polite">正在读取群聊状态…</p><div id="mcp-chat-sessions"></div><p id="mcp-chat-error" class="mcp-warning" role="alert"></p>
     </div>`;
   document.body.append(dialog,chatDialog);
+  const managedQQ=window.TulpaSnowLuma?.mountManaged($('mcp-snowluma-managed'),{prefix:'mcp',onSaved:async()=>refresh()});
   let current, credential=null, busy=false, createError='', platformsInitialized=false, selected = new Map(), page = 0, searchVersion = 0, searchTimer, chatTimer, chatRefreshing=false, liveGroups=null;
   async function api(path, method='GET', body) {
     let response,data;

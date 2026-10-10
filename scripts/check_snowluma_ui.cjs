@@ -33,6 +33,7 @@ function preview(multiple){
         if(url.pathname.startsWith('/ui/'))return route.fulfill({contentType:url.pathname.endsWith('.js')?'text/javascript':url.pathname.endsWith('.css')?'text/css':'image/png',body:fs.readFileSync(path.join(root,'web',path.basename(url.pathname)))});
         if(url.pathname==='/api/desktop/status')return reply({settings,owned:true,storage:'fixture',version:'test'});
         if(url.pathname==='/api/desktop/preferences')return reply({mode:'mcp',background:true});
+        if(url.pathname==='/api/desktop/snowluma/managed')return reply({available:false,phase:'blocked',phase_label:'等待上游授权',version:'1.14.22',authorization_note:'离线测试版',agreements:[],consent_fingerprint:'fixture'});
         if(url.pathname==='/api/read-options')return reply({qq_per_chat:{min:1,max:10000,default:100},wechat_per_chat:{min:1,max:10000,default:100}});
         if(url.pathname==='/api/mcp')return reply({running:false,enabled:false,data_platforms:{}});
         if(url.pathname==='/api/mcp/operations')return reply({operations:[]});
@@ -54,7 +55,7 @@ function preview(multiple){
       });
       const prefix=edition==='full'?'desktop':'lite',q=name=>page.locator('#snow-'+prefix+'-'+name);
       const manual=page.locator('#'+prefix+'-onebot-manual'),dialog=page.locator(edition==='full'?'#desktop-config':'#lite-onebot');
-      async function open(){if(edition==='full')await page.evaluate(()=>window.dispatchEvent(new CustomEvent('tulpa-open-settings',{detail:'onebot'})));else await page.locator('#open-onebot').click();await dialog.waitFor({state:'visible'});}
+      async function open(){if(edition==='full')await page.evaluate(()=>window.dispatchEvent(new CustomEvent('tulpa-open-settings',{detail:'onebot'})));else await page.locator('#open-onebot').click();await dialog.waitFor({state:'visible'});await page.locator('#snow-existing-'+prefix).evaluate(d=>d.open=true);}
       async function scan(){await q('inspect').click();await q('selection').waitFor({state:'visible'});await page.waitForFunction(id=>!document.getElementById(id).disabled,'snow-'+prefix+'-inspect');}
       async function choose(){await q('account').selectOption('12345');await q('http').selectOption('http2');await q('ws').selectOption('ws2');}
       async function status(text){await page.waitForFunction(([id,text])=>document.getElementById(id).textContent.includes(text),['snow-'+prefix+'-status',text]);}

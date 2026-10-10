@@ -29,6 +29,10 @@ WRITES = frozenset(('set_group_ban', 'set_group_kick', 'set_group_name', 'set_gr
 
 
 def configuration(root=None):
+    from .snowluma_managed import connection
+    managed = connection(root or ROOT)
+    if managed is not None:
+        return managed
     values = dotenv_values((root or ROOT) / '.env')
     def value(key):
         return str(os.environ.get(key, values.get(key) or '')).strip()
@@ -41,6 +45,7 @@ def configuration(root=None):
 class Client:
     def __init__(self, config=None, transport=None, timeout=12):
         config = configuration() if config is None else config
+        self.managed_config = config
         self.url = config.get('url', '').rstrip('/')
         self.token = config.get('token', '')
         parsed = urlparse(self.url)
@@ -51,6 +56,11 @@ class Client:
         self.transport, self.timeout = transport, timeout
 
     def call(self, action, payload, *, approved=False):
+        from .snowluma_managed import guard
+        try:
+            guard(self.managed_config)
+        except ValueError:
+            raise OneBotError('QQ 托管授权、进程或账号绑定已失效，未执行操作。', 'managed_not_ready') from None
         if action not in (READS | (WRITES if approved else frozenset())):
             raise OneBotError('该接口不在允许范围内，管理操作需要审批。')
         writing = action in WRITES

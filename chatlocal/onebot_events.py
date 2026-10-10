@@ -17,6 +17,10 @@ from . import onebot
 
 def configuration(root=None):
     root = root or onebot.ROOT
+    from .snowluma_managed import connection
+    managed = connection(root, 'ws')
+    if managed is not None:
+        return managed
     values = dotenv_values(root / '.env')
     def value(key):
         return str(os.environ.get(key, values.get(key) or '')).strip()
@@ -150,6 +154,12 @@ class EventReceiver:
                                     'SnowLuma 实时事件已连接。' if healthy else 'SnowLuma 已连接，但 QQ 接收链路不健康。',
                                     last_event_at=time.time())
                         if healthy:
+                            # Revocation/account switching between recv() and
+                            # dispatch cannot feed a late event into chat/learning.
+                            if self.config_factory() != cfg:
+                                raise ValueError('configuration_changed')
+                            from .snowluma_managed import guard
+                            guard(cfg, fresh=False)
                             self.on_event(event)
             except InvalidStatus as exc:
                 auth = exc.response.status_code in (401, 403)

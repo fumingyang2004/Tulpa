@@ -20,11 +20,17 @@ _fields=('API_BASE','API_KEY','MODEL','REPLY_ONEBOT_URL','REPLY_ONEBOT_TOKEN','R
 def read_product_settings(root=ROOT):
     values=dotenv_values(root/'.env')
     def value(key):return os.environ.get(key,values.get(key) or '').strip()
-    return dict(api_base=value('API_BASE'),model=value('MODEL'),has_api_key=bool(value('API_KEY')),
+    result = dict(api_base=value('API_BASE'),model=value('MODEL'),has_api_key=bool(value('API_KEY')),
         configured=all(value(k) for k in ('API_BASE','API_KEY','MODEL')),
         sender_url=value('REPLY_ONEBOT_URL'),has_sender_token=bool(value('REPLY_ONEBOT_TOKEN')),
         events_url=value('REPLY_ONEBOT_WS_URL'),has_events_token=bool(value('REPLY_ONEBOT_WS_TOKEN')),
         environment_overrides=[k for k in _fields if k in os.environ])
+    from .snowluma_managed import connection
+    http,ws=connection(root),connection(root,'ws')
+    if http is not None:
+        result.update(sender_url=http['url'],has_sender_token=bool(http['token']),
+                      events_url=ws['url'],has_events_token=bool(ws['token']),managed_onebot=True)
+    return result
 
 
 def settings_revision(root):
@@ -36,6 +42,10 @@ def settings_revision(root):
 def save_product_settings(body,root=ROOT,*,replace_onebot_secrets=False,expected_revision=None):
     if not isinstance(body,dict) or set(body)-{'api_base','model','api_key','sender_url','sender_token','events_url','events_token'}:
         raise ValueError('模型配置字段无效。')
+    if set(body)&{'sender_url','sender_token','events_url','events_token'}:
+        from .snowluma_managed import manager
+        if manager(root).state().get('enabled'):
+            raise ValueError('当前正在使用托管 QQ，请先撤销托管授权再配置外部连接。')
     update={}
     for key,env in [('api_base','API_BASE'),('model','MODEL'),('api_key','API_KEY'),('sender_url','REPLY_ONEBOT_URL'),('sender_token','REPLY_ONEBOT_TOKEN'),('events_url','REPLY_ONEBOT_WS_URL'),('events_token','REPLY_ONEBOT_WS_TOKEN')]:
         if key not in body:continue
@@ -76,6 +86,8 @@ def save_product_settings(body,root=ROOT,*,replace_onebot_secrets=False,expected
             for key,value in update.items():
                 if key in os.environ:os.environ[key]=value
         finally:temp.unlink(missing_ok=True)
+    if set(body)&{'sender_url','sender_token','events_url','events_token'}:
+        manager(root).use_external()
     return read_product_settings(root)
 
 
@@ -90,6 +102,48 @@ def install_desktop_routes(app,root=ROOT):
         if (origin and origin!=str(request.base_url).rstrip('/')) or request.headers.get('sec-fetch-site')=='cross-site':raise HTTPException(403,'只允许本机同源操作。')
         if write and (request.headers.get('x-chatweave-ui')!='1' or request.headers.get('content-type','').split(';')[0]!='application/json'):
             raise HTTPException(403,'请通过模型设置保存。')
+
+    from .snowluma_managed import manager
+    from .snowluma_secure import ManagedError
+    managed=manager(root)
+    app.state.tulpa_snowluma=managed
+    def invalidate_managed():
+        from .onebot import invalidate_availability
+        invalidate_availability()
+        service=getattr(app.state,'tulpa_mcp',None)
+        if service:
+            service.tools.chat.stop_all(reason='QQ 托管连接或授权已失效')
+            with service.tools.qq_lock:service.tools.qq_at=0
+    managed.on_invalidated=invalidate_managed
+    from contextlib import asynccontextmanager
+    previous=app.router.lifespan_context
+    @asynccontextmanager
+    async def managed_lifespan(application):
+        async with previous(application):
+            managed.resume()
+            try:yield
+            finally:
+                import anyio
+                await anyio.to_thread.run_sync(managed.close)
+    app.router.lifespan_context=managed_lifespan
+
+    @app.get('/api/desktop/snowluma/managed')
+    def managed_status(request:Request):
+        local(request)
+        return managed.status()
+
+    @app.post('/api/desktop/snowluma/managed/{action}')
+    def managed_action(action:str,request:Request,body:dict):
+        local(request,True)
+        try:
+            if action=='start':result=managed.begin(body)
+            elif action=='select' and set(body)=={'choice_id'}:result=managed.select(body['choice_id'])
+            elif action=='retry' and not body:result=managed.retry()
+            elif action in ('cancel','revoke') and not body:result=managed.cancel(revoke=action=='revoke')
+            else:raise HTTPException(400,'托管操作参数无效。')
+            return dict(ok=True,**result)
+        except ManagedError as exc:
+            return dict(ok=False,code=exc.code,message=str(exc),retryable=exc.retryable)
 
     @app.get('/api/desktop/status')
     def status(request:Request):

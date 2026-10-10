@@ -147,7 +147,7 @@ def inspect_folder(folder):
         fail('not_snowluma', '这不是已知的 SnowLuma 运行目录，请选择包含 launcher.bat、index.mjs 和 config 的文件夹。')
     # Fail closed on unverified future formats, while keeping manual entry.
     version = package.get('version')
-    if version not in ('1.14.19', '1.14.20'):
+    if version not in ('1.14.19', '1.14.20', '1.14.21', '1.14.22'):
         fail('unsupported_version', '此 SnowLuma 版本的配置格式尚未核对，请先使用高级设置手动连接。')
     directory = base / 'config'
     try:
