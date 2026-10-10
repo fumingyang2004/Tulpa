@@ -11,6 +11,9 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
 
+# Windows embeddable Python intentionally omits the caller's directory from
+# sys.path; load fixture helpers explicitly, just as the package tests do.
+sys.path.insert(0,str(Path(__file__).resolve().parent))
 from check_snowluma_managed import (ROOT, SOURCE, ManagedSnowLuma, ManagedError,
     Runtime, API, Installer, Vault, Receiver, load_manifest, consent_key, wait, rejected)
 from chatlocal.snowluma_secure import file_lock, read_json, atomic_json
