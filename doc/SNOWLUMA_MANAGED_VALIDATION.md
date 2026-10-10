@@ -1,18 +1,12 @@
-# SnowLuma 托管接入验证记录
+# 本地 SnowLuma 自动配置验证记录
 
-基线：`d9bfec7bff9f2ea8cc2c5dd0a37b4264723bdb56`，本地分支 `codex/snowluma-managed`；本轮不 push、不改 GitHub Release。源码与测试使用模拟账号，不包含真实聊天、Token 或截图。
+本轮以 `a0b3170f2c5088acbef451c83c81fc8f43404046` 为开发前检查点，继续在本地 `codex/snowluma-managed` 工作，不 push、不发布。按用户修正，删除自动下载部署路径，改为配置用户选定的本地安装；不将原有离线测试当作真实 QQ 通过。
 
-## 官方契约核对
+## 版本和接口
 
-- [v1.14.22 官方完整包](https://github.com/SnowLuma/SnowLuma/releases/tag/v1.14.22)，固定大小 37,866,010 字节、SHA256 `c8076ba2fbcdc19afeb8e8bf9b2956eaab3605e5fa4618c4db702749ae501681`。摘要来自官方 GitHub Release 资产元数据；本轮没有下载或执行这个二进制。
-- 官方 bootstrap 环境变量可设置首次管理密码；本实现走正常 login、agreements、record-consent、auth/state 接口，不使用 DEV_MODE，不伪造 UI 点击，不修改上游 gate。
-- /processes、probe-login、单 PID load/unload、/config/{uin} 的写入与 applied/online 回执按固定源码核对。
-- [hook-session.ts](https://github.com/SnowLuma/SnowLuma/blob/v1.14.22/packages/bridge/src/hook-session.ts) 和 [hook-manager.ts](https://github.com/SnowLuma/SnowLuma/blob/v1.14.22/packages/bridge/src/hook-manager.ts) 显示预存管道可被采用。保守处理为拒绝外部 Hook 共存；未将关闭自动注入误称为完全进程隔离。
-- QQ-agent 的固定提交仅用于参考包校验和托管流程，未复制实现。SnowLuma 是独立上游许可组件，不能按 Tulpa 的 MIT 许可再分发。
+自动初始化以官方 [v1.14.22](https://github.com/SnowLuma/SnowLuma/releases/tag/v1.14.22) / `87527cb7641a5a42f8f0efb73cb066102e004dee` 为准。复用官方 bootstrap 环境变量、login、agreements/record-consent、processes、单 PID load、账号 config API，不修改上游源码或绕过 gate。已有配置导入支持 v1.14.19–v1.14.22。
 
 ## 可重复命令
-
-在仓库目录执行：
 
 ```powershell
 .\.venv\Scripts\python.exe -X utf8 scripts\check_snowluma_managed.py
@@ -20,32 +14,24 @@
 .\.venv\Scripts\python.exe -X utf8 scripts\check_snowluma_setup.py
 node scripts\check_snowluma_managed_ui.cjs
 node scripts\check_snowluma_ui.cjs
-node scripts\check_mcp_ui.cjs
 ```
 
-后端新增检查也接受 `--package <打包目录>`，并纳入 `desktop/build.py` 的打包门禁。浏览器依赖现有 Playwright Core / Edge；`TULPA_TEST_PACKAGE` 可指定打包目录，`SNOWLUMA_UI_SCREENSHOTS` 可将截图存到本地私有目录。
+后端检查支持 `--package <目录>`，纳入打包门禁。浏览器脚本使用现有 Playwright Core / Edge；`PLAYWRIGHT_MODULE` 可指定模块，`SNOWLUMA_UI_SCREENSHOTS` 可保存本机测试截图。
 
-## 已验证范围
-
-| 场景 | 证据种类与结论 |
+| 场景 | 验证方式 |
 | --- | --- |
-| 默认不授权、协议哈希或授权范围变化 | 隔离测试拒绝执行；生产清单的上游授权门禁在建目录和下载之前 |
-| 官方源、固定哈希、续传、损包、越界 ZIP、错误版本、取消 | 合成 ZIP + HTTP mock；半成品不启动，不静默降级，不接触官方二进制 |
-| 首次初始化和中途停止重开、登录和事件超时、认证失败、配置未应用 | 状态机 fixture；保留凭据，不用重置密码掩盖异常 |
-| 多 QQ、无 QQ、未知账号、PID 复用、账号变化、外部 Hook | fixture；只加载选择的 PID；外部 Hook 情形没有启动或停止外部进程 |
-| 两窗口、遗留锁、并发状态读写 | 同目录双 controller + Windows 实际跨进程文件锁；原子状态读写压力检查 |
-| 凭据保护及子进程退出保护 | 本机 Windows DPAPI 合成数据往返；Windows Job Object 实际 Python 子进程测试，未运行 QQ/SnowLuma |
-| HTTP/WS 账号核对、分别鉴权、撤权后旧客户端 | 真实 loopback TCP/WS + 模拟服务；只接收合成心跳，只调用 get_login_info，外部写入为 0 |
-| WS 断开/恢复、撤销在途结果 | 模拟 receiver 状态及实际 cached-client 防线；没有另换账号/Token |
-| 完整版 / 轻量版界面 | Edge 无头浏览器：未授权、下载阶段、选择 QQ、失败重试、模拟就绪、撤权、条款变化、窄屏；模拟画面明确标注 |
-| 旧连接导入 | 原有隔离 HTTP/WS 浏览器及后端测试；.env 旧流程保留，托管开始不覆盖外部配置 |
+| 所选文件夹、缺少 Node、错误版本、协议变化、链接目录、文件指纹变化 | 真实临时文件；检查无执行、无下载，变化后需要重新选择 |
+| 默认不勾选、伪造/过期选择、同源限制、重复点击 | 本地接口及 Edge；没有有效选择及同意时不能启动 |
+| 原地配置、已有密码保护、备份/锁、不同 Tulpa 目录竞争 | 隔离目录、实际文件锁；已有独立配置只走导入，不重置认证 |
+| 单 QQ 自动接入、多 QQ 选择、未知账号、PID 复用、账号切换 | 模拟 QQ 进程及管理 API；固定身份，不扩大授权 |
+| cancel/retry、重开、WS 断开、撤权后的旧客户端 | 状态机 + 真实 loopback HTTP/WS 合成账号；外部 QQ 写入为零 |
+| 凭据、锁与结束准确子进程 | Windows DPAPI、跨进程锁、原子读写、Job Object；子进程只是 Python fixture |
+| full/lite、自动导入已有单一节点、多节点不猜测、窄屏 | 真实 Edge + 实际 UI 代码 + 合成接口；模拟画面标注模拟 |
 
-## 尚未验证 / 尚未完成
+## 未验证及剩余限制
 
-用户确认尚无作者书面授权，本轮只做离线实现与测试。因此未执行真实下载、清空原安装路径、QQ 注入、扫码、消息发送、机器重启或真实首次初始化；没有真实“已就绪”截图。完整包内原生组件布局和运行效果仍需实际许可后的验收，不以 source/API mocks 代替。
+未替用户在真实新解压的 SnowLuma 上勾选、设置凭据、加载 QQ，也没有真实发送消息；没有真实首次初始化“已就绪”截图。API fixtures 不代表真实 QQ、扫码、多 QQ、系统重启或安全软件行为已验收。
 
-真实外部服务并发竞争、选定 QQ 原生绑定、进程重启后的残留 Hook 卸载、平台 UAC/防护软件、多 QQ 权限组合、断电和机器重启均未获真机证明。当前外部 Hook 冲突保守阻止；上游动态采用管道的竞态仍是开放自动托管前的阻塞项。
+上游自动采用其他 Hook 管道的动态竞态、真实原生卸载/重启后的残留 Hook 仍待实测。跨版本自动升级、自动降级、接管已设密码的独立管理实例不提供；这些情况保留原配置和已有导入入口，不伪装成全新初始化。
 
-自动跨版本升级 / 回滚、已初始化外部管理实例的密码安全导入和自动接管不在本离线预览中开放。仍可沿用已有明确选择目录的 OneBot 导入。恢复用本地程序备份；不修改外部实例、不处理 QQ 登录数据、不删除真实库。
-
-取得授权后，先输出确认过的 SnowLuma 实例 / 路径 / 自启清单，完整备份验证，再另行执行用户要求的真实冷启动。需要 UAC、扫码或其他用户安全交接时停在相应步骤；不借过去群聊授权发送验收消息。
+该功能不下载或复制 SnowLuma，所选文件的指纹用于确认用户选择没有变化，不等于上游签名认证。用户应自行从官方渠道取得完整包并遵循其协议。

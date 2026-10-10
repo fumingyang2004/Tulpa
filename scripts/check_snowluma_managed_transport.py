@@ -1,5 +1,6 @@
 """Local TCP/WS + Windows primitives with synthetic accounts, never SnowLuma/QQ."""
 import copy
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -15,7 +16,7 @@ from unittest.mock import patch
 # sys.path; load fixture helpers explicitly, just as the package tests do.
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from check_snowluma_managed import (ROOT, SOURCE, ManagedSnowLuma, ManagedError,
-    Runtime, API, Installer, Vault, Receiver, load_manifest, consent_key, wait, rejected)
+    Runtime, API, Installer, Vault, Receiver, load_manifest, consent_key, wait, rejected, fixture_manifest, accept)
 from chatlocal.snowluma_secure import file_lock, read_json, atomic_json
 from chatlocal.snowluma_runtime import WindowsRuntime, process_identity
 from chatlocal.onebot import Client, OneBotError
@@ -36,13 +37,14 @@ def error_state(service, code):
 
 
 def faults(root):
-    manifest=copy.deepcopy(load_manifest());manifest['automation_authorized']=True
-    body=dict(accepted=True,fingerprint=consent_key(manifest))
-    for case in ('terms','auth','config','login','event','cancel-download','restart-init'):
+    manifest=fixture_manifest()
+    for case in ('terms','auth','config','login','event','cancel-prepare','restart-init'):
         runtime=Runtime();api=API(runtime);entered=threading.Event();release=threading.Event()
         class DelayedInstaller(Installer):
-            def deploy(self, check, progress):
-                entered.set();release.wait(3);check();return super().deploy(check,progress)
+            @contextmanager
+            def acquire(self,receipt,instance,check):
+                entered.set();release.wait(3);check()
+                with super().acquire(receipt,instance,check) as directory:yield directory
         receiver=Receiver('12345')
         if case=='terms':api.changed_terms=True
         if case=='auth':api.auth_fail=True
@@ -50,11 +52,11 @@ def faults(root):
         if case=='login':api.accounts_by_pid[101]=''
         if case=='event':receiver.state='verifying'
         service=ManagedSnowLuma(root/case,manifest=manifest,runtime=runtime,api_factory=lambda _:api,
-            installer_factory=DelayedInstaller if case=='cancel-download' else Installer,
-            vault_factory=Vault,probe=lambda *a:receiver,poll_seconds=.02,login_timeout=.15,event_timeout=.15)
+            installer_factory=DelayedInstaller if case=='cancel-prepare' else Installer,
+            vault_factory=Vault,probe=lambda *a:receiver,poll_seconds=.02,login_timeout=.15,event_timeout=.15,auto_select_single=False)
         try:
-            service.begin(body)
-            if case=='cancel-download':
+            service.begin(accept(service))
+            if case=='cancel-prepare':
                 assert entered.wait(2)
                 cancel=threading.Thread(target=service.cancel);cancel.start()
                 while service.state()['enabled']:time.sleep(.01)
@@ -73,11 +75,11 @@ def faults(root):
                 assert runtime.stops==1 and not service.connection('http')['url']
             else:wait(service,'ready')
         finally:release.set();service.close()
-    print('PASS lifecycle failures: changed terms/auth, config not applied, login/event timeouts, cancellation after download, initialization restart')
+    print('PASS lifecycle failures: changed terms/auth, config not applied, login/event timeouts, cancellation during local prepare, initialization restart')
 
 
 def transport(root):
-    manifest=copy.deepcopy(load_manifest());manifest['automation_authorized']=True
+    manifest=fixture_manifest()
     runtime=Runtime();api=API(runtime);resources=[];received=[];credentials={};wire=[]
     class HTTP(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
@@ -105,10 +107,10 @@ def transport(root):
         wt=threading.Thread(target=ws.serve_forever,daemon=True);wt.start();resources.append((ws,wt))
     api.configure=configure
     service=ManagedSnowLuma(root,manifest=manifest,runtime=runtime,api_factory=lambda _:api,
-        installer_factory=Installer,vault_factory=Vault,poll_seconds=.03)
+        installer_factory=Installer,vault_factory=Vault,poll_seconds=.03,auto_select_single=False)
     _registry[str(root.resolve()).casefold()]=service
     try:
-        service.begin(dict(accepted=True,fingerprint=consent_key(manifest)))
+        service.begin(accept(service))
         s=wait(service,'choosing');service.select(s['choices'][0]['id']);wait(service,'ready')
         config=service.connection('http');client=Client(config)
         assert client.login()=='12345' and service.heartbeat.status()['last_message_at']==0

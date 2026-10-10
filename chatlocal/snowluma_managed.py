@@ -1,7 +1,6 @@
-"""Browser-authorized, single-owner SnowLuma lifecycle. No Agent-facing admin tools.
+"""User-authorized configuration of a selected local SnowLuma installation.
 
-The checked-in release manifest deliberately blocks real automation pending
-upstream permission. Isolated tests inject a synthetic manifest and adapters.
+No package download, component copying, or Agent-facing management API.
 """
 import atexit
 import hashlib
@@ -14,12 +13,11 @@ import time
 
 from .snowluma_secure import (ManagedError, SecretVault, atomic_json, file_lock,
                              local_path, private_directory, read_json)
-from .snowluma_package import PackageInstaller
+from .snowluma_local import LocalInstallation, fingerprint
 from .snowluma_runtime import SnowLumaAPI, WindowsRuntime, free_port, port_available
 
 
-PHASES = dict(idle='等待授权', blocked='等待上游授权', detecting='检测环境',
-    downloading='下载并校验', download_verified='下载校验通过', extracting='部署运行包',
+PHASES = dict(idle='请选择 SnowLuma 文件夹', detecting='核对本地运行文件',
     starting='后台启动', initializing='首次初始化', choosing='选择 QQ',
     waiting_qq='等待打开 QQ', waiting_login='等待 QQ 登录', configuring='配置 OneBot',
     verifying='验证连接', ready='QQ 已就绪', reconnecting='连接恢复中',
@@ -37,15 +35,19 @@ def consent_key(manifest):
 
 class ManagedSnowLuma:
     def __init__(self, root, *, manifest=None, runtime=None, api_factory=SnowLumaAPI,
-                 installer_factory=PackageInstaller, vault_factory=SecretVault,
+                 installer_factory=LocalInstallation, vault_factory=SecretVault,
                  on_invalidated=lambda:None, probe=None, poll_seconds=3,
-                 login_timeout=180, event_timeout=20):
+                 login_timeout=180, event_timeout=20, auto_select_single=True,
+                 check_account=lambda account:None):
         self.root = local_path(root)
         self.directory = self.root/'data/snowluma-managed'
         self.state_path = self.directory/'state.json'
         self.manifest = manifest if manifest is not None else load_manifest()
         self.runtime = runtime or WindowsRuntime()
         self.api_factory, self.installer_factory = api_factory, installer_factory
+        self.installations = installer_factory(self.manifest, self.directory)
+        self.previews = {}
+        self.auto_select_single, self.check_account = auto_select_single, check_account
         self.vault = vault_factory(self.directory)
         self.on_invalidated, self.probe = on_invalidated, probe
         self.poll_seconds = max(.02, poll_seconds)
@@ -61,12 +63,31 @@ class ManagedSnowLuma:
         return read_json(self.state_path, dict(schema=1, phase='idle', enabled=False, generation=0))
 
     def _require_permission(self):
-        if self.manifest.get('automation_authorized') is not True:
-            raise ManagedError('upstream_permission_required', '尚未取得 SnowLuma 自动化部署授权；此测试版不下载或运行上游组件，已有连接仍可使用。')
+        if self.manifest.get('mode') != 'user_selected_local_directory':
+            raise ManagedError('unsupported_mode', '当前仅支持配置用户明确选择的本地 SnowLuma 文件夹。')
+
+    def inspect(self, folder):
+        self._require_permission()
+        try:receipt = self.installations.inspect(folder)
+        except ManagedError:raise
+        except (OSError,ValueError,TypeError,RuntimeError):
+            raise ManagedError('folder_unreadable', '文件夹无法完整读取或正在变化，请核对权限和解压结果后重新载入。') from None
+        with self.mutex:
+            now = time.monotonic()
+            self.previews = {k:v for k,v in self.previews.items() if now-v[0]<600}
+            if len(self.previews) >= 8:
+                self.previews.pop(next(iter(self.previews)))
+            key = secrets.token_urlsafe(24)
+            consent = fingerprint([consent_key(self.manifest), receipt['fingerprint']])
+            self.previews[key] = (now, receipt, consent)
+        return dict(selection_id=key, consent_fingerprint=consent,
+                    **{k:receipt[k] for k in ('folder','version','mode','message')})
 
     def _consented(self, state):
         return (state.get('consent', {}).get('fingerprint') == consent_key(self.manifest)
-                and state.get('consent', {}).get('scope') == self.manifest['scope'])
+                and state.get('consent', {}).get('scope') == self.manifest['scope']
+                and bool(state.get('installation'))
+                and state.get('consent', {}).get('source') == state['installation'].get('fingerprint'))
 
     def _write(self, state):
         state['updated_at'] = time.time()
@@ -91,40 +112,50 @@ class ManagedSnowLuma:
         except ManagedError as exc:
             state = dict(phase='error', code=exc.code, message=str(exc), enabled=False)
         phase = state.get('phase', 'idle')
-        if not self.manifest.get('automation_authorized') and phase == 'idle':
-            phase = 'blocked'
         public = {k:state[k] for k in ('enabled','generation','account','message','code','retryable',
             'progress','ports','verified_at','updated_at','history','choices','selection_required') if k in state}
         owner = state.get('owner') or {}
         selected = state.get('selected') or {}
         public.update(phase=phase, phase_label=PHASES.get(phase,'状态未知'),
             version=self.manifest['version'], real_pc_verified=self.manifest['compatibility']['real_pc_verified'],
-            available=self.manifest.get('automation_authorized') is True,
+            available=self.manifest.get('mode') == 'user_selected_local_directory',
             consent_current=self._consented(state), has_consent=bool(state.get('consent')), consent_fingerprint=consent_key(self.manifest),
             consent_at=state.get('consent',{}).get('at'), agreements=self.manifest['agreements'],
             scope=self.manifest['scope'], service_pid=owner.get('pid'), qq_pid=selected.get('pid'),
-            storage=str(self.directory), qq_ready=phase=='ready',
-            authorization_note='本测试版等待上游书面授权；不会下载、启动或清理 SnowLuma。' if not self.manifest.get('automation_authorized') else '',
-            security_note='Tulpa 凭据由 Windows 当前用户 DPAPI 保护。上游 OneBot 配置必须含明文 Token，放在仅当前用户及系统可访问的托管目录。')
+            storage=str(self.directory), folder=state.get('installation',{}).get('folder',''), qq_ready=phase=='ready',
+            authorization_note='',
+            security_note='Tulpa 凭据由 Windows 当前用户 DPAPI 保护。所选 SnowLuma 的配置目录会保存它运行所需的明文 Token，并限制为当前用户和系统访问。')
         if public.get('qq_ready') and (not self.thread or not self.thread.is_alive()):
             public.update(qq_ready=False, phase='reconnecting', phase_label=PHASES['reconnecting'])
         return public
 
     def begin(self, body):
-        if (set(body) != {'accepted','fingerprint'} or body['accepted'] is not True
-                or body['fingerprint'] != consent_key(self.manifest)):
-            raise ManagedError('consent_required', '请主动勾选当前版本协议与自动配置授权；未开始部署。')
+        if set(body) != {'accepted','fingerprint','selection_id'} or body['accepted'] is not True:
+            raise ManagedError('consent_required', '请先检测本地文件夹，再主动勾选协议与自动配置授权。')
+        with self.mutex:
+            preview = self.previews.get(body.get('selection_id')) if isinstance(body.get('selection_id'),str) else None
+        if not preview or time.monotonic()-preview[0]>=600:
+            raise ManagedError('selection_expired', '文件夹检查已过期，请重新检测后确认。')
+        _, receipt, agreed = preview
+        if body['fingerprint'] != agreed:
+            raise ManagedError('consent_required', '文件夹或协议已变化，请重新检测并主动同意。')
+        if receipt['mode'] != 'local':
+            raise ManagedError('existing_installation', '请导入这份 SnowLuma 的已有连接；不会重置其管理密码。')
         self._require_permission()
+        self.installations.verify(receipt)
         private_directory(self.directory)
         with file_lock(self.directory/'state.lock'):
             state = self.state()
+            if state.get('installation') and state['installation']['folder'] != receipt['folder']:
+                raise ManagedError('installation_bound', '本连接已绑定另一文件夹。请保留该绑定，使用另一份 Tulpa 接入其他 SnowLuma。')
             if state.get('enabled') and self._consented(state):
                 duplicate = True
             else:
                 duplicate = False
                 state.update(schema=1, mode='managed', instance=state.get('instance') or secrets.token_hex(16),
                     generation=state.get('generation',0)+1, enabled=True, phase='detecting', code='', message='',
-                    consent=dict(fingerprint=body['fingerprint'], at=time.time(), scope=self.manifest['scope']),
+                    installation=receipt,
+                    consent=dict(fingerprint=consent_key(self.manifest), source=receipt['fingerprint'], at=time.time(), scope=self.manifest['scope']),
                     version=self.manifest['version'], retryable=False, choices=[], selection_required=False)
                 self._write(state)
         if not duplicate or state.get('phase') not in ('error','cancelled','revoked'):
@@ -201,7 +232,7 @@ class ManagedSnowLuma:
     def resume(self):
         try:state = self.state()
         except ManagedError:return  # Corrupt QQ setup must not disable historical MCP.
-        if self.manifest.get('automation_authorized') and state.get('enabled') and self._consented(state):
+        if state.get('enabled') and self._consented(state):
             self.launch()
 
     def close(self):
@@ -248,24 +279,26 @@ class ManagedSnowLuma:
         check = lambda: self._check(generation)
         state = check()
         self._set(generation, 'detecting')
+        install = local_path(state['installation']['folder'])
+        if not (state.get('owner') and self.runtime.owned(state['owner'],install,state['instance'])) and self.runtime.hooks():
+            raise ManagedError('external_hook_present', '已有 QQ 接入服务正在工作，请导入已有连接；未启动第二份服务或改写配置。')
+        with self.installations.acquire(state['installation'], state['instance'], check) as install:
+            self._run_installation(generation, install)
+
+    def _run_installation(self, generation, install):
+        check = lambda: self._check(generation)
+        state = check()
         existing_owner = state.get('owner')
-        if not (existing_owner and self.runtime.owned(existing_owner, self.directory/'runtime', state['instance'])):
+        if not (existing_owner and self.runtime.owned(existing_owner, install, state['instance'])):
             if self.runtime.hooks():
-                raise ManagedError('external_hook_present', '发现已有 QQ Hook，未下载或启动第二个服务。请使用已有外部连接；不会卸载或关闭它。')
+                raise ManagedError('external_hook_present', '发现已有 QQ 接入服务，未启动第二份。可选择其文件夹导入已有连接；若要换用新服务，请先自行退出原服务并重开 QQ。')
         credentials = self.vault.read()
         if not credentials:
-            if state.get('initialized') or (self.directory/'runtime/config/webui.json').exists():
+            if state.get('initialized') or (install/'config/webui.json').exists():
                 raise ManagedError('credential_unavailable', '已初始化服务的托管凭据缺失，未重置密码。')
             credentials = dict(admin_password=secrets.token_urlsafe(36), http_token=secrets.token_urlsafe(32),
                                ws_token=secrets.token_urlsafe(32))
             check(); self.vault.write(credentials)
-        last_progress = [0]
-        def progress(phase, done, total):
-            check()
-            if phase != 'downloading' or time.monotonic()-last_progress[0] > .25:
-                self._set(generation, phase, progress=dict(downloaded=done,total=total))
-                last_progress[0] = time.monotonic()
-        install = self.installer_factory(self.manifest, self.directory).deploy(check, progress)
         check()
         owner = state.get('owner')
         receiver = None
@@ -280,7 +313,7 @@ class ManagedSnowLuma:
                     ports = dict(admin=free_port(), http=free_port(), ws=free_port())
                 self._set(generation, 'starting', ports=ports)
                 check()
-                owner = self.runtime.spawn(install, ports['admin'], credentials, state['instance'])
+                owner = self.runtime.spawn(install, ports['admin'], dict(credentials,bound_account=state.get('account','')), state['instance'])
                 self._set(generation, owner=owner)
             self.api = self.api_factory(ports['admin'])
             self._set(generation, 'initializing')
@@ -318,12 +351,17 @@ class ManagedSnowLuma:
                                         account=account, account_label=account or '账号待验证'))
                 self._set(generation, 'choosing' if choices else 'waiting_qq', choices=choices,
                           selection_required=bool(choices), message='请选择要绑定的 QQ。' if choices else '请打开桌面 QQ 并完成必要扫码，Tulpa 将自动继续。')
+                if self.auto_select_single and len(choices)==1:
+                    self.select(choices[0]['id'])
+                    selected = self.state().get('selected')
+                    continue
                 state = self._pause(generation, self.poll_seconds)
                 selected = state.get('selected')
             check()
             if self.runtime.identity(selected['pid']) != selected:
                 raise ManagedError('process_changed', '所选 QQ 进程已退出或被复用，请重选。', retryable=True)
             before = self.api.probe(selected['pid'])
+            if before:self.check_account(before)
             if self.runtime.hooks():
                 raise ManagedError('external_hook_present', '加载前检测到已有 QQ Hook，未接管。')
             expected = state.get('account', '')
@@ -345,6 +383,7 @@ class ManagedSnowLuma:
                     if any(a != current for a in accounts):
                         raise ManagedError('unexpected_account', '托管实例出现未选择的账号，已停止。')
                     account = current
+                    self.check_account(account)
                     break
                 if time.monotonic() >= deadline:
                     raise ManagedError('login_timeout', 'QQ 登录尚未完成，请完成扫码后重试。', retryable=True)
@@ -413,6 +452,7 @@ class ManagedSnowLuma:
                 self._set(generation, 'stopped', verified_at=0)
 
     def _verify_identity(self, instance, owner, install, selected, account):
+        self.check_account(account)
         if not self.runtime.owned(owner, install, instance):
             raise ManagedError('service_changed', '托管服务进程已变化，相关 QQ 工具已停止。', retryable=True)
         if self.runtime.identity(selected['pid']) != selected:
@@ -431,7 +471,7 @@ class ManagedSnowLuma:
         if not state.get('instance') or state.get('mode')=='external':
             return None
         empty = dict(url='',token='')
-        if (not self.manifest.get('automation_authorized') or not state.get('enabled') or not self._consented(state)
+        if (not state.get('enabled') or not self._consented(state)
                 or state.get('phase') != 'ready' or time.time()-state.get('verified_at',0)>12
                 or not self.thread or not self.thread.is_alive()):
             return empty
@@ -447,7 +487,7 @@ class ManagedSnowLuma:
         if time.time()-state.get('verified_at',0)>12:
             raise ManagedError('managed_not_ready', 'QQ 托管身份验证已过期。')
         if fresh:
-            self._verify_identity(state['instance'], state['owner'], self.directory/'runtime', state['selected'], state['account'])
+            self._verify_identity(state['instance'], state['owner'], local_path(state['installation']['folder']), state['selected'], state['account'])
         if not self.heartbeat or self.heartbeat.status().get('state') != 'connected':
             raise ManagedError('event_disconnected', 'QQ 事件通道未就绪，未执行操作。')
 

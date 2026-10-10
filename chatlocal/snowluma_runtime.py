@@ -148,6 +148,10 @@ class WindowsRuntime:
                 raise ManagedError('security_handoff', '托管实例存在额外安全设置，需要人工安全交接；未自动关闭。')
         runtime_path = config/'runtime.json'
         runtime = read_json(runtime_path)
+        account_files = [local_path(path) for path in config.glob('onebot_*.json')]
+        expected_name = 'onebot_'+credentials.get('bound_account','')+'.json'
+        if any(path.name != expected_name for path in account_files):
+            raise ManagedError('unexpected_config', '所选目录出现不属于当前绑定的 QQ 配置，未覆盖；请使用已有连接导入。')
         runtime.update(webuiHost='127.0.0.1', webuiPort=port, hookAutoLoad=False,
                        webuiTls=dict(enabled=False), trustProxy='', logMaxTotalMb=32, logRetainDays=1, logPerUin=False)
         atomic_json(runtime_path, runtime)
@@ -155,7 +159,7 @@ class WindowsRuntime:
             atomic_json(config/'onebot.json', empty_config())
         # An initialized owned account is never allowed to expose stale listeners
         # before management authentication and identity verification on restart.
-        for path in config.glob('onebot_*.json'):
+        for path in account_files:
             if re.fullmatch(r'onebot_\d{5,10}\.json', path.name):
                 atomic_json(path, dict(empty_config(), mode='snapshot'))
         # Official env API; never use DEV_MODE or accept agreements by env.

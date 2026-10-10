@@ -33,12 +33,13 @@ function preview(multiple){
         if(url.pathname.startsWith('/ui/'))return route.fulfill({contentType:url.pathname.endsWith('.js')?'text/javascript':url.pathname.endsWith('.css')?'text/css':'image/png',body:fs.readFileSync(path.join(root,'web',path.basename(url.pathname)))});
         if(url.pathname==='/api/desktop/status')return reply({settings,owned:true,storage:'fixture',version:'test'});
         if(url.pathname==='/api/desktop/preferences')return reply({mode:'mcp',background:true});
-        if(url.pathname==='/api/desktop/snowluma/managed')return reply({available:false,phase:'blocked',phase_label:'等待上游授权',version:'1.14.22',authorization_note:'离线测试版',agreements:[],consent_fingerprint:'fixture'});
+        if(url.pathname==='/api/desktop/snowluma/managed')return reply({available:true,phase:'idle',phase_label:'请选择 SnowLuma 文件夹',version:'1.14.22',agreements:[],consent_fingerprint:'fixture'});
         if(url.pathname==='/api/read-options')return reply({qq_per_chat:{min:1,max:10000,default:100},wechat_per_chat:{min:1,max:10000,default:100}});
         if(url.pathname==='/api/mcp')return reply({running:false,enabled:false,data_platforms:{}});
         if(url.pathname==='/api/mcp/operations')return reply({operations:[]});
         if(url.pathname==='/api/components/voice')return reply({status:'available',message:'fixture',total:1,downloaded:0});
         const body=req.postDataJSON();requests.push({path:url.pathname,body});
+        if(url.pathname==='/api/desktop/snowluma/managed/inspect')return reply({ok:true,mode:'existing',folder:body.folder,version:'1.14.20',selection_id:'existing-fixture',consent_fingerprint:'existing-consent',message:'检测到已有配置'});
         if(url.pathname==='/api/desktop/snowluma/inspect')return reply(failInspect?{ok:false,code:'account_config_missing',message:'账号配置尚未生成，请手动加载 QQ。'}:preview(multiple));
         if(url.pathname==='/api/desktop/snowluma/import'){
           if(slow)await new Promise(resolve=>setTimeout(resolve,150));
@@ -85,6 +86,21 @@ function preview(multiple){
       await manual.locator('summary').click();await httpField.fill('http://127.0.0.1:19002/manual');
       await manual.locator('button[type=submit]').click();await page.waitForFunction(id=>document.getElementById(id).textContent.includes('已连接'),edition==='full'?'desktop-onebot-status':'lite-onebot-result');
       assert.equal(settings.sender_url,'http://127.0.0.1:19002/manual');
+      // The main entry imports an unambiguous existing configuration after the
+      // one checkbox, without asking the user to fill tokens or choose nodes.
+      failInspect=false;multiple=false;slow=false;
+      const managed=name=>page.locator('#snow-managed-'+prefix+'-'+name);
+      await managed('folder').fill('C:\\SnowLuma-fixture');await managed('inspect').click();
+      await page.waitForFunction(id=>document.getElementById(id).textContent.includes('已有配置'),'snow-managed-'+prefix+'-status');
+      const beforeImport=requests.filter(r=>r.path.endsWith('/import')).length;
+      assert.equal(await managed('consent').isChecked(),false);await managed('consent').check();await managed('start').click();
+      await page.waitForFunction(id=>document.getElementById(id).textContent.includes('已核对'),'snow-managed-'+prefix+'-status');
+      assert.equal(requests.filter(r=>r.path.endsWith('/import')).length,beforeImport+1);
+      assert.equal(requests.filter(r=>r.path.endsWith('/managed/start')).length,0);
+      // Multiple accounts/nodes still require an explicit selection, no guessing.
+      multiple=true;await managed('start').click();
+      await page.waitForFunction(id=>document.getElementById(id).textContent.includes('多个选择'),'snow-managed-'+prefix+'-status');
+      assert.equal(requests.filter(r=>r.path.endsWith('/import')).length,beforeImport+1);
       assert.deepEqual(errors,[]);
       if(process.env.SNOWLUMA_UI_SCREENSHOTS){await manual.locator('summary').click();await page.screenshot({path:path.join(process.env.SNOWLUMA_UI_SCREENSHOTS,edition+'.png')});}
       await page.close();

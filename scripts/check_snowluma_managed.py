@@ -3,6 +3,7 @@
 Never starts SnowLuma, hooks QQ, downloads an upstream binary, or writes QQ.
 """
 import argparse
+from contextlib import contextmanager
 import copy
 import hashlib
 import io
@@ -24,7 +25,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from chatlocal.snowluma_managed import ManagedSnowLuma,consent_key,load_manifest,_registry
 from chatlocal.snowluma_secure import ManagedError,SecretVault,atomic_json,sha256,file_lock
-from chatlocal.snowluma_package import PackageInstaller
+from chatlocal.snowluma_local import LocalInstallation
 from chatlocal.snowluma_runtime import SnowLumaAPI,onebot_config,process_identity
 from chatlocal.desktop_routes import install_desktop_routes
 
@@ -66,12 +67,34 @@ class Runtime:
         assert self.owned(owner,directory,instance);self.stops+=1;self.owner=None;return True
 
 
-class Installer:
+def fixture_folder(folder, manifest):
+    folder.mkdir(parents=True,exist_ok=True)
+    files={'package.json':json.dumps(dict(name='@snowluma/runtime',version=manifest['version'])),
+           'index.mjs':'// nonexecutable fixture','node.exe':b'MZ-fixture','fixture.node':b'fixture','LICENSE':'fixture'}
+    for doc in manifest['agreements']:files[doc['file']]=doc['id']
+    for name,value in files.items():(folder/name).write_bytes(value.encode() if isinstance(value,str) else value)
+    return folder
+
+
+def fixture_manifest():
+    value=copy.deepcopy(load_manifest())
+    for doc in value['agreements']:doc['sha256']=hashlib.sha256(doc['id'].encode()).hexdigest()
+    return value
+
+
+def accept(service, folder=None):
+    folder=folder or service.root/'fixture-snow'
+    if not folder.exists():fixture_folder(folder,service.manifest)
+    preview=service.inspect(str(folder))
+    return dict(accepted=True,fingerprint=preview['consent_fingerprint'],selection_id=preview['selection_id'])
+
+
+class Installer(LocalInstallation):
     calls=0
-    def __init__(self,manifest,directory):self.directory=directory
-    def deploy(self,check,progress):
-        check();Installer.calls+=1;progress('downloading',1,2);check();progress('download_verified',2,2)
-        root=self.directory/'runtime';root.mkdir(parents=True,exist_ok=True);return root
+    @contextmanager
+    def acquire(self,receipt,instance,check):
+        check();Installer.calls+=1
+        with super().acquire(receipt,instance,check) as root:yield root
 
 
 class API:
@@ -102,63 +125,47 @@ class Receiver:
     def stop(self):self.stopped=True
 
 
-def package_checks(root):
-    original=load_manifest();manifest=copy.deepcopy(original)
-    for doc in manifest['agreements']:doc['sha256']=hashlib.sha256(doc['id'].encode()).hexdigest()
-    def archive(extra=None,version='1.14.22'):
-        stream=io.BytesIO()
-        with zipfile.ZipFile(stream,'w') as z:
-            files={'package.json':json.dumps(dict(name='@snowluma/runtime',version=version)),
-                   'index.mjs':'// nonexecutable fixture','node.exe':b'MZ-fixture','fixture.node':b'fixture',
-                   'LICENSE':'fixture','EULA.md':'eula','PRIVACY.md':'privacy'}
-            if extra:files.update(extra)
-            for p,value in files.items():
-                info=zipfile.ZipInfo(p);info.filename=p
-                z.writestr(info,value)
-        return stream.getvalue()
-    raw=archive();manifest['package'].update(size=len(raw),sha256=hashlib.sha256(raw).hexdigest())
-    requests=[]
-    def server(request):
-        requests.append(request)
-        offset=int(request.headers['Range'].split('=')[1].split('-')[0])
-        return httpx.Response(206,content=raw[offset:],headers={'Content-Range':f'bytes {offset}-{len(raw)-1}/{len(raw)}'})
-    def factory(**kw):return httpx.Client(transport=httpx.MockTransport(server),**kw)
-    package=PackageInstaller(manifest,root/'package',client_factory=factory)
-    check=lambda:None;progress=lambda *a:None
-    installed=package.deploy(check,progress)
-    assert len(requests)==1 and (installed/'node.exe').read_bytes()==b'MZ-fixture'
-    package.deploy(check,progress);assert len(requests)==1
-    (installed/'index.mjs').write_text('changed')
-    rejected('installed_hash_mismatch',lambda:package.deploy(check,progress))
-    # Resume from bytes, cache always rehashed; corrupted cache never accepted.
-    another=PackageInstaller(manifest,root/'resumed',client_factory=factory)
-    partial=another.directory/'downloads'/(manifest['package']['sha256']+'.partial')
-    partial.parent.mkdir(parents=True);partial.write_bytes(raw[:100])
-    assert another.download(check,progress).read_bytes()==raw and requests[-1].headers['Range']=='bytes=100-'
-    third=PackageInstaller(manifest,root/'complete-partial',client_factory=factory)
-    part=third.directory/'downloads'/partial.name;part.parent.mkdir(parents=True);part.write_bytes(raw)
-    before=len(requests);third.download(check,progress);assert len(requests)==before
-    final=another.directory/'downloads'/(manifest['package']['sha256']+'.zip');final.write_bytes(b'bad')
-    rejected('cache_hash_mismatch',lambda:another.download(check,progress))
-    counter=[0]
-    def cancel():
-        counter[0]+=1
-        if counter[0]>1:raise ManagedError('cancelled','fixture')
-    cancelling=PackageInstaller(manifest,root/'cancelled',client_factory=factory)
-    rejected('cancelled',lambda:cancelling.deploy(cancel,progress))
-    assert not (cancelling.directory/'runtime').exists()
-    for n,extra in enumerate([{'../escape':'x'},{'C:/outside':'x'},{'foo\\bar':'x'},{'NUL.txt':'x'},{'INDEX.MJS':'x'}]):
-        bad=archive(extra);m=copy.deepcopy(manifest);m['package'].update(sha256=hashlib.sha256(bad).hexdigest(),size=len(bad))
-        p=root/f'bad{n}.zip';p.write_bytes(bad)
-        rejected('archive_path',lambda:PackageInstaller(m,root/f'bad{n}').extract(p,root/f'unpack{n}',check))
-    wrong=archive(version='9.9.9');m=copy.deepcopy(manifest);m['package']['sha256']=hashlib.sha256(wrong).hexdigest();p=root/'wrong.zip';p.write_bytes(wrong)
-    rejected('version_mismatch',lambda:PackageInstaller(m,root/'version').extract(p,root/'wrong-version',check))
-    def bad_net(request):raise httpx.ConnectError('fixture secret omitted')
-    net=PackageInstaller(manifest,root/'network',client_factory=lambda **kw:httpx.Client(transport=httpx.MockTransport(bad_net),**kw))
-    rejected('download_network',lambda:net.download(check,progress))
-    m=copy.deepcopy(manifest);m['package']['url']='https://untrusted.invalid/zip'
-    rejected('source_rejected',lambda:PackageInstaller(m,root/'source').download(check,progress))
-    print('PASS synthetic package: pinned hash, cache recheck, partial/complete resume, cancellation, corrupt cache, paths, wrong version, no network fallback')
+def local_folder_checks(root):
+    manifest=fixture_manifest()
+    installer=LocalInstallation(manifest,root/'app/data/snowluma-managed')
+    rejected('folder_required',lambda:installer.inspect('relative/path'))
+    rejected('folder_missing',lambda:installer.inspect(str(root/'absent')))
+    folder=fixture_folder(root/'user-supplied',manifest)
+    before={p.name:p.read_bytes() for p in folder.iterdir()}
+    receipt=installer.inspect(str(folder))
+    assert receipt['mode']=='local' and not (folder/'config').exists()
+    assert before=={p.name:p.read_bytes() for p in folder.iterdir()}
+    (folder/'config').mkdir();(folder/'config/runtime.json').write_text('{"webuiPort": 5099}')
+    with installer.acquire(receipt,'instance',lambda:None) as selected:
+        assert selected==folder and (folder/'config/tulpa-owner.json').is_file()
+        other=LocalInstallation(manifest,root/'other/data/snowluma-managed')
+        rejected('owned_elsewhere',lambda:other.inspect(str(folder)))
+        rejected('busy',lambda:installer.acquire(receipt,'instance',lambda:None).__enter__())
+        backup=installer.directory/'local-config-backup/instance/runtime.json'
+        assert backup.read_bytes()==(folder/'config/runtime.json').read_bytes()
+    assert installer.verify(receipt)==folder
+    (folder/'index.mjs').write_text('// changed')
+    rejected('installation_changed',lambda:installer.verify(receipt))
+    (folder/'EULA.md').write_text('changed terms')
+    rejected('terms_changed',lambda:installer.inspect(str(folder)))
+    external=fixture_folder(root/'external',manifest);(external/'config').mkdir()
+    auth=external/'config/webui.json';auth.write_text('{"fixture":"existing admin auth, do not touch"}')
+    value=auth.read_bytes();assert installer.inspect(str(external))['mode']=='existing' and auth.read_bytes()==value
+    newer=fixture_folder(root/'newer',manifest)
+    (newer/'package.json').write_text('{"name":"@snowluma/runtime","version":"9.9.9"}')
+    rejected('unsupported_version',lambda:installer.inspect(str(newer)))
+    lite=fixture_folder(root/'lite',manifest);(lite/'node.exe').unlink()
+    rejected('package_incomplete',lambda:installer.inspect(str(lite)))
+    if os.name=='nt':
+        import subprocess
+        link=root/'linked'
+        result=subprocess.run(['powershell.exe','-NoProfile','-Command',
+            'New-Item -ItemType Junction -Path '+repr(str(link))+' -Target '+repr(str(external))],capture_output=True)
+        assert result.returncode==0
+        try:rejected('unsafe_path',lambda:installer.inspect(str(link)))
+        finally:link.rmdir()
+    assert not any(p.name=='downloads' for p in root.rglob('*'))
+    print('PASS local folder: read-only inspection, consent resource hash, in-place ownership/lock/backup, independent password preservation, changed files/terms, missing runtime, wrong version, junction rejection; downloads=0')
 
 
 def adapter_checks():
@@ -198,20 +205,20 @@ def adapter_checks():
 
 def lifecycle_checks(root):
     locked=ManagedSnowLuma(root/'locked');fingerprint=consent_key(locked.manifest)
-    rejected('consent_required',lambda:locked.begin(dict(accepted=False,fingerprint=fingerprint)))
-    rejected('upstream_permission_required',lambda:locked.begin(dict(accepted=True,fingerprint=fingerprint)))
+    rejected('consent_required',lambda:locked.begin(dict(accepted=False,fingerprint=fingerprint,selection_id='absent')))
+    rejected('selection_expired',lambda:locked.begin(dict(accepted=True,fingerprint=fingerprint,selection_id='absent')))
     assert not locked.directory.exists()
-    manifest=copy.deepcopy(load_manifest());manifest['automation_authorized']=True  # In-memory synthetic adapter only.
+    manifest=fixture_manifest()
     runtime=Runtime();api=API(runtime);receivers=[];invalid=[]
     def probe(http,ws,account,check):
         check();r=Receiver(account);receivers.append(r);return r
     instances=[]
     def new(where):
         result=ManagedSnowLuma(where,manifest=manifest,runtime=runtime,api_factory=lambda _:api,
-            installer_factory=Installer,vault_factory=Vault,probe=probe,poll_seconds=.04,on_invalidated=lambda:invalid.append(1))
+            installer_factory=Installer,vault_factory=Vault,probe=probe,poll_seconds=.04,on_invalidated=lambda:invalid.append(1),auto_select_single=False)
         instances.append(result);return result
     service=new(root/'Tulpa');key=str(service.root.resolve()).casefold();_registry[key]=service
-    body=dict(accepted=True,fingerprint=consent_key(manifest))
+    body=accept(service)
     try:
         service.begin(body);s=wait(service,'choosing');assert len(s['choices'])==1
         assert service.begin(body)['already_started']
@@ -221,7 +228,7 @@ def lifecycle_checks(root):
         config=service.connection('http');marker=config['_managed'];service.guard(marker)
         public=json.dumps(service.status());assert all(secret not in public for secret in service.vault.read().values())
         assert not (service.root/'.env').exists()
-        peer=new(service.root);peer.begin(body);time.sleep(.1)
+        peer=new(service.root);peer.begin(accept(peer));time.sleep(.1)
         assert runtime.spawns==1,(runtime.spawns,service.state(),api.calls)
         # Broken WS invalidates dependent sessions and restores only same identity.
         receivers[-1].state='disconnected';wait(service,'reconnecting');assert service.connection('http')['url']=='' and invalid
@@ -249,7 +256,7 @@ def lifecycle_checks(root):
         assert not restored.connection('http')['url']
         restored.use_external();assert restored.connection('http') is None
         # Two roots, multiple QQ, unknown account, no QQ, cancel/retry, stale choices.
-        runtime.qq.clear();api.loaded.clear();second=new(root/'OtherTulpa');second.begin(body);wait(second,'waiting_qq')
+        runtime.qq.clear();api.loaded.clear();second=new(root/'OtherTulpa');second.begin(accept(second));wait(second,'waiting_qq')
         runtime.qq[202]=dict(pid=202,created=200,executable='C:/Fixture/QQ.exe');api.accounts_by_pid[202]=''
         runtime.qq[303]=dict(pid=303,created=300,executable='C:/Fixture/QQ.exe');api.accounts_by_pid[303]='67890'
         s=wait(second,'choosing');assert len(s['choices'])==2 and s['choices'][0]['account_label']=='账号待验证'
@@ -259,23 +266,36 @@ def lifecycle_checks(root):
         second.close()
         # Existing external hooks are preserved; no download, attach, or stop.
         runtime.external_hooks={303};before=(Installer.calls,runtime.spawns,runtime.stops,list(api.calls))
-        blocked=new(root/'ExternalConflict');blocked.begin(body)
+        blocked=new(root/'ExternalConflict');blocked.begin(accept(blocked))
         end=time.monotonic()+3
         while blocked.status()['phase']!='error' and time.monotonic()<end:time.sleep(.02)
         assert blocked.status()['code']=='external_hook_present'
         assert before==(Installer.calls,runtime.spawns,runtime.stops,api.calls)
         blocked.close();runtime.external_hooks.clear()
-        # Browser routes cannot bypass the production license gate, leak keys,
+        # Browser routes cannot bypass explicit folder/consent selection, leak keys,
         # or accept writes from a foreign Origin/missing UI header.
         app=FastAPI();install_desktop_routes(app,root/'routes')
         with TestClient(app) as client:
-            s=client.get('/api/desktop/snowluma/managed').json();assert s['available'] is False
+            s=client.get('/api/desktop/snowluma/managed').json();assert s['available'] is True
             route='/api/desktop/snowluma/managed/start'
-            b=dict(accepted=True,fingerprint=s['consent_fingerprint'])
+            b=dict(accepted=True,fingerprint=s['consent_fingerprint'],selection_id='forged')
             assert client.post(route,json=b).status_code==403
             assert client.post(route,json=b,headers={'X-ChatWeave-UI':'1','Origin':'https://foreign.invalid'}).status_code==403
-            r=client.post(route,json=b,headers={'X-ChatWeave-UI':'1'}).json();assert r['code']=='upstream_permission_required'
-        print('PASS lifecycle fixtures: opt-in/license gate, atomic owner, duplicate start, unknown/no/multiple process identity, PID reuse, fixed account, WS loss, cancel/revoke, restart, no .env secrets, local-only routes')
+            r=client.post(route,json=b,headers={'X-ChatWeave-UI':'1'}).json();assert r['code']=='selection_expired'
+        # The default one-QQ flow proceeds without an extra process-picker step.
+        runtime.qq={101:dict(pid=101,created=400,executable='C:/Fixture/QQ.exe')};api.loaded.clear();api.accounts_by_pid[101]='12345'
+        automatic=new(root/'Automatic');automatic.auto_select_single=True
+        automatic.begin(accept(automatic));wait(automatic,'ready');automatic.cancel(revoke=True)
+        constrained=new(root/'GrantMismatch');constrained.auto_select_single=True
+        def mismatch(account):raise ManagedError('scope_mismatch','Fixture account is outside current grants')
+        constrained.check_account=mismatch;before=list(api.calls)
+        constrained.begin(accept(constrained))
+        end=time.monotonic()+3
+        while constrained.status()['phase']!='error' and time.monotonic()<end:time.sleep(.02)
+        assert constrained.status()['code']=='scope_mismatch'
+        assert not any(isinstance(c,tuple) and c[0] in ('load','configure') for c in api.calls[len(before):])
+        constrained.close()
+        print('PASS lifecycle fixtures: explicit local folder/consent, atomic owner, one-QQ automatic setup, duplicate start, unknown/no/multiple process identity, PID reuse, fixed account, WS loss, cancel/revoke, restart, no .env secrets, local-only routes')
     finally:
         for value in list(_registry.values()):
             if str(value.root).startswith(str(root)):value.close()
@@ -291,7 +311,7 @@ def main():
             vault.write(secret);assert vault.read()==secret and b'synthetic' not in vault.path.read_bytes()
             identity=process_identity(os.getpid());assert identity and identity['pid']==os.getpid()
             print('PASS Windows DPAPI roundtrip/current-process identity using synthetic local material')
-        package_checks(root);adapter_checks();lifecycle_checks(root)
+        local_folder_checks(root);adapter_checks();lifecycle_checks(root)
     print('PASS offline only; SnowLuma binary downloads=0, QQ injections=0, QQ writes=0, real-PC first-run=NOT RUN')
 
 

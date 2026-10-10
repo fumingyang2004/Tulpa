@@ -115,6 +115,10 @@ def install_desktop_routes(app,root=ROOT):
             service.tools.chat.stop_all(reason='QQ 托管连接或授权已失效')
             with service.tools.qq_lock:service.tools.qq_at=0
     managed.on_invalidated=invalidate_managed
+    def check_managed_account(account):
+        try:check_account_scope(getattr(app.state,'tulpa_mcp',None),account)
+        except SetupError as exc:raise ManagedError(exc.code,str(exc)) from None
+    managed.check_account=check_managed_account
     from contextlib import asynccontextmanager
     previous=app.router.lifespan_context
     @asynccontextmanager
@@ -136,7 +140,8 @@ def install_desktop_routes(app,root=ROOT):
     def managed_action(action:str,request:Request,body:dict):
         local(request,True)
         try:
-            if action=='start':result=managed.begin(body)
+            if action=='inspect' and set(body)=={'folder'}:result=managed.inspect(body['folder'])
+            elif action=='start':result=managed.begin(body)
             elif action=='select' and set(body)=={'choice_id'}:result=managed.select(body['choice_id'])
             elif action=='retry' and not body:result=managed.retry()
             elif action in ('cancel','revoke') and not body:result=managed.cancel(revoke=action=='revoke')

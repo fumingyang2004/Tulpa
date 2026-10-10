@@ -2,20 +2,14 @@
   "schema": 1,
   "version": "1.14.22",
   "source_commit": "87527cb7641a5a42f8f0efb73cb066102e004dee",
-  "adapter": "snowluma-1.14.22",
-  "automation_authorized": false,
-  "authorization_note": "EULA 5.4 requires upstream written permission for automated deployment. Not obtained; this build enables offline fixtures only.",
+  "adapter": "snowluma-local-1.14.22",
+  "mode": "user_selected_local_directory",
   "release_url": "https://github.com/SnowLuma/SnowLuma/releases/tag/v1.14.22",
-  "package": {
-    "url": "https://github.com/SnowLuma/SnowLuma/releases/download/v1.14.22/SnowLuma-v1.14.22-win-x64.zip",
-    "sha256": "c8076ba2fbcdc19afeb8e8bf9b2956eaab3605e5fa4618c4db702749ae501681",
-    "size": 37866010,
-    "required": ["index.mjs", "node.exe", "package.json", "LICENSE", "EULA.md", "PRIVACY.md"]
-  },
+  "required_files": ["index.mjs", "node.exe", "package.json", "LICENSE", "EULA.md", "PRIVACY.md"],
   "agreements": [
     {"id":"eula","title":"SnowLuma 使用细则","version":"1.1","file":"EULA.md","url":"https://github.com/SnowLuma/SnowLuma/blob/v1.14.22/EULA.md","sha256":"373c4f7c5d87da116fa4444ce45b3f41a0cf238ec4ee3f993a2123bfc945a5b6"},
     {"id":"privacy","title":"SnowLuma 隐私政策","file":"PRIVACY.md","url":"https://github.com/SnowLuma/SnowLuma/blob/v1.14.22/PRIVACY.md","sha256":"d36474445ce510e27e64fbe76609cc088c75b1dfa3dfb6c257241598749f08fd"}
   ],
-  "scope": ["download_official_full_runtime", "loopback_admin_http_ws", "manage_random_credentials", "bind_one_selected_qq_process", "resume_same_verified_account"],
+  "scope": ["configure_user_selected_directory_in_place", "backup_existing_config_before_write", "loopback_admin_http_ws", "manage_random_credentials", "bind_one_selected_qq_process", "resume_same_verified_account"],
   "compatibility": {"managed":["1.14.22"],"existing_import":["1.14.19","1.14.20","1.14.21","1.14.22"],"real_pc_verified":false}
 }
