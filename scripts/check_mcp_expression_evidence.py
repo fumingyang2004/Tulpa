@@ -5,7 +5,7 @@ import json,sqlite3,sys,tempfile
 sys.path.insert(0,str(Path(__file__).parent))
 from check_mcp_language_learning import ROOT,Clock,review_fixture,ground_fixture_rows
 from chatlocal.mcp_language_store import LanguageStore,LearningError
-from chatlocal.mcp_expression_evidence import VERSION
+from chatlocal.mcp_expression_evidence import VERSION,check_expression
 
 
 def main():
@@ -24,9 +24,11 @@ def main():
         def submit(task,result):
             nonlocal serial
             serial+=1;return s.submit(b,task['job_id'],task['lease'],'fixture-model-'+str(serial),result)
-        def denied(code,fn):
+        def denied(code,fn,field=None):
             try:fn()
-            except LearningError as e:assert e.code==code,(e.code,code)
+            except LearningError as e:
+                assert e.code==code,(e.code,code)
+                if field:assert e.field==field,(e.field,field)
             else:raise AssertionError('accepted '+code)
         for style in ['不打断，等话题自己告一段落','用短反问顶回去，不解释','可以调侃接住，也可以不接','不插手别人的指令，安静看着','保持沉默、不表态']:
             bad=deepcopy(valid);bad['expressions'][0]['style']=style
@@ -40,6 +42,15 @@ def main():
         for row in legacy['expressions']:
             for key in ('evidence_quote','surface_form','form_type'):del row[key]
         denied('expression_evidence_required',lambda:submit(t,legacy))
+        bad=deepcopy(valid);bad['expressions'][1]['surface_form']='{全部}'
+        denied('invalid_expression_form',lambda:submit(t,bad),'expressions[1].surface_form')
+        bad=deepcopy(valid);bad['expressions']=bad['expressions'][:1]
+        denied('invalid_expression_count',lambda:submit(t,bad),'expressions')
+        # Actual traffic exposed useful forms whose fixed part is one code point.
+        for quote,form in [('前端吗','{名词}吗'),('嗯','嗯'),('🧐🧐🧐','🧐{重复}'),('🧐','🧐')]:
+            single=dict(situation='合成场景',style='群友使用原话中的简短语言形式',source_id='fixture',
+                        evidence_quote=quote,surface_form=form,form_type='wording')
+            check_expression(single,{'fixture':dict(source='PEER',text=quote)},LearningError)
         assert s.status(b)['expression_count']==0
         submit(t,valid);review=s.claim(b,'fixture-context');good=review_fixture(review)
         for reason in ('符合小鲸鱼人格','这是本轮实际做法','机器人应该这样回应'):
@@ -47,7 +58,9 @@ def main():
         bad=deepcopy(good);bad['reviews'][0]['checks']['source_supported']=False
         denied('expression_review_unsupported',lambda:submit(review,bad))
         bad=deepcopy(good);bad['reviews'][0]['evidence_quote']='替换来源'
-        denied('expression_quote_mismatch',lambda:submit(review,bad))
+        denied('expression_quote_mismatch',lambda:submit(review,bad),'reviews[0].evidence_quote')
+        bad=deepcopy(good);bad['reviews'].reverse();bad['reviews'][0]['evidence_quote']='替换来源'
+        denied('expression_quote_mismatch',lambda:submit(review,bad),'reviews[0].evidence_quote')
         out=submit(review,good);assert out['state']=='completed'
         assert submit(review,good)['state']=='already_completed'
         state=s.status(b,records=True);assert state['library']['checked_expressions']==3
@@ -65,7 +78,7 @@ def main():
         s=LanguageStore(path,clock=clock);assert len(list(Path(tmp).glob('*.before-peer-evidence-*.sqlite3')))==1
         assert s.status(b)['expression_count']==4
         print(json.dumps(dict(status='passed',source='synthetic',policy_regressions=5,evidence_contract=VERSION,
-            legitimate_forms=3,duplicate_count=1,legacy_preserved=True,legacy_excluded=True,qq_writes=0,model_calls=0)))
+            legitimate_forms=3,one_character_forms=4,field_locations=True,duplicate_count=1,legacy_preserved=True,legacy_excluded=True,qq_writes=0,model_calls=0)))
 
 
 if __name__=='__main__':main()

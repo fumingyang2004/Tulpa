@@ -34,8 +34,9 @@ def uid(): return uuid.uuid4().hex
 
 
 class LearningError(ValueError):
-    def __init__(self, code):
+    def __init__(self, code, *, field=None):
         self.code = code
+        self.field = field
         super().__init__(code)
 
 
@@ -366,10 +367,14 @@ class LanguageStore:
         if stage=='extract':
             if set(result)!={'expressions','jargon'}:raise LearningError('invalid_result')
             exp,words=result['expressions'],result['jargon']
-            if not isinstance(exp,list) or (len(exp)!=0 and not 3<=len(exp)<=5) or not isinstance(words,list) or len(words)>30:raise LearningError('invalid_result')
+            if not isinstance(exp,list) or (len(exp)!=0 and not 3<=len(exp)<=5):raise LearningError('invalid_expression_count',field='expressions')
+            if not isinstance(words,list) or len(words)>30:raise LearningError('invalid_result',field='jargon')
             sources={m['source_id']:m for m in material['messages']}
-            for item in exp:
-                evidence.check_expression(item,sources,LearningError)
+            for index,item in enumerate(exp):
+                try:evidence.check_expression(item,sources,LearningError)
+                except LearningError as exc:
+                    exc.field=f'expressions[{index}]'+('.'+exc.field if exc.field else '')
+                    raise
             for item in words:
                 if not isinstance(item,dict) or set(item)!={'term','source_id'}:raise LearningError('invalid_result')
                 term=text(item['term'],40)
@@ -379,9 +384,12 @@ class LanguageStore:
             count=len(material['expressions'])
             if set(result)!={'reviews'} or not isinstance(result['reviews'],list) or len(result['reviews'])!=count:raise LearningError('invalid_result')
             indexes=set()
-            for review in result['reviews']:
+            for position,review in enumerate(result['reviews']):
                 if not isinstance(review,dict) or type(review.get('index')) is not int or not 0<=review['index']<count:raise LearningError('invalid_result')
-                evidence.check_review(review,material['expressions'][review['index']],LearningError)
+                try:evidence.check_review(review,material['expressions'][review['index']],LearningError)
+                except LearningError as exc:
+                    exc.field=f'reviews[{position}]'+('.'+exc.field if exc.field else '')
+                    raise
                 indexes.add(review['index'])
             if indexes!=set(range(count)):raise LearningError('invalid_result')
         elif stage in ('with_context','without_context'):

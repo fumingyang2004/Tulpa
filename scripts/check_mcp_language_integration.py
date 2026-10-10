@@ -96,6 +96,10 @@ def main():
                             return read
                         ids=[m['source_id'] for m in t['material']['messages']]
                         result=dict(expressions=[expression_fixture(t['material']['messages'][i],'情境'+str(i),'抽象方式'+str(i)) for i in range(3)],jargon=[dict(term='云朵开机',source_id=ids[0])])
+                        bad=json.loads(json.dumps(result));bad['expressions'][1]['surface_form']='{全部内容}'
+                        error=submit(t,bad,'failed-field-check')
+                        assert error['field']=='expressions[1].surface_form' and error['error_code']=='invalid_expression_form'
+                        assert '全部内容' not in json.dumps(error,ensure_ascii=False)
                         assert submit(t,result,'actual-call-1')['state']=='stage_completed'
                         assert resume_wait()['event']=='learning_ready'
                         t=call('claim_chat_learning',session_id=sid,context_id='new-host-context')['task']

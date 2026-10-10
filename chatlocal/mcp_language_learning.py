@@ -44,7 +44,8 @@ ERRORS={
  'invalid_result':'结果字段、数量或长度不符合当前阶段要求。请按 result_schema 提交，不编造来源。',
  'expression_evidence_required':'表达须含 evidence_quote、surface_form、form_type。只观察群友实际说法，不总结自己的回应策略；按本阶段新协议提交。',
  'expression_quote_mismatch':'引用必须逐字来自指定群友原话，自检须复核同一引用；不能用自己的回复或另一个来源补足。',
- 'invalid_expression_form':'语言形式须选允许的 form_type，surface_form 固定部分至少2字符，变量用至多3个{槽位}。',
+ 'invalid_expression_count':'expressions 只能为空数组，或包含3–5条有充分原话依据的表达；不能为凑数编造。',
+ 'invalid_expression_form':'form_type 仅允许 wording/sentence_pattern/punctuation/wordplay；surface_form 至少含1个原文可见固定字符，可含至多3个{槽位}。',
  'expression_form_mismatch':'所提取形式在引用原话中不存在。只能保留原话可见的固定部分，不能编造群友用法。',
  'expression_private_detail':'可复用形式含网址、长数字或邮箱等具体信息，应抽象为槽位或拒绝该条。',
  'expression_is_policy':'这是应对/沉默/工具策略或机器人命令，不是群友可观察的语言形式，不能作为表达学习入库。',
@@ -347,4 +348,6 @@ class ChatLearning:
                     return result
                 raise LearningError('unknown_learning_tool')
         except LearningError as exc:
-            return dict(state='rejected',error_code=exc.code,note=ERRORS.get(exc.code,'学习操作不可用；正常聊天可继续。'),automatic_retry=False)
+            result=dict(state='rejected',error_code=exc.code,note=ERRORS.get(exc.code,'学习操作不可用；正常聊天可继续。'),automatic_retry=False)
+            if exc.field:result['field']=exc.field  # Schema path only; never echo private values.
+            return result
