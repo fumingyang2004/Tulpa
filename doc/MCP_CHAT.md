@@ -2,7 +2,7 @@
 
 仅作用于外部 Agent 的持续 QQ 群聊。完整版的 MCP 与轻量 MCP 使用相同实现；普通问答、帮我回复、记忆、关注卡和工作区不使用这些提示词。只依赖 SnowLuma 实时事件和独立的小型 MCP 缓存，不读大型历史数据库。
 
-当前开发版加入 [Planner / Replyer 与发送队列](MCP_CHAT_TURNS.md)：get/wait → plan_chat_reply → send_chat_reply。单条兼容发送也需计划；程序检查静默、相关新消息和气泡间中止。新增独立“小鲸鱼2号”（`little_whale_v2`），原卡保持不变。升级后重连 MCP，停止旧群聊并用新开始编号选择人物卡。
+0.5.5 加入 [Planner / Replyer 与发送队列](MCP_CHAT_TURNS.md)：get/wait → plan_chat_reply → send_chat_reply。单条兼容发送也需计划；程序检查静默、相关新消息和气泡间中止。新增独立“小鲸鱼2号”（`little_whale_v2`），保留原卡。升级后重连 MCP，停止旧群聊并用新开始编号选择人物卡。
 
 ## 使用
 
@@ -124,7 +124,7 @@ Agent 调用 `list_chat_personas`，得到最新的 `count`、`personas` 和 `wa
 
 `check_mcp_chat_targets.py` 用隔离 OneBot HTTP / WebSocket 与真实 MCP HTTP 验证纯文本兼容、原生引用和 @、目标校验、分页交付边界、回执/回传去重、停止/撤权竞争、幂等及 UNKNOWN；不向真实 QQ 群发送消息，不调用外部模型。可用 `--package <安装目录>` 在目标 release 的模块上运行。通过夹具不代表真实 QQ 的引用外观或隐式 @ 已实测。
 
-模型表现与实际宿主、人格修改和群聊语境有关。合成场景只能核对接话、等待、看图等工具选择，不能替代真实群聊的长期体验；发布验证记录见 [0.5.3 发布说明](releases/0.5.3.md)。
+模型表现与实际宿主、人格修改和群聊语境有关。合成场景只能核对接话、等待、看图等工具选择，不能替代真实群聊的长期体验；发布验证记录见 [0.5.5 发布说明](releases/0.5.5.md)。
 
 ## 消息表情回应
 

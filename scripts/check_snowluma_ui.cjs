@@ -118,7 +118,10 @@ function preview(multiple,httpOnly=false){
       await manual.locator('summary').click();await q('folder',prefix).fill('C:\\Fresh-draft');
       await page.setViewportSize({width:390,height:844});await screenshot('narrow');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
       assert.deepEqual(errors,[]);assert.ok(!requests.some(r=>Object.keys(r.body||{}).some(k=>k.endsWith('token'))&&r.path.includes('snowluma')));
-      await page.reload();await openMcp();assert.equal(await q('consent').isChecked(),false,'reload never carries a draft consent into a new context');
+      // Synthetic F5 has no browser default: navigation proves our page handler
+      // works even when the desktop disables its built-in browser accelerator.
+      await Promise.all([page.waitForEvent('load'),page.evaluate(()=>document.dispatchEvent(new KeyboardEvent('keydown',{key:'F5',cancelable:true})))]);
+      await openMcp();assert.equal(await q('consent').isChecked(),false,'reload never carries a draft consent into a new context');
       await page.close();
     }
     console.log('PASS full/lite actual MCP + settings entrances: path -> consent -> one click; no separate load; native picker no side effect; shared path/consent/result/selections; concurrent dedup; terms/path invalidation; existing import, multi-account and HTTP-only choices, failures and UNKNOWN retention; advanced manual save; 390px. All APIs mocked; real QQ writes=0.');

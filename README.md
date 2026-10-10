@@ -18,7 +18,9 @@ Tulpa 在本机整理聊天、图片和文件，让 Agent 按你授权的范围�
 
 > 先列出可用人格和允许的 QQ 群，核对“我的测试群”后，用小鲸鱼持续聊天，直到我停止。接得上话再说，不必每条都回复。
 
-随包提供小鲸鱼（`little_whale`）和龙娘（`dragon_girl`，测试版），也能用 Markdown 写自己的角色。支持按语境接话、原生 @ 与引用；授权后可看图、发送和收藏表情，保留理解笔记供后续会话选用。
+随包提供小鲸鱼（`little_whale`）、小鲸鱼2号（`little_whale_v2`）和龙娘（`dragon_girl`，测试版），也能用 Markdown 写自己的角色。支持按语境接话、原生 @ 与引用；授权后可看图、发送和收藏表情、给消息贴表情回应，保留理解笔记供后续会话选用。
+
+持续聊天会在当前已授权的机器人账号和群里积累群友表达与黑话，潜水时也能学习；同账号同群重开可接续积累。人物卡与学习参考分开，模型可以选择本轮不用。[聊天节奏](doc/MCP_CHAT_TURNS.md) · [实时学习](doc/MCP_LANGUAGE_LEARNING.md)
 
 人格卡只改变表达，不会替换底层模型；发言和表情使用由 Agent 决定。详见 [人格教程](doc/MCP_CHAT.md)与[表情链路](doc/MCP_STICKERS.md)。
 
@@ -66,12 +68,12 @@ Tulpa 在本机整理聊天、图片和文件，让 Agent 按你授权的范围�
 
 ## 下载
 
-| 版本 | 适合你，如果你想… | v0.5.3 下载 |
+| 版本 | 适合你，如果你想… | v0.5.5 下载 |
 | --- | --- | --- |
-| **MCP 轻量版** | 使用已有 Agent 查资料或参与 QQ 群聊 | [约 94 MB](https://github.com/fumingyang2004/Tulpa/releases/download/v0.5.3/Tulpa-MCP-0.5.3-win-x64.zip) |
-| **完整版** | 在 Tulpa 内提问，使用回复、记忆和工作区；也能接外部 Agent | [约 907 MB](https://github.com/fumingyang2004/Tulpa/releases/download/v0.5.3/Tulpa-0.5.3-win-x64.zip) |
+| **MCP 轻量版** | 使用已有 Agent 查资料或参与 QQ 群聊 | [下载 ZIP](https://github.com/fumingyang2004/Tulpa/releases/download/v0.5.5/Tulpa-MCP-0.5.5-win-x64.zip) |
+| **完整版** | 在 Tulpa 内提问，使用回复、记忆和工作区；也能接外部 Agent | [下载 ZIP](https://github.com/fumingyang2004/Tulpa/releases/download/v0.5.5/Tulpa-0.5.5-win-x64.zip) |
 
-两版都有 Python 和相同的 MCP 能力。完整版内置 Harness、本地 OCR / 语音 / Office 解析与固定 WebView2；轻量版使用系统 WebView2 Evergreen Runtime，语音模型按需安装。[版本区别](doc/MCP_LITE.md) · [最新发布](https://github.com/fumingyang2004/Tulpa/releases/latest) · [0.5.3 更新说明](doc/releases/0.5.3.md)
+两版都有 Python 和相同的 MCP 能力。完整版内置 Harness、本地 OCR / 语音 / Office 解析与固定 WebView2；轻量版使用系统 WebView2 Evergreen Runtime，语音模型按需安装。[版本区别](doc/MCP_LITE.md) · [最新发布](https://github.com/fumingyang2004/Tulpa/releases/latest) · [0.5.5 更新说明](doc/releases/0.5.5.md)
 
 需要 **.NET Framework 4.8**。下载 ZIP 后完整解压到可写目录，打开 `Tulpa/Tulpa.exe`；不要从压缩包直接运行。**`Source code` 不是安装包，两版不要混装。** QQ / 微信客户端、模型服务及可选 OneBot 服务需自行准备。
 

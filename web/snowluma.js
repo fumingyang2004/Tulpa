@@ -208,4 +208,13 @@
     return {refresh,reset(){render();void refresh();},destroy(){dead=true;views.delete(view);if(nativePicker)window.chrome.webview.removeEventListener?.('message',picked);if(!views.size){clearInterval(timer);timer=null;}}};
   }
   window.TulpaSnowLuma={mount,mountManaged:mount};
+  // The desktop shell disables browser accelerators. Handle only the explicit
+  // refresh key in the page; reloading the UI does not restart MCP or OneBot.
+  document.addEventListener('keydown',event=>{
+    if(!window.TULPA_FOLDER_PICKER||event.key!=='F5'||event.ctrlKey||event.altKey||event.metaKey)return;
+    event.preventDefault();
+    if(event.repeat)return;
+    if(draft.busy){draft.notice='连接配置正在进行，请等待操作结束后再刷新。';emit();return;}
+    window.location.reload();
+  });
 })();

@@ -28,7 +28,7 @@
 可让桌面壳连接已启动的开发服务：
 
 ```powershell
-.\release\0.5.3\Tulpa\Tulpa.exe --connect http://127.0.0.1:7860
+.\release\0.5.5\Tulpa\Tulpa.exe --connect http://127.0.0.1:7860
 ```
 
 连接模式仅允许本机 HTTP，关闭桌面窗口不会关闭外部开发服务。
@@ -44,13 +44,13 @@
 # 检查并提交源码后再构建
 .\.venv\Scripts\python.exe desktop/build.py
 .\.venv\Scripts\python.exe desktop/build.py --mcp-only
-.\.venv\Scripts\python.exe scripts/check_publication.py --archive release/Tulpa-0.5.3-win-x64.zip
-.\.venv\Scripts\python.exe scripts/check_publication.py --archive release/Tulpa-MCP-0.5.3-win-x64.zip
+.\.venv\Scripts\python.exe scripts/check_publication.py --archive release/Tulpa-0.5.5-win-x64.zip
+.\.venv\Scripts\python.exe scripts/check_publication.py --archive release/Tulpa-MCP-0.5.5-win-x64.zip
 ```
 
 OCR 初始化只下载固定依赖版本的默认模型。构建会校验三份 OCR 模型、语音模型、官方 Python / WebView2 / SQLite 下载的 SHA256，哈希不匹配时停止。
 
-输出：完整版 `release/0.5.3/Tulpa/`、`release/Tulpa-0.5.3-win-x64.zip`；轻量版 `release/0.5.3-mcp/Tulpa/`、`release/Tulpa-MCP-0.5.3-win-x64.zip`。`SHA256SUMS.txt` 包含已经构建且提交一致的两个包及 FFmpeg 源码归档。`--no-zip` 只生成目录；`--qa --no-zip` 用于本机测试构建，不可作为正式 Release。
+输出：完整版 `release/0.5.5/Tulpa/`、`release/Tulpa-0.5.5-win-x64.zip`；轻量版 `release/0.5.5-mcp/Tulpa/`、`release/Tulpa-MCP-0.5.5-win-x64.zip`。`SHA256SUMS.txt` 包含已经构建且提交一致的两个包及 FFmpeg 源码归档。`--no-zip` 只生成目录；`--qa --no-zip` 用于本机测试构建，不可作为正式 Release。
 
 构建使用固定组件、已跟踪脚本和文件清单，并用随包 Python 运行真实 HTTP MCP 隔离回归，检查协议依赖及范围控制。ZIP 根据本次清单逐项生成，禁止把使用过的程序目录整体压缩上传。`build-manifest.json` 记录版本、源码提交、依赖和文件列表。正式包不包含 QA 调试端点、用户配置、数据库、私人报告、旧预览包或 SnowLuma 服务。
 
