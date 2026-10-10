@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).parent))
 from check_mcp_reactions import ReactionBot,Events,ROOT
-from check_mcp_language_learning import Clock
+from check_mcp_language_learning import Clock,expression_fixture,review_fixture,ground_fixture_rows
 from chatlocal.store import Store
 from chatlocal.mcp_routes import install_mcp_routes
 from chatlocal.mcp_language_store import LanguageStore,LearningError
@@ -48,7 +48,11 @@ def migration():
         assert saved['jargon'][0]['manual'] and not saved['jargon'][0]['enabled']
         store.configure(b,enabled=True)
         assert not store.context(b,'nine',[],'')['candidates']
+        assert saved['library']['checked_expressions']==0 and saved['library']['pending_expressions']==9
+        ground_fixture_rows(store,scope)
+        assert not store.context(b,'nine-verified',[],'')['candidates']
         with store.db() as db:db.execute("INSERT INTO expressions(id,scope,situation,style,count,updated,independence) VALUES('tenth',?,'第十个','方式',2,1,'degraded')",(scope,))
+        ground_fixture_rows(store,scope)
         candidates=store.context(b,'ten',[],'')['candidates'];assert 0<len(candidates)<=10
         store.select(b,'ten',[e['id'] for e in candidates[:5]])
         for i in range(10):store.observe(b,dict(source_id=i,sent_at=clock(),text='合成材料',at=clock(),peer=True))
@@ -141,13 +145,13 @@ def main():
                     # Model works on one stage while a fresh message arrives.
                     receive(1,500)
                     ids=[m['source_id'] for m in t['material']['messages']]
-                    result=dict(expressions=[dict(situation='情境'+str(i),style='方式'+str(i),source_id=ids[i]) for i in range(3)],jargon=[dict(term='云朵开机',source_id=ids[0])])
+                    result=dict(expressions=[expression_fixture(t['material']['messages'][i],'情境'+str(i),'方式'+str(i)) for i in range(3)],jargon=[dict(term='云朵开机',source_id=ids[0])])
                     submitted=call('submit_chat_learning',**t['submit_call']['arguments'],invocation_id=key(),result=result)
                     assert call('claim_chat_learning',session_id=sid)['reason']=='return_to_wait'
                     packet=follow(submitted['next_call']);assert packet['event']=='messages'
                     link=silence(packet);wake=follow(link);assert wake['event']=='learning_ready'
                     t2=follow(wake['next_call'])['task'];assert t2['stage']=='review'
-                    checked=dict(reviews=[dict(index=i,accept=True,reason='合成来源支持') for i in range(3)])
+                    checked=review_fixture(t2)
                     final=call('submit_chat_learning',**t2['submit_call']['arguments'],invocation_id=key(),result=checked)
                     assert call('submit_chat_learning',**t2['submit_call']['arguments'],invocation_id=key(),result=checked)['state']=='already_completed'
                     assert final['state']=='completed';idle=follow(final['next_call']);assert idle['event']=='idle'

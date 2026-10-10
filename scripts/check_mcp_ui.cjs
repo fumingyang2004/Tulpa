@@ -133,7 +133,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     assert.deepEqual(requests[0].body.conversations,[['qq','111:group:444']]);
     // Display literal persona, preserve expanded details across polling, stop one/all.
     learning={enabled:true,independence:'degraded',library:{checked_expressions:4,known_jargon:0,observing_jargon:17,last_completed_at:null},run:{completed_batches:0,buffered:8},calls_last_hour:2,hourly_call_budget:20,expression_count:4,jargon_count:17,
-      expressions:[{id:'synthetic-expression',situation:'<img src=x onerror=alert(1)> 合成适用场景',style:'合成抽象表达方式；长文本自动换行。'.repeat(8),count:1,enabled:true,independence:'degraded'}],jargon:[{id:'synthetic-word',term:'云朵开机',meaning:'',enabled:true,is_jargon:false,count:1,independence:'degraded'}]};
+      expressions:[{id:'synthetic-expression',situation:'<img src=x onerror=alert(1)> 合成适用场景',style:'合成抽象表达方式；长文本自动换行。'.repeat(8),count:1,enabled:true,independence:'degraded',evidence_version:2,surface_form:'不然{对象}？'}],jargon:[{id:'synthetic-word',term:'云朵开机',meaning:'',enabled:true,is_jargon:false,count:1,independence:'degraded'}]};
     sessions=[{id:'fixture-chat',name:'测试群',connection_name:'qqmcp',persona_name:'小鲸鱼2号',active:true,state:'waiting_messages',persona:'<img src=x onerror=alert(1)> 自然聊天',participation:'natural',cursor:12}];
     await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-status','1 个');
     await page.locator('#mcp-settings').evaluate(e=>e.scrollTop=0);await shot('01-lurking-threshold');
@@ -145,6 +145,15 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     await learningDialog.getByText('正在加载学习记录…',{exact:true}).waitFor();await shot('09-loading');libraryDelay=false;
     await learningDialog.getByRole('button',{name:'停用此条'}).first().waitFor();assert.equal(await learningDialog.locator('img').count(),0);
     assert.equal(await learningDialog.getByRole('checkbox').count(),0); // Advanced controls are collapsed.
+    await learningDialog.getByText('可观察形式：不然{对象}？',{exact:true}).waitFor();
+    learning.library.pending_expressions=1;
+    learning.expressions.push({id:'legacy-expression',situation:'旧表达保留',style:'合成旧策略',enabled:true,count:2,independence:'degraded',evidence_version:0});
+    learning.expression_count=5;
+    await learningDialog.getByText('旧记录待复核 · 暂不用于聊天',{exact:true}).waitFor();
+    await learningDialog.getByText(/另有 1 条旧记录保留待复核/).waitFor();
+    await shot('11-peer-evidence-and-legacy');
+    learning.expressions.pop();learning.expression_count=4;learning.library.pending_expressions=0;
+    await learningDialog.getByText('旧记录待复核 · 暂不用于聊天',{exact:true}).waitFor({state:'hidden'});
     await shot('02-records');
     await learningDialog.getByRole('button',{name:'停用此条'}).first().click();await learningDialog.getByRole('button',{name:'启用此条'}).waitFor();
     await learningDialog.getByText('高级设置与检查详情',{exact:true}).click();

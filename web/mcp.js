@@ -174,7 +174,7 @@
     budgetSave.onclick=()=>change({hourly_calls:Number(budget.value)});
     async function load(force=false){if(loading)return;loading=true;try{
       const data=await api(query),lib=data.library;
-      summary.textContent=`表达：${thresholdText(lib)}。黑话：已掌握 ${lib.known_jargon}，待观察 ${lib.observing_jargon}。最近完成学习：${dateText(lib.last_completed_at)}。`;
+      summary.textContent=`表达：${thresholdText(lib)}。${lib.pending_expressions?`另有 ${lib.pending_expressions} 条旧记录保留待复核，暂不用于聊天。`:''}黑话：已掌握 ${lib.known_jargon}，待观察 ${lib.observing_jargon}。最近完成学习：${dateText(lib.last_completed_at)}。`;
       if(document.activeElement!==paused)paused.checked=!data.enabled;
       if(document.activeElement!==budget)budget.value=data.hourly_call_budget;
       technical.textContent=JSON.stringify({independence:data.independence,run:data.run,calls_last_hour:data.calls_last_hour,hourly_call_budget:data.hourly_call_budget,last_failure:data.last_failure},null,2);
@@ -187,7 +187,10 @@
         if(!(data[kind]||[]).length)section.append(node('p','还没有记录，聊天中会逐步积累。','mcp-muted'));
         for(const item of data[kind]||[]){
           const line=node('article','', 'mcp-learning-record');
-          if(kind==='expressions')line.append(node('h4',item.situation),node('p',item.style),node('small',item.enabled?'已通过检查':'已停用','mcp-muted'));
+          if(kind==='expressions'){
+            line.append(node('h4',item.situation),node('p',item.style),node('small',!item.enabled?'已停用':item.evidence_version===2?'群友表达 · 已通过自检':'旧记录待复核 · 暂不用于聊天','mcp-muted'));
+            if(item.evidence_version===2&&item.surface_form)line.append(node('p','可观察形式：'+item.surface_form,'mcp-muted'));
+          }
           else line.append(node('h4',item.term),node('p',item.meaning||'还需观察用法，暂不作为确定释义'),node('small',!item.enabled?'已停用':item.manual?'人工释义':item.is_jargon?'已掌握':'待观察','mcp-muted'));
           const toggle=node('button',item.enabled?'停用此条':'启用此条');toggle.type='button';toggle.onclick=()=>change({kind,id:item.id,enabled:!item.enabled});line.append(toggle);
           const details=node('details','');details.append(node('summary','检查详情'),node('p',`有效批次命中 ${item.count} · 上下文独立性 ${item.independence}`));
@@ -223,6 +226,7 @@
         if(lib){
           const stats=node('div','', 'mcp-learning-stats');
           stats.append(node('p','学习 · '+group.learning_state),node('p','表达 · '+thresholdText(lib)),node('p',`黑话 · 已掌握 ${lib.known_jargon} · 待观察 ${lib.observing_jargon}`));card.append(stats);
+          if(lib.pending_expressions)card.append(node('p',`${lib.pending_expressions} 条旧表达已保留，需重新核对群友原话，暂不参与回复。`,'mcp-muted'));
           card.append(node('p','本群最近完成学习：'+dateText(lib.last_completed_at),'mcp-muted'));
           if(group.active.length)card.append(node('p',`本次运行：已完成 ${learning.run.completed_batches} 批 · 正在积累 ${learning.run.buffered} 条新消息`,'mcp-muted'));
           else if(lib.checked_expressions||lib.known_jargon||lib.observing_jargon)card.append(node('p','重新开始会接续已有积累，不会清空记录。','mcp-muted'));

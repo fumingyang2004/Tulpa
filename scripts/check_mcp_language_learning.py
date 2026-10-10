@@ -17,6 +17,27 @@ class Clock:
     def advance(self, seconds): self.now += seconds
 
 
+def expression_fixture(message,situation,style):
+    quote=message['text'][:12].strip()
+    return dict(situation=situation,style=style,source_id=message['source_id'],
+                evidence_quote=quote,surface_form=quote,form_type='wording')
+
+
+def review_fixture(task,*,reject=(),reason='原文固定用词支持该表达的观察描述'):
+    from chatlocal.mcp_expression_evidence import CHECKS
+    return dict(reviews=[dict(index=i,accept=i not in reject,reason=reason,evidence_quote=e['evidence_quote'],
+                             checks={k:i not in reject for k in CHECKS}) for i,e in enumerate(task['material']['expressions'])])
+
+
+def ground_fixture_rows(store,scope):
+    """Explicit synthetic records for selection/count tests, never real data."""
+    from chatlocal.mcp_expression_evidence import VERSION
+    with store.db() as db:
+        db.execute('''INSERT OR IGNORE INTO expression_grounding
+                      SELECT scope,id,?,'wording','合成形式','fixture-batch','fixture-source','fixture-hash',updated
+                      FROM expressions WHERE scope=?''',(VERSION,scope))
+
+
 def main():
     from chatlocal.mcp_language_store import LanguageStore, LearningError
     assert Path(__import__('chatlocal.mcp_language_store',fromlist=['LanguageStore']).__file__).resolve()==ROOT/'chatlocal/mcp_language_store.py'
@@ -42,14 +63,14 @@ def main():
         rejected('invalid_learning_policy',lambda:LanguageStore(Path(tmp)/'bad.sqlite3',policy=['wrong']))
         def extraction(t,tag='base',words=True):
             ids=[m['source_id'] for m in t['material']['messages']]
-            return dict(expressions=[dict(situation=f'{tag} 情境 {i}',style=f'{tag} 抽象方式 {i}',source_id=ids[i]) for i in range(3)],
+            return dict(expressions=[expression_fixture(t['material']['messages'][i],f'{tag} 情境 {i}',f'{tag} 抽象方式 {i}') for i in range(3)],
                         jargon=[dict(term='云朵开机',source_id=ids[3])] if words else [])
         def finish(t,tag='base',b=None,accept=True):
             r=extraction(t,tag);submit(t,r,b)
             review=claim(b)
             assert review['stage']=='review'
             assert len(review['material']['messages'])>=10
-            return submit(review,dict(reviews=[dict(index=i,accept=accept,reason='合成来源确实支持可复用表达' if accept else '内容太具体') for i in range(3)]),b)
+            return submit(review,review_fixture(review,reject=() if accept else (0,1,2)),b)
         def batch(tag='base',b=None):
             clock.advance(31);add(10,tag+'-'+str(clock()),b)
             t=claim(b);assert t and t['stage']=='extract',t
@@ -71,7 +92,7 @@ def main():
         submit(task,valid,invocation='same-invocation')
         assert submit(task,valid)['state']=='already_completed'
         review=claim();assert review['stage']=='review'
-        reviews=dict(reviews=[dict(index=i,accept=i!=1,reason='真实依据可用' if i!=1 else '含具体身份不可用') for i in range(3)])
+        reviews=review_fixture(review,reject=(1,))
         rejected('separate_model_call_required',lambda:submit(review,reviews,invocation='same-invocation'))
         submit(review,reviews)
         assert submit(review,reviews)['state']=='already_completed'
@@ -86,7 +107,7 @@ def main():
         # Duplicate expressions and terms contribute only once per batch.
         add(10,'duplicates');task=claim();r=extraction(task)
         r['expressions']=[r['expressions'][0]]*3;r['jargon']*=3
-        submit(task,r);review=claim();submit(review,dict(reviews=[dict(index=i,accept=True,reason='supported') for i in range(3)]))
+        submit(task,r);review=claim();submit(review,review_fixture(review))
         data=store.status(binding,records=True)
         assert next(x for x in data['expressions'] if x['situation']=='base 情境 0')['count']==2
         assert data['jargon'][0]['count']==2
@@ -107,6 +128,8 @@ def main():
                                          (f'vector-{i}',scope,f'vector fixture {i}','abstract',clock(),'degraded'))
             db.execute('INSERT INTO expressions(id,scope,situation,style,count,updated,independence) VALUES(?,?,?,?,2,?,?)',
                        ('foreign-vector','qq:999:group:222','private sentinel','private sentinel',clock(),'degraded'))
+        ground_fixture_rows(store,scope)
+        ground_fixture_rows(store,'qq:999:group:222')
         vector=store.context(binding,'plan-large-vector',[],'intent',retriever=lambda s,q,k:['foreign-vector']+[f'vector-{i}' for i in range(60)])
         assert len(vector['candidates'])==50 and 'private sentinel' not in json.dumps(vector)
         began=time.perf_counter()

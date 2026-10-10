@@ -17,7 +17,7 @@ def schemas(tool):
         tool('get_chat_learning','查看本会话当前账号与群的学习状态和少量抽象条目。不能查询其他分区，不能启用学习。',
              dict(**common,records=dict(type='boolean')),['session_id']),
         tool('claim_chat_learning','wait_chat_messages 返回 learning_ready 时按 next_call 自动领取一个阶段。一次只做一个阶段，提交后必须回到 wait，潜水也继续循环。程序不调用模型。'
-             '当前 Agent 另一次模型调用完成该阶段，再 submit。每阶段不同 invocation_id。'
+             '当前 Agent 另一次模型调用完成该阶段，再 submit。每阶段不同 invocation_id。只学习群友实际用语，绝不能总结自己的回复或人格规则；严格逐字证据与语言形式校验。'
              '顺序上下文一律 degraded，不得假装独立；换账号/群必须新建 MCP 连接及宿主会话。',
              dict(**common,context_id=dict(type='string',minLength=8,maxLength=100,description='可省略，服务端使用本会话绑定的上下文标识。'),wake_id=dict(type='string',minLength=64,maxLength=64)),['session_id']),
         tool('submit_chat_learning','提交已领取阶段的结构化模型结果或一次失败。重试原 lease 和结果幂等；'
@@ -42,6 +42,14 @@ ERRORS={
  'separate_model_call_required':'提取、审核及释义阶段必须分别调用模型，不能复用 invocation_id。',
  'idempotency_conflict':'同一已完成请求不能换结果或换选择。',
  'invalid_result':'结果字段、数量或长度不符合当前阶段要求。请按 result_schema 提交，不编造来源。',
+ 'expression_evidence_required':'表达须含 evidence_quote、surface_form、form_type。只观察群友实际说法，不总结自己的回应策略；按本阶段新协议提交。',
+ 'expression_quote_mismatch':'引用必须逐字来自指定群友原话，自检须复核同一引用；不能用自己的回复或另一个来源补足。',
+ 'invalid_expression_form':'语言形式须选允许的 form_type，surface_form 固定部分至少2字符，变量用至多3个{槽位}。',
+ 'expression_form_mismatch':'所提取形式在引用原话中不存在。只能保留原话可见的固定部分，不能编造群友用法。',
+ 'expression_private_detail':'可复用形式含网址、长数字或邮箱等具体信息，应抽象为槽位或拒绝该条。',
+ 'expression_is_policy':'这是应对/沉默/工具策略或机器人命令，不是群友可观察的语言形式，不能作为表达学习入库。',
+ 'expression_review_required':'自检需 evidence_quote 及5项 checks，不能只给 accept=true 和泛泛理由。',
+ 'expression_review_unsupported':'接受理由必须来自群友语言证据，5项检查均成立；符合人格或本轮做法不能作为依据。',
  'selection_unavailable':'本轮学习候选已失效；补读和重规划，不复用旧分区候选。',
  'invalid_selection':'只能选择本计划候选中的 0–5 个不重复 ID。',
  'record_unavailable':'条目不属于当前作用域或不可用。',

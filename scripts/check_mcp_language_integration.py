@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).parent))
 from check_mcp_reactions import ReactionBot, Events, eventually, ROOT
+from check_mcp_language_learning import expression_fixture,review_fixture
 from chatlocal.store import Store
 from chatlocal.mcp_routes import install_mcp_routes
 from chatlocal.mcp_language_learning import TOOLS
@@ -94,12 +95,12 @@ def main():
                                 read=call('wait_chat_messages',session_id=sid,timeout_seconds=1,quiet_seconds=0,acknowledge_through_id=read['read_through_id'])
                             return read
                         ids=[m['source_id'] for m in t['material']['messages']]
-                        result=dict(expressions=[dict(situation='情境'+str(i),style='抽象方式'+str(i),source_id=ids[i]) for i in range(3)],jargon=[dict(term='云朵开机',source_id=ids[0])])
+                        result=dict(expressions=[expression_fixture(t['material']['messages'][i],'情境'+str(i),'抽象方式'+str(i)) for i in range(3)],jargon=[dict(term='云朵开机',source_id=ids[0])])
                         assert submit(t,result,'actual-call-1')['state']=='stage_completed'
                         assert resume_wait()['event']=='learning_ready'
                         t=call('claim_chat_learning',session_id=sid,context_id='new-host-context')['task']
                         assert t['stage']=='review'
-                        assert submit(t,dict(reviews=[dict(index=i,accept=True,reason='来源确实支持且可复用') for i in range(3)]),'actual-call-2')['state']=='completed'
+                        assert submit(t,review_fixture(t),'actual-call-2')['state']=='completed'
                         assert call('get_chat_learning',session_id=sid)['usable_expressions']==3
                     assert asyncio.run(wire(service,created['token'],sid))
                     # Server-authoritative binding: knowing another SID or
