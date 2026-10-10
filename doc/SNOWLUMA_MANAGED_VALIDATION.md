@@ -6,6 +6,8 @@
 
 自动初始化以官方 [v1.14.22](https://github.com/SnowLuma/SnowLuma/releases/tag/v1.14.22) / `87527cb7641a5a42f8f0efb73cb066102e004dee` 为准。复用官方 bootstrap 环境变量、login、agreements/record-consent、processes、单 PID load、账号 config API，不修改上游源码或绕过 gate。已有配置导入支持 v1.14.19–v1.14.22。
 
+运行包布局另按官方 `packages/core/vite.config.ts` 和 `.github/workflows/release.yml` 核对：检查 Windows QQ/WS/FFmpeg 原生组件及 EULA/PRIVACY，不把未由打包脚本复制的根目录 LICENSE 当作必需文件。仓库 `.gitattributes` 固定 Markdown 为 LF，保留协议精确哈希检查。
+
 ## 可重复命令
 
 ```powershell

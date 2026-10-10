@@ -5,7 +5,7 @@
   "adapter": "snowluma-local-1.14.22",
   "mode": "user_selected_local_directory",
   "release_url": "https://github.com/SnowLuma/SnowLuma/releases/tag/v1.14.22",
-  "required_files": ["index.mjs", "node.exe", "package.json", "LICENSE", "EULA.md", "PRIVACY.md"],
+  "required_files": ["index.mjs", "node.exe", "package.json", "EULA.md", "PRIVACY.md", "native/snowluma-win32-x64.dll", "native/snowluma-win32-x64.node", "native/websocket-win32-x64.node", "native/ffmpeg/ffmpegAddon.win32.x64.node"],
   "agreements": [
     {"id":"eula","title":"SnowLuma 使用细则","version":"1.1","file":"EULA.md","url":"https://github.com/SnowLuma/SnowLuma/blob/v1.14.22/EULA.md","sha256":"373c4f7c5d87da116fa4444ce45b3f41a0cf238ec4ee3f993a2123bfc945a5b6"},
     {"id":"privacy","title":"SnowLuma 隐私政策","file":"PRIVACY.md","url":"https://github.com/SnowLuma/SnowLuma/blob/v1.14.22/PRIVACY.md","sha256":"d36474445ce510e27e64fbe76609cc088c75b1dfa3dfb6c257241598749f08fd"}

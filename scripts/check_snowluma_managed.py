@@ -70,9 +70,13 @@ class Runtime:
 def fixture_folder(folder, manifest):
     folder.mkdir(parents=True,exist_ok=True)
     files={'package.json':json.dumps(dict(name='@snowluma/runtime',version=manifest['version'])),
-           'index.mjs':'// nonexecutable fixture','node.exe':b'MZ-fixture','fixture.node':b'fixture','LICENSE':'fixture'}
+           'index.mjs':'// nonexecutable fixture','node.exe':b'MZ-fixture'}
+    for name in manifest['required_files']:
+        if name.startswith('native/'):files[name]=b'nonexecutable-native-fixture'
     for doc in manifest['agreements']:files[doc['file']]=doc['id']
-    for name,value in files.items():(folder/name).write_bytes(value.encode() if isinstance(value,str) else value)
+    for name,value in files.items():
+        (folder/name).parent.mkdir(parents=True,exist_ok=True)
+        (folder/name).write_bytes(value.encode() if isinstance(value,str) else value)
     return folder
 
 
@@ -131,10 +135,11 @@ def local_folder_checks(root):
     rejected('folder_required',lambda:installer.inspect('relative/path'))
     rejected('folder_missing',lambda:installer.inspect(str(root/'absent')))
     folder=fixture_folder(root/'user-supplied',manifest)
-    before={p.name:p.read_bytes() for p in folder.iterdir()}
+    before={p.name:p.read_bytes() for p in folder.iterdir() if p.is_file()}
     receipt=installer.inspect(str(folder))
     assert receipt['mode']=='local' and not (folder/'config').exists()
-    assert before=={p.name:p.read_bytes() for p in folder.iterdir()}
+    assert before=={p.name:p.read_bytes() for p in folder.iterdir() if p.is_file()}
+    assert not (folder/'LICENSE').exists()  # Official v1.14.22 build copies EULA/PRIVACY, not this optional file.
     (folder/'config').mkdir();(folder/'config/runtime.json').write_text('{"webuiPort": 5099}')
     with installer.acquire(receipt,'instance',lambda:None) as selected:
         assert selected==folder and (folder/'config/tulpa-owner.json').is_file()
