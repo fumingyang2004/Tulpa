@@ -35,7 +35,7 @@
       <div id="desktop-snowluma"></div>
       <details id="desktop-onebot-manual"><summary>高级设置：手动配置连接</summary>
       <form id="desktop-onebot-form" autocomplete="off">
-        <p class="config-intro">这份配置同时用于 QQ 回复、群管理和已授权的 MCP 群资料读取。OneBot 服务须独立运行；本地聊天检索不依赖它。</p>
+        <p class="config-intro">这份连接用于实时群聊、QQ 回复、群管理和已授权的 MCP 群资料读取。本地聊天检索不受影响。</p>
         <label for="desktop-sender-url">本机 OneBot 地址</label><input id="desktop-sender-url" type="url" placeholder="http://127.0.0.1:3000" maxlength="2048">
         <label for="desktop-sender-token">访问 Token</label><input id="desktop-sender-token" type="password" autocomplete="new-password" maxlength="4096"><small>只保存在本机，不提供给外部 Agent。留空保留已存 Token。</small>
         <label for="desktop-events-url">实时事件地址 · 持续群聊</label><input id="desktop-events-url" type="url" placeholder="ws://127.0.0.1:3001" maxlength="2048"><small>在 SnowLuma 开启正向 WebSocket 服务。持续群聊从这里接收新消息，无需数据库实时读取。</small>

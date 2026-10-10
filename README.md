@@ -81,7 +81,7 @@ Tulpa 在本机整理聊天、图片和文件，让 Agent 按你授权的范围�
 
 ### SnowLuma 自动配置
 
-自行下载并解压 [SnowLuma v1.14.22 Windows x64 完整版](https://github.com/SnowLuma/SnowLuma/releases/tag/v1.14.22)，在 Tulpa 载入文件夹，勾选同意后点击 **同意并自动配置**。新目录自动初始化、选择空闲端口、配置 HTTP/WS 并核对 QQ；多 QQ 时选择目标即可，无需终端、手填 Token 或设置管理密码。
+自行下载并解压 [SnowLuma v1.14.22 Windows x64 完整版](https://github.com/SnowLuma/SnowLuma/releases/tag/v1.14.22)，在 Tulpa 输入文件夹路径，勾选授权，点击 **载入并配置**。文件检查和配置一次完成，已有连接自动检测并导入；新目录自动初始化、选择空闲端口、配置 HTTP/WS 并核对 QQ。多 QQ 时选择目标即可，无需终端、手填 Token 或设置管理密码。
 
 已有可用节点会自动检测并导入，保留原配置。Tulpa 不下载、复制或附带 SnowLuma，不扩大 MCP 授权。[操作与恢复](doc/SNOWLUMA_MANAGED.md) · [验证范围](doc/SNOWLUMA_MANAGED_VALIDATION.md)
 

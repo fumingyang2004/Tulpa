@@ -246,6 +246,7 @@ html .vision-toggle[aria-checked=true] .vision-dot {background:#fff}
 .snow-managed p { overflow-wrap: anywhere; }
 .snow-managed details { margin: .7rem 0; }
 .snow-managed-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .8rem 0; }
+.snow-managed .snow-managed-actions .primary-button { background: var(--ink, #171715); color: #fff; border-color: var(--ink, #171715); }
 .snow-managed progress { width: 100%; }
 .snow-managed small { display: block; margin-top: .6rem; }
 .snow-managed [id$="-diagnostics"] { white-space: pre-wrap; }

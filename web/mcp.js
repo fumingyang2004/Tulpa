@@ -64,7 +64,7 @@
       <p id="mcp-chat-status" role="status" aria-live="polite">正在读取群聊状态…</p><div id="mcp-chat-sessions"></div><p id="mcp-chat-error" class="mcp-warning" role="alert"></p>
     </div>`;
   document.body.append(dialog,chatDialog);
-  const managedQQ=window.TulpaSnowLuma?.mountManaged($('mcp-snowluma-managed'),{prefix:'mcp',onSaved:async()=>refresh()});
+  const managedQQ=window.TulpaSnowLuma?.mount($('mcp-snowluma-managed'),{prefix:'mcp',onSaved:async()=>refresh()});
   let current, credential=null, busy=false, createError='', platformsInitialized=false, selected = new Map(), page = 0, searchVersion = 0, searchTimer, chatTimer, chatRefreshing=false, liveGroups=null;
   async function api(path, method='GET', body) {
     let response,data;

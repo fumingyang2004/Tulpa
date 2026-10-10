@@ -6,8 +6,8 @@ Tulpa 使用你自行下载并解压的 SnowLuma。它不下载、安装、复�
 
 1. 从 [SnowLuma 官方 v1.14.22 页面](https://github.com/SnowLuma/SnowLuma/releases/tag/v1.14.22)自行下载 **Windows x64 完整版**（带 Node.js，文件名没有 lite），完整解压到自己选择的目录。
 2. 打开并登录 QQ，再打开 Tulpa。新解压的 SnowLuma **无需先运行 launcher.bat 或设置管理密码**。
-3. 在“连接外部 Agent → 准备资料 → 连接 QQ”选择 SnowLuma 文件夹；浏览器版粘贴绝对路径后点击“载入文件夹”。要选包含 `index.mjs`、`node.exe`、`package.json` 的目录，不是 QQ 目录或 `config` 子目录。
-4. 查看版本和协议，主动勾选 **同意 SnowLuma 使用细则，并自动配置和连接 QQ**，再点击 **同意并自动配置**。
+3. 在“连接外部 Agent → 准备资料 → 连接 QQ”输入或选择 SnowLuma 文件夹。要选包含 `index.mjs`、`node.exe`、`package.json` 的目录，不是 QQ 目录或 `config` 子目录。
+4. 查看协议，主动勾选 **同意 SnowLuma 使用细则，并自动配置和连接 QQ**，点击 **载入并配置**。检查文件、识别已有连接、检测并保存会连续完成，无需先点击另一个“载入”。这与“OneBot 与后台服务”是同一套设置，切换入口会保留当前路径和进度，不需要重复操作；多个账号或节点时才会要求选择。
 5. Tulpa 备份原配置，原地初始化所选运行包，生成管理密码及分别独立的 HTTP/WS Token，选择空闲本机端口，然后核对账号和实时事件。只有一个 QQ 进程时自动连接；多个进程时在 Tulpa 选择目标。如果尚未登录，在 QQ 完成必要扫码即可。
 6. 显示“QQ 已就绪”后，在外部 Agent 中使用原有 MCP 连接。无需填写模型 Key、端口、Token 或 SnowLuma 管理密码。
 

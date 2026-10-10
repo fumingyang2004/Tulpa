@@ -22,6 +22,7 @@ const shots=process.env.SNOWLUMA_UI_SCREENSHOTS;
         if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="stylesheet" href="/ui/desktop.css"><body><main style="max-width:780px;margin:24px auto;padding:20px"><h1>Tulpa · ${edition} 接入验收（模拟）</h1><div id="host"></div></main><script src="/ui/snowluma.js"></script><script>window.mounted=TulpaSnowLuma.mountManaged(document.getElementById('host'),{prefix:'fixture'});</script></body></html>`});
         if(url.pathname.startsWith('/ui/'))return route.fulfill({contentType:url.pathname.endsWith('.js')?'text/javascript':'text/css',body:fs.readFileSync(path.join(root,'web',path.basename(url.pathname)))});
         if(url.pathname==='/api/desktop/snowluma/managed')return reply(state);
+        if(url.pathname==='/api/desktop/status')return reply({settings:{sender_url:'http://127.0.0.1:3000',events_url:'ws://127.0.0.1:3001'}});
         assert.equal(request.method(),'POST');assert.equal(request.headers()['x-chatweave-ui'],'1');
         const action=url.pathname.split('/').pop(),body=request.postDataJSON();calls.push({action,body});
         if(action==='inspect')return reply({ok:true,mode:'local',folder:body.folder,version:manifest.version,selection_id:'local-choice',consent_fingerprint:'local-consent',message:'本地文件夹检查通过'});
@@ -36,10 +37,10 @@ const shots=process.env.SNOWLUMA_UI_SCREENSHOTS;
       async function refresh(){await page.evaluate(()=>window.mounted.refresh());}
       async function has(text){await page.waitForFunction(t=>document.getElementById('snow-managed-fixture-status').textContent.includes(t),text);}
       async function shot(name){if(shots){fs.mkdirSync(shots,{recursive:true});await page.screenshot({path:path.join(shots,edition+'-'+name+'.png'),fullPage:true});}}
-      await page.goto(origin);await has('请选择 SnowLuma 文件夹');assert.equal(await q('consent').isChecked(),false);assert.equal(await q('start').isEnabled(),false);await shot('select-folder');
-      await q('folder').fill('C:\\FixtureSnow');await q('inspect').click();await has('检查通过');await q('consent').check();
+      await page.goto(origin);assert.equal(await q('consent').isChecked(),false);assert.equal(await q('start').isEnabled(),false);await shot('select-folder');
+      await q('folder').fill('C:\\FixtureSnow');await q('consent').check();assert.equal(calls.length,0);
       await q('folder').fill('C:\\ChangedFixtureSnow');assert.equal(await q('consent').isChecked(),false);assert.equal(await q('start').isEnabled(),false);
-      await q('inspect').click();await has('检查通过');assert.equal(await q('start').isEnabled(),false);await shot('loaded-folder');
+      assert.equal(await q('start').isEnabled(),false);assert.equal(calls.length,0);await shot('entered-folder');
       await q('consent').check();await q('start').evaluate(e=>{e.click();e.click();});await has('后台启动');
       const starts=calls.filter(c=>c.action==='start');assert.equal(starts.length,1);assert.deepEqual(starts[0].body,{accepted:true,fingerprint:'local-consent',selection_id:'local-choice'});await shot('initializing');
       state={...state,phase:'choosing',phase_label:'选择 QQ',selection_required:true,choices:[{id:'choice-101',pid:101,path:'C:/QQ/QQ.exe',account_label:'12345'},{id:'choice-202',pid:202,path:'C:/QQ/QQ.exe',account_label:'账号待验证'}]};await refresh();await q('qq').selectOption('choice-202');await refresh();assert.equal(await q('qq').inputValue(),'choice-202');await shot('choose-qq');
@@ -48,7 +49,7 @@ const shots=process.env.SNOWLUMA_UI_SCREENSHOTS;
       state={...state,phase:'ready',phase_label:'QQ 已就绪',account:'12345',qq_ready:true,message:'管理认证与事件身份一致。'};await refresh();await shot('ready-mock');
       assert.equal(await q('consent').isChecked(),true);await q('revoke').click();await has('已撤销授权');assert.equal(calls.filter(c=>c.action==='revoke').length,1);
       state={...state,phase:'idle',phase_label:'等待重新同意',consent_fingerprint:'fixture-v2'};await refresh();assert.equal(await q('consent').isChecked(),false);assert.equal(await q('start').isEnabled(),false);
-      state={...state,phase:'error',enabled:true,has_consent:true,consent_current:false,code:'terms_changed'};await refresh();assert.equal(await q('revoke').isVisible(),true);await q('revoke').click();await has('已撤销授权');assert.equal(await q('inspect').isEnabled(),true);
+      state={...state,phase:'error',enabled:true,has_consent:true,consent_current:false,code:'terms_changed'};await refresh();assert.equal(await q('revoke').isVisible(),true);await q('revoke').click();await has('已撤销授权');assert.equal(await q('folder').isEnabled(),true);
       await page.setViewportSize({width:390,height:844});await shot('narrow');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
       assert.deepEqual(errors,[]);assert.ok(!(await page.locator('body').innerText()).includes('Bearer '));
       await page.close();
