@@ -33,7 +33,7 @@ def schema(tool):
     event=dict(type='integer',minimum=1,maximum=2**63-1)
     return [tool('plan_chat_reply',
         'Planner 阶段：根据 get/wait 返回的 input_batch.id，决定等待、沉默或参与，指定接谁的话和表达通道。'
-        '程序核对相关消息静默与新鲜度；READY 后同一个 Agent 才进入 Replyer。只写简短沟通意图，不写思维链、不发进群。',
+        '程序核对相关消息静默与新鲜度；READY 后按 next_call 先完成表达选择（有候选时可明确全不选），再进入 Replyer。只写简短沟通意图，不写思维链、不发进群。',
         dict(session_id=sid,idempotency_key=key,batch_id=sid,
              action=dict(type='string',enum=['wait','silence','reply']),
              target_event_id=event, topic_event_ids=dict(type='array',maxItems=5,uniqueItems=True,items=event),
@@ -44,6 +44,7 @@ def schema(tool):
         ['session_id','batch_id','action','intent']),
         tool('send_chat_reply',
         'Replyer 阶段：按 READY 计划一次提交 1–3 个语义气泡，不按标点机械拆句。'
+        '有学习候选的文字回复须先 select_chat_expressions，选 0–5 条；未选择会返回 expression_selection_required。'
         '程序串行发送、气泡间留间隔并重新检查相关新消息/停止/授权。STALE 需补读重规划，已发不撤回，旧尾部不续发；UNKNOWN 禁止重试。'
         '纯 reaction、纯表情包均可结束本轮，不必配文。',
         dict(session_id=sid,plan_id=sid,idempotency_key=key,
@@ -114,6 +115,8 @@ class ChatTurns:
             continuation['arguments']['minimum_wait_seconds']=delay
             result['recovery']=dict(action='wait',automatic_write_retry=False,
                 retry_after_seconds=delay,next_call=continuation)
+        elif exc.code=='expression_selection_required':
+            result['recovery']=dict(action='select_expressions',automatic_write_retry=False,next_call=exc.details['next_call'])
         else:
             result['recovery']=dict(action='fix_request_or_stop',automatic_write_retry=False)
         return result
@@ -186,6 +189,36 @@ class ChatTurns:
         if not r:raise TurnRejected('plan_missing','计划不属于当前会话，请补读并规划。')
         return dict(r)
 
+    def record_language_context(self,p,context):
+        """Audit prepared MCP reference material, never claim host prompt use.
+
+        Keep only IDs/counts/digests in the existing bounded turn receipt. Full
+        candidates remain in the short-lived learning store. No new raw chat log.
+        """
+        decision=context['expression_decision'];complete=context['selection_complete']
+        candidates=context.get('candidates',[]);selected=context.get('selected',[])
+        material={k:context.get(k,[]) for k in (('selected','jargon') if complete else ('candidates','jargon'))}
+        fingerprint=hashlib.sha256(dump(material).encode()).hexdigest()
+        with self.access.connect() as db:
+            row=db.execute('SELECT payload,state,queue_signature FROM chat_turn_plans WHERE id=? AND session_id=?',
+                           (p['id'],p['session_id'])).fetchone()
+            if not row:return
+            if row['state']!='READY' or row['queue_signature']:
+                p['payload']=row['payload'];return
+            payload=json.loads(row['payload']);old=payload.get('expression_selection',{})
+            audit=dict(state=decision['state'],reason=decision['reason'],candidate_ids=[x['id'] for x in candidates],
+                       selected_ids=[x['id'] for x in selected],jargon_ids=[x['id'] for x in context.get('jargon',[])],
+                       delivery='tool_result_prepared',host_injection='unverified',model_use='unverified')
+            if 'candidate_context' in old:audit['candidate_context']=old['candidate_context']
+            key='selected_context' if complete else 'candidate_context'
+            prior=old.get(key,{})
+            audit[key]=dict(sha256=fingerprint,chars=len(dump(material)),
+                            prepared_at=prior.get('prepared_at',time.time()) if prior.get('sha256')==fingerprint else time.time())
+            if old!=audit:
+                payload['expression_selection']=audit
+                db.execute('UPDATE chat_turn_plans SET payload=? WHERE id=?',(dump(payload),p['id']))
+            p['payload']=dump(payload)
+
     def public(self,p):
         data=json.loads(p['payload'])
         result=dict(plan_id=p['id'],state=p['state'],phase='REPLYING' if p['state']=='READY' else p['state'],
@@ -196,7 +229,12 @@ class ChatTurns:
             result['next_call']=dict(tool='send_chat_reply',arguments=dict(session_id=p['session_id'],plan_id=p['id']),requires=['bubbles'])
             if hasattr(self.chat,'learning'):
                 context=self.chat.learning.plan_context(p)
-                if context:result['learned_language']=context
+                if context:
+                    result['learned_language']=context
+                    if context.get('selection_required'):
+                        result['phase']='SELECTING_EXPRESSION'
+                        result['next']='先选择本轮表达参考，expression_ids=[] 表示明确不用；完成后再组织文字。'
+                        result['next_call']=context['select_call']
         elif p['state'] in ('WAITING','SILENT','SUCCEEDED'):
             result['next_call']=self.chat.continuation(p['session_id'],through=data['watermark'])
         else:
@@ -204,6 +242,8 @@ class ChatTurns:
             # write request. Reading the durable receipt is always the next step.
             result['recovery']=dict(action='inspect_result',automatic_write_retry=False,
                 next_call=dict(tool='get_chat_session',arguments=dict(session_id=p['session_id'])))
+        audit=json.loads(p['payload']).get('expression_selection')
+        if audit:result['expression_selection']=audit
         return result
 
     def save(self,p,state,queue=None,reason=''):
@@ -293,6 +333,9 @@ class ChatTurns:
                 expressions=expressions,intent=args['intent'],batch_id=batch['id'],watermark=batch['watermark'],
                 read_at=batch['created'],epoch=self.epoch,gap=batch['gap'],grant_id=grant['id'],
                 wait_seconds=args.get('wait_seconds',0),not_before=now+args.get('wait_seconds',0))
+            if args['action']!='reply':
+                data['expression_selection']=dict(state='not_applicable',reason='no_reply',delivery='none',
+                    candidate_ids=[],selected_ids=[],host_injection='unverified',model_use='unverified')
             candidate=dict(id=pid,session_id=sid,payload=dump(data),created=now)
             if args['action']=='reply':self.check(candidate,cancel,cooldown=True)
             state={'reply':'READY','wait':'WAITING','silence':'SILENT'}[args['action']]
@@ -332,6 +375,20 @@ class ChatTurns:
                 if kind=='reaction' and b['event_id']!=data['target_event_id']:raise TurnRejected('target_mismatch','回应目标与计划不一致。')
                 if kind=='text' and i and (b.get('quote') or b.get('mention_user_ids')):raise TurnRejected('repeated_addressing','同一轮仅首条按需引用或 @；改变目标需重新规划。')
             self.check(p,cancel,cooldown=True)
+            if any(b['kind']=='text' for b in bubbles) and hasattr(self.chat,'learning'):
+                prepared=self.public(p)
+                if prepared.get('learned_language',{}).get('selection_required'):
+                    raise TurnRejected('expression_selection_required','先明确选择本轮的 0–5 条表达参考；全不选也可以。尚未发送。',
+                        next_call=prepared['next_call'],learned_language=prepared['learned_language'])
+            elif 'text' in data['expressions']:
+                # A mixed plan may ultimately use only a sticker/reaction. Keep
+                # the evidence of material already offered, but do not demand a
+                # redundant selection or leave a successful turn marked pending.
+                data=json.loads(p['payload'])
+                if 'expression_selection' in data:
+                    data['expression_selection'].update(state='not_applicable',reason='non_text_output')
+                    p['payload']=dump(data)
+                    with self.access.connect() as db:db.execute('UPDATE chat_turn_plans SET payload=? WHERE id=?',(p['payload'],p['id']))
             queue=[dict(index=i,expression=b,state='PENDING') for i,b in enumerate(bubbles)]
             with self.access.connect() as db:db.execute('UPDATE chat_turn_plans SET queue_signature=? WHERE id=?',(signature,p['id']))
             p=self.save(p,'SENDING',queue)

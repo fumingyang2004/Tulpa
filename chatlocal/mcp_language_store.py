@@ -17,14 +17,17 @@ import time
 import uuid
 
 from . import mcp_expression_evidence as evidence
+from .mcp_jargon_match import find_known_terms
 
 
 DEFAULTS = dict(window_messages=20, buffer_messages=40, interval_seconds=30,
                 evidence_seconds=86400, message_chars=800, material_chars=16000,
-                lease_seconds=120, hourly_calls=20, max_attempts=2, evidence_batches=100, retry_seconds=15)
+                lease_seconds=120, hourly_calls=20, max_attempts=2, evidence_batches=100, retry_seconds=15,
+                jargon_cache_terms=50)
 RANGES = dict(window_messages=(10,50), buffer_messages=(20,200), interval_seconds=(30,600),
               evidence_seconds=(300,86400), message_chars=(100,1200), material_chars=(8000,24000),
-              lease_seconds=(30,600), hourly_calls=(2,100), max_attempts=(1,3), evidence_batches=(20,500), retry_seconds=(2,300))
+              lease_seconds=(30,600), hourly_calls=(2,100), max_attempts=(1,3), evidence_batches=(20,500), retry_seconds=(2,300),
+              jargon_cache_terms=(0,200))
 THRESHOLDS = (4,8,25,100)
 
 
@@ -110,6 +113,7 @@ class LanguageStore:
                     UNIQUE(scope,folded));
                 CREATE TABLE IF NOT EXISTS jargon_hits(scope TEXT, item_id TEXT, batch_id TEXT, source_id TEXT,
                     PRIMARY KEY(scope,item_id,batch_id));
+                CREATE INDEX IF NOT EXISTS jargon_recent ON jargon(scope,enabled,manual,updated DESC,id);
                 CREATE TABLE IF NOT EXISTS jargon_evidence(scope TEXT, item_id TEXT, batch_id TEXT, expires REAL,
                     body TEXT, PRIMARY KEY(scope,item_id,batch_id));
                 CREATE TABLE IF NOT EXISTS selections(id TEXT PRIMARY KEY, scope TEXT, gid TEXT, sid TEXT, epoch TEXT,
@@ -428,16 +432,19 @@ class LanguageStore:
             self._validate_result(db,job,result)
             db.execute('INSERT INTO stages VALUES(?,?,?,?,?,?,?)',(job_id,job['stage'],lease,dump(result),signature,invocation,self.clock()))
             stage=job['stage'];next_stage={'extract':'review','with_context':'without_context','without_context':'compare'}.get(stage)
+            observation=None
             if stage=='extract' and not result['expressions']:
-                self._apply_batch(db,b,job,dict(reviews=[]));next_stage=None
-            elif stage=='review':self._apply_batch(db,b,job,result)
+                observation=self._apply_batch(db,b,job,dict(reviews=[]));next_stage=None
+            elif stage=='review':observation=self._apply_batch(db,b,job,result)
             elif stage=='compare':self._apply_jargon(db,b,job,result)
             db.execute('UPDATE jobs SET state=?,stage=?,lease=?,attempts=0,failure=?,retry_at=0,wake_version=wake_version+1 WHERE id=?',
                        ('pending' if next_stage else 'completed',next_stage or stage,'','',job_id))
             db.execute('UPDATE settings SET failure=?,last_learned=CASE WHEN ? THEN ? ELSE last_learned END WHERE scope=? AND gid=?',
                        ('',not next_stage,self.clock(),b['scope'],b['gid']))
             if not next_stage:db.execute('UPDATE language_libraries SET last_learned=? WHERE scope=?',(self.clock(),b['scope']))
-            return dict(state='stage_completed' if next_stage else 'completed',next_stage=next_stage,independence='degraded')
+            reply=dict(state='stage_completed' if next_stage else 'completed',next_stage=next_stage,independence='degraded')
+            if observation is not None:reply['jargon_observation']=observation
+            return reply
 
     def _apply_batch(self,db,b,job,result):
         extracted=self._prior(db,job['id'],'extract');bid=job['batch_id'];scope=b['scope'];now=self.clock()
@@ -454,15 +461,32 @@ class LanguageStore:
                        (scope,eid,evidence.VERSION,item['form_type'],item['surface_form'],bid,item['source_id'],digest(item['evidence_quote']),now))
             if db.execute('INSERT OR IGNORE INTO expression_hits VALUES(?,?,?,?)',(scope,eid,bid,item['source_id'])).rowcount:
                 db.execute('UPDATE expressions SET count=count+1,updated=? WHERE id=? AND scope=?',(now,eid,scope))
-        batch=db.execute('SELECT expires FROM batches WHERE id=?',(bid,)).fetchone()
-        for item in extracted['jargon']:
+        batch=db.execute('SELECT expires,evidence FROM batches WHERE id=?',(bid,)).fetchone()
+        # Same authorized, live peer batch that the model just processed. Never
+        # rescan history or use the model's wording as evidence. The small DB
+        # index restores recent terms across sessions/restarts without a full scan.
+        recent=[r['term'] for r in db.execute('''SELECT term FROM jargon
+            WHERE scope=? AND enabled=1 AND manual=0 ORDER BY updated DESC,id LIMIT ?''',
+            (scope,self.cfg['jargon_cache_terms']))]
+        words={x['term'].strip().casefold():x for x in extracted['jargon']}
+        cached=find_known_terms(recent,json.loads(batch['evidence']))
+        added=sum(x['term'].casefold() not in words for x in cached)
+        for item in cached:words.setdefault(item['term'].casefold(),item)
+        hits=0
+        for item in words.values():
             term=item['term'].strip();folded=term.casefold()
-            row=db.execute('SELECT id FROM jargon WHERE scope=? AND folded=?',(scope,folded)).fetchone();jid=row[0] if row else uid()
+            row=db.execute('SELECT id,enabled,manual FROM jargon WHERE scope=? AND folded=?',(scope,folded)).fetchone()
+            if row and (not row['enabled'] or row['manual']):continue
+            jid=row['id'] if row else uid()
             if not row:db.execute('INSERT INTO jargon(id,scope,term,folded,updated) VALUES(?,?,?,?,?)',(jid,scope,term,folded,now))
             if not db.execute('INSERT OR IGNORE INTO jargon_hits VALUES(?,?,?,?)',(scope,jid,bid,item['source_id'])).rowcount:continue
+            hits+=1
             db.execute('UPDATE jargon SET count=count+1,updated=? WHERE id=? AND scope=?',(now,jid,scope))
             db.execute('INSERT OR IGNORE INTO jargon_evidence VALUES(?,?,?,?,?)',(scope,jid,bid,batch['expires'],dump(dict(source_id=item['source_id']))))
             db.execute('DELETE FROM jargon_evidence WHERE scope=? AND item_id=? AND batch_id NOT IN (SELECT batch_id FROM jargon_evidence WHERE scope=? AND item_id=? ORDER BY expires DESC LIMIT 3)',(scope,jid,scope,jid))
+        return dict(model_terms=len({x['term'].strip().casefold() for x in extracted['jargon']}),
+                    cached_terms_checked=len(recent),cached_terms_matched=len(cached),
+                    supplemented_terms=added,new_batch_hits=hits)
 
     def _apply_jargon(self,db,b,job,result):
         meaning=self._prior(db,job['id'],'with_context')
@@ -517,7 +541,7 @@ class LanguageStore:
                 db.execute("UPDATE jargon SET meaning=?,is_jargon=1,manual=1,independence='manual',updated=? WHERE id=? AND scope=?",(meaning,self.clock(),item_id,b['scope']))
             db.execute('DELETE FROM selections WHERE scope=?',(b['scope'],))
 
-    def context(self,b,plan_id,peer_texts,intent,*,retriever=None):
+    def context(self,b,plan_id,peer_texts,intent,*,retriever=None,include_expressions=True):
         with self.db() as db:
             cfg=self._enabled(db,b)
             self._maintain(db,b)
@@ -526,9 +550,10 @@ class LanguageStore:
             if cached:return self._selection(cached)
             rows=[dict(r) for r in db.execute('''SELECT e.id,e.situation,e.style,e.count,g.form_type,g.surface_form FROM expressions e
                          JOIN expression_grounding g ON g.scope=e.scope AND g.item_id=e.id AND g.version=?
-                         WHERE e.scope=? AND e.enabled=1 ORDER BY e.updated DESC''',(evidence.VERSION,b['scope']))] if cfg['allow_degraded'] else []
+                         WHERE e.scope=? AND e.enabled=1 ORDER BY e.updated DESC''',(evidence.VERSION,b['scope']))] if cfg['allow_degraded'] and include_expressions else []
             candidates=[];method='insufficient_expressions'
-            if len(rows)>=10:
+            if not include_expressions:method='non_text_plan'
+            if include_expressions and len(rows)>=10:
                 if retriever:
                     try:
                         valid={r['id']:r for r in rows}
@@ -548,11 +573,16 @@ class LanguageStore:
                 if (r['manual'] or cfg['allow_degraded']) and r['term'].casefold() in haystack:matched.append(dict(r))
                 if len(matched)==10:break
             db.execute('INSERT INTO selections VALUES(?,?,?,?,?,?,?,?,?,?)',
-                       (plan_id,b['scope'],b['gid'],b['sid'],b['epoch'],self.clock()+120,dump(candidates),None,dump(matched),method))
-            return dict(candidates=candidates,selected=[],jargon=matched,method=method,independence='degraded',selection_complete=False)
+                       (plan_id,b['scope'],b['gid'],b['sid'],b['epoch'],self.clock()+120,dump(candidates),None if candidates else '[]',dump(matched),method))
+            return self._selection(db.execute('SELECT * FROM selections WHERE id=?',(plan_id,)).fetchone())
 
     def _selection(self,r):
-        return dict(candidates=json.loads(r['candidates']),selected=json.loads(r['selected'] or '[]'),jargon=json.loads(r['jargon']),method=r['method'],independence='degraded',selection_complete=r['selected'] is not None)
+        candidates=json.loads(r['candidates']);selected=json.loads(r['selected'] or '[]');complete=r['selected'] is not None
+        state='not_applicable' if not candidates else 'pending' if not complete else 'selected' if selected else 'none'
+        reason=r['method'] if not candidates else 'awaiting_choice' if not complete else 'model_choice' if selected else 'explicit_none'
+        return dict(candidates=candidates,selected=selected,jargon=json.loads(r['jargon']),method=r['method'],
+                    independence='degraded',selection_complete=complete,selection_required=not complete,
+                    expression_decision=dict(state=state,reason=reason))
 
     def select(self,b,plan_id,ids):
         with self.db() as db:
@@ -566,7 +596,7 @@ class LanguageStore:
             selected=[index[i] for i in ids]
             if row['selected'] is not None and json.loads(row['selected'])!=selected:raise LearningError('idempotency_conflict')
             db.execute('UPDATE selections SET selected=? WHERE id=?',(dump(selected),plan_id))
-            return dict(selected=selected,jargon=json.loads(row['jargon']),independence='degraded')
+            return self._selection(db.execute('SELECT * FROM selections WHERE id=?',(plan_id,)).fetchone())
 
 
 # Original task prompts, deliberately not copied from GPL-licensed upstream.

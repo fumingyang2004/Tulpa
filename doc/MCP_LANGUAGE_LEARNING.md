@@ -47,6 +47,10 @@
 
 黑话新候选 `is_jargon=false`、释义为空。命中批次累计到 **4、8、25、100** 时，另外需要 **3 次模型调用**：带上下文解释 → 仅词本身解释 → 比较。比较须有充分证据且意义不相同时才确认。一次计数跨多个里程碑时只推断当前计数一次；到 100 后结束自动推断。人工释义优先，进行中的自动结果也不能覆盖。
 
+黑话批次入账时，除模型提取的新词外，也用当前账号群最近 **50 个**启用、非人工词条匹配本批原始群友文本，补上模型漏提的已知候选。中文用子串，其他词用文字边界，大小写归一；例如 `cat` 不会因 `concatenate` 而命中。合并后每词每批最多增加一次计数，并保存本批可核对的来源编号。重试、并发重复提交、模型提取与程序同时匹配均不重复累计。停用或人工释义条目不继续自动累计。程序匹配不直接确认释义，也不增加模型调用。
+
+最近候选从已有作用域索引有界读取，重启或新授权核验通过后可继续补漏；不回读历史库，不读取别群/别账号原文，不用机器人和工具输出。只有合法学习批次完成入账时才执行补漏，提取失败不计数；有表达时仍先完成自检。返回的 `jargon_observation` 只报告模型词数、检查的缓存词数、补漏词数和新增批次命中数，不包含原文。`jargon_cache_terms` 可设为 0 关闭补漏，默认 50、最大 200。
+
 提取和审核工具领取/提交是不同阶段，要求不同 `invocation_id`；这可以阻止误复用调用编号，**不能从服务端证明模型真的推理了两次**。宿主应实际分次调用。本版没有可验证的隔离子模型适配器：即使 `without_context` 的本次材料只有词，顺序对话仍可能看过前文，因此全部自动结果标记为降级。不提供靠一个布尔参数就升级成“独立验证”的通道。
 
 默认每个账号群每小时最多领取 20 个阶段；创建新连接不会重置预算。每阶段最多 2 次尝试，重试至少等待 15 秒，lease 120 秒；每会话一个领取，全局最多三个。预算、lease 占用、重试冷却时 wait 保持等待，默认连续调用使用 180 秒有界长等待；到期返回 idle 后继续 wait，不做零任务忙循环。按默认等待约每分钟 0.33 次空闲调用，服务端本地时钟不产生模型调用。
@@ -60,7 +64,9 @@ READY 回复超过原发送 TTL 后不再阻塞学习领取；发送中的队列
 ## 回复时使用
 
 - 仍先 `plan_chat_reply`。只匹配该计划关联的已读真实他人文本，不能扩大到未读页或历史库。
-- 可用表达不足 10 条不出候选；没有 embedding 配置时按 count 加权、不放回抽样：全库最多5条，计数大于1的高频池至少10条时另取最多5条，合并去重后至多10条。候选固定在该计划，不因轮询反复换样。模型用 `select_chat_expressions` 选择 0–5 条后组织回复，也可全部不选。
+- 可用表达不足 10 条不出候选；没有 embedding 配置时按 count 加权、不放回抽样：全库最多5条，计数大于1的高频池至少10条时另取最多5条，合并去重后至多10条。候选固定在该计划，不因轮询反复换样。有候选的文字计划将顶层 `next_call` 指向 `select_chat_expressions`，模型须选择 0–5 条后组织回复，也可用空列表明确全部不选。发送入口和旧单条发送工具均检查此步骤，缺失时返回 `expression_selection_required`，尚未发送。
+- 沉默/等待、纯表情/回应、无候选、未到 10 条门槛及学习暂停不要求额外选择调用。混合计划实际只发表情时也可直接完成。相同选择幂等，改变已完成的选择会拒绝；人工停用条目后旧候选失效，若仍有足量候选须重新选择，不能沿用已停用内容。选定返回只包含选定参考和匹配黑话，不再重复整个候选集。
+- 计划回执的 `expression_selection` 记录候选/已选 ID、参考载荷哈希、准备时间及明确不用/不适用的原因，跟随发送成功、失败或未知的真实回执。标记 `tool_result_prepared`，宿主实际注入与模型措辞采用保持 `unverified`；不能将“已选”当作“模型确实学会或使用”。未选候选此前可能已在宿主上下文中出现，程序不能清除外部模型记忆。记录不保存额外原话，沿用聊天计划的保留和授权边界。
 - 当前 MCP 没有已有 embedding 服务配置，因此本版实际使用加权路线。存储层有受作用域约束的可选检索器接口并用 fixture 验证最多 50 条；这不代表已经上线向量服务，也不会偷偷调用新的服务。
 - 黑话仅用大小写归一后的子串匹配，最多 10 条有释义且确认/人工设置的词。候选、空释义、禁用记录不作为确定知识。
 - 人物卡优先，学习只作本轮可选数据。不会修改原小鲸鱼或小鲸鱼2号，不自动复读、不强制发言、不绕过原来的等待、目标、新鲜度、权限和气泡队列。
@@ -68,7 +74,7 @@ READY 回复超过原发送 TTL 后不再阻塞学习领取；发送中的队列
 配置可选放入 `data/mcp-language-policy.json`，修改后重启；默认不需文件：
 
 ```json
-{"window_messages":20,"buffer_messages":40,"interval_seconds":30,"evidence_seconds":86400,"evidence_batches":100,"message_chars":800,"material_chars":16000,"lease_seconds":120,"hourly_calls":20,"max_attempts":2,"retry_seconds":15}
+{"window_messages":20,"buffer_messages":40,"interval_seconds":30,"evidence_seconds":86400,"evidence_batches":100,"message_chars":800,"material_chars":16000,"lease_seconds":120,"hourly_calls":20,"max_attempts":2,"retry_seconds":15,"jargon_cache_terms":50}
 ```
 
 无效配置会停止学习并报错，不能静默降低安全门槛。局部覆盖字段可用；观察门槛 10 条、最低间隔 30 秒、全局并发 3 不允许越过。
@@ -80,8 +86,8 @@ READY 回复超过原发送 TTL 后不再阻塞学习领取；发送中的队列
 | 环节 | 保留的机制 | Tulpa 的适配 |
 |---|---|---|
 | [表达提取与审核](https://github.com/Mai-with-u/MaiBot/blob/f9ec3670a3638d6a4708ee5253f7ffe2838c9415/src/learners/expression_learner.py) | 最少10条、30秒间隔、每会话一个、全局三个、SELF排除、另行 self_reflect | 有界实时观察由时钟和消息触发封批；40/20是 Tulpa 默认值；外部 Agent 一次推进一阶段 |
-| [表达选择](https://github.com/Mai-with-u/MaiBot/blob/f9ec3670a3638d6a4708ee5253f7ffe2838c9415/src/chat/replyer/maisaka_expression_selector.py) | 少于10条跳过；向量最多50；无候选时 count 加权；模型选择0–5 | 当前实际是无新 embedding 服务的加权路线；候选按计划固定，选择仍经过作用域/连接检查 |
-| [黑话提取](https://github.com/Mai-with-u/MaiBot/blob/f9ec3670a3638d6a4708ee5253f7ffe2838c9415/src/learners/jargon_learner.py) | 至多30个、来源及前后3条、每批命中计数 | 比上游更严格：黑话也仅采实时真实他人，不采自己的输出、工具或注入参考 |
+| [表达选择](https://github.com/Mai-with-u/MaiBot/blob/f9ec3670a3638d6a4708ee5253f7ffe2838c9415/src/chat/replyer/maisaka_expression_selector.py) | 少于10条跳过；向量最多50；无候选时 count 加权；模型选择0–5 | 当前实际是无新 embedding 服务的加权路线；文字发送前必须完成选择或明确不用，留有工具返回准备记录 |
+| [黑话提取](https://github.com/Mai-with-u/MaiBot/blob/f9ec3670a3638d6a4708ee5253f7ffe2838c9415/src/learners/jargon_learner.py) | 至多30个、来源及前后3条、每批命中计数、最近50词匹配补漏 | 通过作用域索引有界恢复最近词；仅采实时真实他人，不采自己的输出、工具或注入参考；计数幂等、停用/人工优先 |
 | [阶段推断](https://github.com/Mai-with-u/MaiBot/blob/f9ec3670a3638d6a4708ee5253f7ffe2838c9415/src/learners/jargon_miner.py) | 4/8/25/100、三阶段、计数跳跃只做当前阶段、人工释义优先 | 顺序宿主保留 degraded 技术标记；自检通过默认可用，但不能宣称独立核验 |
 | [黑话匹配](https://github.com/Mai-with-u/MaiBot/blob/f9ec3670a3638d6a4708ee5253f7ffe2838c9415/src/maisaka/jargon_context_matcher.py) | casefold 子串、确认且有释义、最多10条 | 仅 Planner 当前关联真实他人文本；不提供跨群共享或全局回退 |
 
@@ -92,12 +98,18 @@ READY 回复超过原发送 TTL 后不再阻塞学习领取；发送中的队列
 .\.venv\Scripts\python.exe -X utf8 scripts\check_mcp_language_integration.py
 .\.venv\Scripts\python.exe -X utf8 scripts\check_mcp_auto_learning.py
 .\.venv\Scripts\python.exe -X utf8 scripts\check_mcp_expression_evidence.py
+.\.venv\Scripts\python.exe -X utf8 scripts\check_mcp_language_usage.py
+.\.venv\Scripts\python.exe -X utf8 scripts\check_mcp_jargon_matching.py
 .\.venv\Scripts\python.exe -X utf8 scripts\check_mcp_chat_turns.py
 $env:PLAYWRIGHT_MODULE = 'C:\Lab0921\.tmp\desktop-qa\node_modules\playwright-core'
 node scripts\check_mcp_ui.cjs
 ```
 
 前四项使用假时钟、合成消息和本机模拟接口；不读取真实历史库、不调用真实模型、不发 QQ 消息。UI 验收使用真实 Edge、实际样式和脚本加接口 fixture。`--package <目录>` 可核验实际打包模块。mock 证明工程边界，不证明语言质量或宿主永远遵循循环。
+
+表达选择闭环与黑话补漏的新增两项也只使用隔离夹具，前者经过实际 MCP HTTP、原生发送适配器和本机模拟 OneBot，后者用假时钟验证计数与证据。此次不构建或发布 Release。没有新增数据迁移，只有可删除的查询索引和既有计划 JSON 的附加诊断字段；旧库不重新入账。若回退到不识别 `jargon_cache_terms` 的旧程序，先去除手动添加的这个配置项；未建立配置文件的默认使用者无需处理。
+
+本次详细检查、成本样本与限制见[表达选择闭环与黑话补漏验收](MCP_LANGUAGE_USAGE_VALIDATION.md)。
 
 人工测试：正常开始指定群的持续聊天，让 Agent 潜水；出现至少10条他人实时消息并满30秒后，即使没有后续消息也应开始学习。查看记录页与4/10等门槛；停止再开，条目与人工修改保留，本次运行进度从新会话计起。高级设置暂停后重开仍暂停。宿主退出应显示等待 Agent；不要把队列存在当成学习已完成。
 

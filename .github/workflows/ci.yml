@@ -37,7 +37,7 @@ jobs:
         shell: pwsh
         run: |
           $checks = @('check_publication.py','check_client_accounts.py','check_data_controls.py','check_desktop.py','check_snowluma_setup.py','check_qq_account_diagnostics.py','check_qq_source_fix.py','check_qq_passive_keys.py','check_qq_replies.py','check_napcat_qq_probe.py','check_napcat_onebot_contract.py','check_upgrade.py','check_mcp.py','check_mcp_onebot.py','check_mcp_actions.py','check_mcp_chat.py','check_mcp_chat_prompts.py','check_mcp_chat_media.py','check_mcp_sticker_library.py','check_mcp_chat_targets.py','check_mcp_reactions.py','check_mcp_chat_turns.py','check_mcp_downloads.py','check_chat_browser.py','check_reply_history.py','check_reply_copilot.py','check_group_admin.py','check_workspace_ide.py','check_tulpa.py','check_tulpa_api.py','check_withheld_claims.py','agent_smoke.py')
-          $checks += @('check_mcp_language_learning.py','check_mcp_language_integration.py','check_mcp_auto_learning.py','check_mcp_expression_evidence.py')
+          $checks += @('check_mcp_language_learning.py','check_mcp_language_integration.py','check_mcp_auto_learning.py','check_mcp_expression_evidence.py','check_mcp_language_usage.py','check_mcp_jargon_matching.py')
           foreach ($check in $checks) {
             python "scripts/$check"
             if ($LASTEXITCODE -ne 0) { throw "$check failed" }

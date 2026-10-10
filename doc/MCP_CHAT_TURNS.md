@@ -9,7 +9,7 @@
 3. 停止原群聊会话，用新开始编号 `start_chat_session(persona_preset="little_whale_v2", ...)`。返回的 `session.persona_preset` 和 `chat_prompt.persona` 应为新卡；重复使用旧开始编号仍返回旧快照，不能用它切人格。
 4. `get_chat_session` / `wait_chat_messages` 返回 `input_batch`，包含批次 ID、水位、收集原因及同人短连发的 ID 分组。单条时间、来源和消息 ID 不丢失。
 5. Planner 调用 `plan_chat_reply`，传批次、`wait / silence / reply`、简短沟通意图；参与时选目标、相关话题消息及 `text / sticker / reaction`。可附少量主题词。这里只记决定，不发送推理或规划文本。
-6. `READY` 后同一个 Agent 组织内容，调用 `send_chat_reply` 提交 1–3 个完整语义气泡。程序先检查，再依次发送，后续气泡有间隔。一个长解释可以仍是一条；不按标点切句。
+6. `READY` 后先遵循 `next_call`：有表达候选的文字计划先调用 `select_chat_expressions`，选 0–5 条参考或用 `expression_ids=[]` 明确不用；未选择直接发送返回 `expression_selection_required`，不会派发。没有候选、学习关闭和纯媒体计划自动跳过选择。之后同一个 Agent 组织内容，调用 `send_chat_reply` 提交 1–3 个完整语义气泡。程序先检查，再依次发送，后续气泡有间隔。一个长解释可以仍是一条；不按标点切句。
 7. 看回执，确认已处理消息水位后继续等待。沉默、只用图或小回应同样是完整参与；程序不补发说明文字。
 
 ```json
@@ -37,6 +37,8 @@
 ```
 
 单条兼容工具 `send_chat_message`、`send_chat_sticker`、`react_to_chat_message` 保留原参数，新增 `plan_id`；缺少计划返回 `plan_required`。一份计划只提交一个完整队列，组合表达应一次提交。文字首条可选 `quote` / `mention_user_ids`；回应目标来自计划，后续不重复提醒。图片使用既有 `sticker_id` 和已看原图校验。小回应使用既有 `event_id / reaction_id / operation`，原生协议与授权不变。不能通过普通 `send_qq_message` 绕开正在运行的持续聊天队列。
+
+`expression_selection` 随计划和 `get_chat_session.recent_turns` 返回：区分等待选择、选择若干、明确不用、无需选择和学习不可用，并记录候选/选定条目的 ID、参考载荷哈希与准备时间。它关联既有队列回执，沿用最近 200 个普通结束计划的保留边界；不会额外记录聊天正文。`delivery=tool_result_prepared` 只证明 Tulpa 准备了该工具返回，不能证明宿主将其放入下一次模型请求或模型实际采用了其措辞；这两项明确为 `unverified`。
 
 ## 等待与新鲜度
 
