@@ -11,7 +11,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
   try{
     const page=await browser.newPage({viewport:{width:1100,height:920}}),errors=[];
     page.on('pageerror',e=>errors.push(e.message));
-    let state,requests,mode,failList=false,delayCreate=false,sessions=[],overviewError=false,libraryError=false,libraryDelay=false,learningState='积累中',learning={enabled:true};
+    let state,requests,mode,failList=false,delayCreate=false,sessions=[],overviewError=false,libraryError=false,libraryDelay=false,stopError=false,learningState='积累中',learning={enabled:true};
     let connections=[];
     const group=()=>({conversation_id:'111:group:444',account:'111',group:'444',name:'合成测试群',active:sessions.filter(s=>s.active),history:sessions.filter(s=>!s.active),learning,learning_state:learningState,can_start:!sessions.some(s=>s.active),connection_id:'fixture-connection'});
     const shot=async name=>{if(process.env.AUTO_LEARNING_SCREENSHOT_DIR){fs.mkdirSync(process.env.AUTO_LEARNING_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.AUTO_LEARNING_SCREENSHOT_DIR,name+'.png')});}};
@@ -43,8 +43,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
         return reply(learning);
       }
       if(url.pathname==='/api/mcp/chats/start'){
-        sessions.push({id:'fixture-new-chat',name:'测试群',connection_name:'qqmcp',active:true,persona_name:'小鲸鱼2号',persona:'合成人物提示',turn_process:{phase:'WAITING'}});
-        learningState='等待 Agent';return reply({session_id:'fixture-new-chat',note:'已开启会话并接续原群积累。请在已连接的 Agent 中开始或继续该群聊天。'});
+        throw Error('UI must never start a chat; only the Agent starts sessions');
       }
       if(url.pathname.endsWith('/learning')&&method==='PUT'){
         learning={...learning,...body,expression_count:1,usable_expressions:body.allow_degraded?1:0,jargon_count:0,confirmed_jargon:0,pending:[],last_learned:0,calls_last_hour:2,hourly_call_budget:20,
@@ -54,6 +53,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
         learning.expressions[0].enabled=body.enabled;return reply(learning);
       }
       if(url.pathname.startsWith('/api/mcp/chats/')&&method==='POST'){
+        if(stopError)return reply({detail:'合成停止失败，请重试'},503);
         const sid=url.pathname.split('/')[4];sessions=sessions.map(s=>sid==='all'||s.id===sid?{...s,active:false,state:'stopped'}:s);return reply({stopped:1});
       }
       if(url.pathname==='/api/mcp'&&method==='PUT'){
@@ -70,7 +70,6 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     async function setup(running=false){
       state={enabled:running,running,port:18777,url:'http://127.0.0.1:18777/mcp',error:''};requests=[];mode='ok';failList=false;delayCreate=false;sessions=[];connections=[];
       await page.goto('http://127.0.0.1:39879/');await page.locator('#open-mcp').click();await page.locator('#mcp-chats input').waitFor();
-      await page.locator('#mcp-chat-advanced').evaluate(e=>e.open=true);
       await page.locator('#mcp-name').fill('qqmcp');await page.locator('#mcp-all').check();
       await page.locator('#mcp-start').fill('2026-09-01');await page.locator('#mcp-end').fill('2026-10-03');
     }
@@ -126,8 +125,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     assert.equal(requests[0].body.chat_reactions,true);assert.equal(requests[0].body.chat_images,false);
     assert.ok((await page.locator('#mcp-config').inputValue()).includes('tools.react_to_chat_message'));
     await setup(true);await page.locator('#mcp-all').uncheck();await page.locator('#mcp-live-groups').click();
-    await waitText('mcp-chats','未导入的实时群');await page.locator('#mcp-chat-refresh').click();
-    await waitText('mcp-event-status','SnowLuma 实时事件已连接');
+    await waitText('mcp-chats','未导入的实时群');
     await page.locator('#mcp-search').fill('实时');await waitText('mcp-chats','未导入的实时群');
     await page.locator('#mcp-chats input').check();await page.locator('#mcp-chat').check();await create();
     assert.deepEqual(requests[0].body.conversations,[['qq','111:group:444']]);
@@ -135,8 +133,18 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     learning={enabled:true,independence:'degraded',library:{checked_expressions:4,known_jargon:0,observing_jargon:17,last_completed_at:null},run:{completed_batches:0,buffered:8},calls_last_hour:2,hourly_call_budget:20,expression_count:4,jargon_count:17,
       expressions:[{id:'synthetic-expression',situation:'<img src=x onerror=alert(1)> 合成适用场景',style:'合成抽象表达方式；长文本自动换行。'.repeat(8),count:1,enabled:true,independence:'degraded',evidence_version:2,surface_form:'不然{对象}？'}],jargon:[{id:'synthetic-word',term:'云朵开机',meaning:'',enabled:true,is_jargon:false,count:1,independence:'degraded'}]};
     sessions=[{id:'fixture-chat',name:'测试群',connection_name:'qqmcp',persona_name:'小鲸鱼2号',active:true,state:'waiting_messages',persona:'<img src=x onerror=alert(1)> 自然聊天',participation:'natural',cursor:12}];
+    await waitText('mcp-chat-summary','1 个');
+    assert.equal(await page.locator('#mcp-settings .mcp-group-card').count(),0);
+    assert.equal(await page.locator('#mcp-chat-manager').isVisible(),false);
+    assert.equal(await page.locator('button').filter({hasText:/^开始持续水群$/}).count(),0);
+    assert.ok((await page.locator('.mcp-chat-entry').boundingBox()).height<110);
+    await page.locator('#mcp-settings').evaluate(e=>e.scrollTop=0);await shot('00-compact-connection');
+    await page.locator('#mcp-chat-open').click();
+    await page.locator('#mcp-chat-manager').waitFor({state:'visible'});
+    await waitText('mcp-event-status','SnowLuma 实时事件已连接');
+    await page.locator('#mcp-chat-advanced').getByText('高级操作',{exact:true}).click();
     await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-status','1 个');
-    await page.locator('#mcp-settings').evaluate(e=>e.scrollTop=0);await shot('01-lurking-threshold');
+    await page.locator('#mcp-chat-manager').evaluate(e=>e.scrollTop=0);await shot('01-lurking-threshold');
     await waitText('mcp-chat-sessions','4/10');await waitText('mcp-chat-sessions','未记录');
     await page.locator('#mcp-chat-sessions summary').click();assert.equal(await page.locator('#mcp-chat-sessions img').count(),0);
     await page.locator('#mcp-chat-refresh').click();await page.waitForTimeout(100);assert.equal(await page.locator('#mcp-chat-sessions details').getAttribute('open'),'');
@@ -165,23 +173,29 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MCP U
     libraryError=false;await learningDialog.getByText(/合成记录读取失败/).waitFor({state:'hidden'});
     if(process.env.LEARNING_UI_SCREENSHOT)await learningDialog.screenshot({path:process.env.LEARNING_UI_SCREENSHOT});
     await learningDialog.getByRole('button',{name:'关闭',exact:true}).click();
-    learningState='学习中';await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-sessions','学习中');await page.locator('#mcp-settings').evaluate(e=>e.scrollTop=0);await shot('03-learning');
+    learningState='学习中';await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-sessions','学习中');await page.locator('#mcp-chat-manager').evaluate(e=>e.scrollTop=0);await shot('03-learning');
+    stopError=true;await page.locator('[data-chat-stop]').click();await waitText('mcp-chat-error','合成停止失败');assert.equal(sessions[0].active,true);assert.equal(await page.locator('#mcp-chat-error').isVisible(),true);stopError=false;
     await page.locator('[data-chat-stop]').click();await waitText('mcp-chat-sessions','已停止');
     assert.equal(await page.locator('#mcp-chat-stop-all').isEnabled(),false);
-    await page.locator('#mcp-settings').evaluate(e=>e.scrollTop=0);await shot('04-stopped-retained');
-    connections=[{id:'fixture-connection',name:'DSH 合成连接',revoked:false,accounts:{qq:'111'},scope:{platforms:['qq'],conversations:[['qq','111:group:444']],chat:true,send:true,chat_account:'111'}}];
-    await page.locator('#mcp-chat-start').click();const startDialog=page.locator('dialog.mcp-chat-start-dialog');await startDialog.getByRole('combobox',{name:'聊天群'}).waitFor();
-    assert.equal(await startDialog.getByRole('combobox',{name:'人物'}).inputValue(),'little_whale_v2');await shot('05-start');
-    await startDialog.getByRole('button',{name:'开始持续水群'}).click();await startDialog.getByText('已开启会话并接续原群积累。请在已连接的 Agent 中开始或继续该群聊天。').waitFor();
-    await startDialog.getByRole('button',{name:'关闭',exact:true}).click();await waitText('mcp-chat-sessions','等待 Agent');
+    await page.locator('#mcp-chat-manager').evaluate(e=>e.scrollTop=0);await shot('04-stopped-retained');
+    // A new session arrives from the Agent; the management panel only observes it.
+    sessions.push({id:'fixture-new-chat',name:'测试群',connection_name:'qqmcp',active:true,persona_name:'小鲸鱼2号',persona:'合成人物提示',turn_process:{phase:'WAITING'}});
+    learningState='等待 Agent';await waitText('mcp-chat-sessions','等待 Agent');await shot('05-agent-resumed');
     assert.equal(await page.locator('.mcp-group-card').count(),1);assert.equal(await page.locator('[data-chat-stop]').count(),1);
-    await page.setViewportSize({width:390,height:844});await page.locator('#mcp-settings').evaluate(e=>e.scrollTop=0);await shot('06-narrow-resumed');
-    assert.ok(await page.locator('#mcp-settings').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
+    await page.setViewportSize({width:390,height:844});await page.locator('#mcp-chat-manager').evaluate(e=>e.scrollTop=0);await shot('06-narrow-resumed');
+    assert.ok(await page.locator('#mcp-chat-manager').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
     overviewError=true;await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-status','暂时无法更新');assert.equal(await page.locator('.mcp-group-card').count(),1);await shot('07-error-retained');
     overviewError=false;await waitText('mcp-chat-status','1 个'); // Normal automatic refresh, no save/click.
     await page.locator('#mcp-chat-stop-all').click();await waitText('mcp-chat-sessions','已停止');
-    sessions=[];await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-sessions','还没有持续水群记录');await page.locator('#mcp-settings').evaluate(e=>e.scrollTop=0);await shot('08-empty');
+    sessions=[];await page.locator('#mcp-chat-refresh').click();await waitText('mcp-chat-sessions','还没有持续水群记录');await page.locator('#mcp-chat-manager').evaluate(e=>e.scrollTop=0);await shot('08-empty');
+    await page.keyboard.press('Escape');assert.equal(await page.locator('#mcp-chat-manager').isVisible(),false);assert.equal(await page.locator('#mcp-settings').isVisible(),true);
+    assert.equal(await page.locator('#mcp-chat-open').evaluate(e=>e===document.activeElement),true);
+    await page.locator('#mcp-settings').evaluate(e=>e.scrollTop=0);await shot('12-narrow-connection');
+    assert.ok(await page.locator('#mcp-settings').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
+    await page.locator('#mcp-chat-open').click();await waitText('mcp-chat-sessions','还没有持续水群记录');
+    await page.locator('#mcp-chat-close').click();assert.equal(await page.locator('#mcp-chat-manager').isVisible(),false);
+    assert.equal(requests.filter(r=>r.path==='/api/mcp/chats/start').length,0);
     assert.deepEqual(errors,[]);
-    console.log('PASS: real Edge + actual MCP UI; existing connection/permission regressions, start/resume, grouped library, threshold/unknown time, records, pause, literal long content, learning/stop, auto refresh, error recovery, empty/narrow. API fixtures only.');
+    console.log('PASS: real Edge + actual MCP UI; compact connection, separate manager, no UI start, Agent-created sessions, existing connection/permissions, grouped library, threshold/unknown time, records, pause, literal long content, learning/stop, visible stop errors, auto refresh, error recovery, empty/narrow, Escape/focus. API fixtures only.');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

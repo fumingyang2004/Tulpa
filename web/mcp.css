@@ -2,6 +2,7 @@
 .mcp-dialog::backdrop{background:rgba(0,0,0,.32)}
 .mcp-learning{padding:20px 24px}.mcp-learning>label{display:flex;align-items:center;gap:8px;margin:14px 0}.mcp-learning button{margin:4px 8px 4px 0}
 .mcp-dialog>.dialog-head{position:sticky;top:0;z-index:2;background:var(--panel);padding:14px 24px;margin:0;border-bottom:1px solid var(--line)}
+.mcp-dialog>.dialog-head>button,.mcp-panel-head>button{flex-shrink:0;white-space:nowrap}
 .mcp-body{padding:8px 24px 24px}.mcp-body p{font-size:14px;line-height:1.65}.mcp-muted{color:var(--muted)}
 .mcp-body h3{margin-top:24px;font-size:16px}.mcp-body input:not([type=checkbox]),.mcp-body textarea{display:block;width:100%;margin:6px 0 14px;padding:9px;border:1px solid var(--line);border-radius:6px;background:transparent;color:inherit;box-sizing:border-box}
 .mcp-step{border-bottom:1px solid var(--line);padding-bottom:20px}.mcp-background{display:flex;gap:8px;align-items:center;margin:16px 0}.mcp-warning{color:var(--warning)}.mcp-body [hidden]{display:none!important}
@@ -20,12 +21,13 @@
 .mcp-group-heading h3{margin:0;font-size:20px}.mcp-status-pill{border:1px solid var(--line);border-radius:18px;padding:3px 10px;font-size:12px;white-space:nowrap}
 .mcp-learning-stats{border-left:2px solid var(--line);padding-left:14px;margin:16px 0}.mcp-learning-stats p{margin:6px 0}
 .mcp-group-actions{justify-content:flex-start}.mcp-group-card details{margin:14px 0}.mcp-group-card pre,.mcp-learning pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 monospace}
-.mcp-learning,.mcp-chat-start-dialog{box-sizing:border-box;padding:20px 24px;overflow-wrap:anywhere}
+.mcp-chat-entry{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}
+.mcp-chat-entry>div{min-width:0}.mcp-chat-entry h3{font-size:15px;margin:0}.mcp-chat-entry p{font-size:13px;margin:4px 0 0;overflow-wrap:anywhere}.mcp-chat-entry>button{flex-shrink:0;white-space:nowrap}
+.mcp-learning{box-sizing:border-box;padding:20px 24px;overflow-wrap:anywhere}
 .mcp-panel-head{padding:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.mcp-learning h2,.mcp-chat-start-dialog h2{font-size:20px;margin:0}.mcp-learning h3{font-size:16px;margin:22px 0 12px}
-.mcp-learning button,.mcp-chat-start-dialog button{padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:transparent;color:inherit;cursor:pointer}
-.mcp-chat-start-dialog button[type=submit],#mcp-chat-start{background:var(--accent);color:white}
-.mcp-chat-start-dialog label{display:block;margin:16px 0}.mcp-chat-start-dialog select,.mcp-learning textarea{display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:inherit;font:inherit}
+.mcp-learning h2{font-size:20px;margin:0}.mcp-learning h3{font-size:16px;margin:22px 0 12px}
+.mcp-learning button{padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:transparent;color:inherit;cursor:pointer}
+.mcp-learning textarea{display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:inherit;font:inherit}
 .mcp-learning-record{padding:16px 0;border-bottom:1px solid var(--line)}.mcp-learning-record h4{margin:0;font-weight:600}.mcp-learning-record p{margin:8px 0;line-height:1.7}.mcp-learning-record small{display:inline-block;margin-right:16px}.mcp-learning-record details{margin-top:12px}
 .mcp-learning>details{margin-top:24px}.mcp-learning>details>label{display:block;margin:16px 0}.mcp-empty{padding:20px 0;color:var(--muted)}
-@media(max-width:520px){.mcp-learning,.mcp-chat-start-dialog{padding:16px}.mcp-group-heading h3{font-size:18px}.mcp-active-run{align-items:flex-start}.mcp-dialog{width:94vw}.mcp-active-run p{width:100%;margin-bottom:0}}
+@media(max-width:520px){.mcp-learning{padding:16px}.mcp-group-heading h3{font-size:18px}.mcp-active-run{align-items:flex-start}.mcp-dialog{width:94vw}.mcp-active-run p{width:100%;margin-bottom:0}}
