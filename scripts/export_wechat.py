@@ -95,6 +95,7 @@ def main():
     p.add_argument('--limit',type=int,default=500,help='每会话最近原始消息条数（含非文本），默认 500')
     p.add_argument('--output')
     p.add_argument('--no-stickers',action='store_true',help='表情包及动态图仅保留占位，不复制媒体')
+    p.add_argument('--no-images',action='store_true',help='图片与表情仅保留占位，不探测或读取图片文件和密钥')
     p.add_argument('--incremental-request')
     p.add_argument('--batch-dir')
     p.add_argument('--all-messages',action='store_true')
@@ -130,7 +131,7 @@ def main():
         workdir=str(DATA/'wechat-reader'/'work'),keys_file=str(DATA/'wechat-reader'/'keys.json'))
     if request:
         from incremental_wechat import export_delta
-        payload=export_delta(reader,metadata,request,not args.no_stickers,batch_dir=local_path(args.batch_dir) if args.batch_dir else None)
+        payload=export_delta(reader,metadata,request,not args.no_stickers,batch_dir=local_path(args.batch_dir) if args.batch_dir else None,read_images=not args.no_images)
         encoded=json.dumps(payload,ensure_ascii=False)
         if len(encoded.encode('utf-8'))>100*1024*1024:raise ValueError('新增导出超过单批限制；未推进进度，请先补读历史。')
         output.write_text(encoded,encoding='utf-8')
@@ -149,7 +150,7 @@ def main():
     with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='wechat-export-') as folder:
         staging=Path(folder)/'export.json'
         result=export_selected(reader,selected,metadata,staging,None if args.all_messages else args.limit,coverage,load_stickers=not args.no_stickers,start=args.start,end=args.end,
-            batch_dir=local_path(args.batch_dir) if args.batch_dir else None)
+            batch_dir=local_path(args.batch_dir) if args.batch_dir else None,read_images=not args.no_images)
         if staging.stat().st_size>100*1024*1024:
             raise ValueError('导出超过单文件 100 MB，请使用 --chat 按会话导出；原文件保留。')
         output.parent.mkdir(parents=True,exist_ok=True)

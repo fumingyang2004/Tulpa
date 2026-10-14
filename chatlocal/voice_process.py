@@ -1,5 +1,6 @@
 """Tie native decoder/ASR lifetime to its parent even on force-close (Windows)."""
 import ctypes
+import os
 from ctypes import wintypes
 
 class _Basic(ctypes.Structure):
@@ -14,6 +15,8 @@ class _Extended(ctypes.Structure):
 
 class ChildJob:
     def __init__(self,process,*,memory_bytes=2*1024**3):
+        self.process=process;self.handle=None
+        if os.name != 'nt':return  # macOS lifetime is managed by VoiceWorker._child.
         k=ctypes.WinDLL('kernel32',use_last_error=True);self.k=k;self.handle=None
         k.CreateJobObjectW.argtypes=[ctypes.c_void_p,wintypes.LPCWSTR];k.CreateJobObjectW.restype=wintypes.HANDLE
         k.SetInformationJobObject.argtypes=[wintypes.HANDLE,ctypes.c_int,ctypes.c_void_p,wintypes.DWORD];k.SetInformationJobObject.restype=wintypes.BOOL

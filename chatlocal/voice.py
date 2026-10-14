@@ -151,12 +151,18 @@ class VoiceService:
         return dict(message_id=mid,status='queued',note='本地转写仍在排队或执行，稍后可再次调用同一工具。')
     def _loop(self):
         # Cross-process ownership also protects CLI/Agent calls from double ASR.
-        import msvcrt
+        if os.name == 'nt':
+            import msvcrt
+        else:
+            import fcntl
         path=self.root/'worker.lock'
         path.touch(exist_ok=True);lock=path.open('r+b')
         try:
             while True:
-                try:msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1);break
+                try:
+                    if os.name == 'nt':msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
+                    else:fcntl.flock(lock.fileno(),fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
                 except OSError:
                     if self.stop.wait(2):return
             with self.store.connect() as db:

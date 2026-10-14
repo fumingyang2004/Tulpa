@@ -75,7 +75,7 @@ class MCPAccess:
         return {p: bound_account(self.store, p) or '' for p in platforms}
 
     def create(self, body):
-        fields = {'name', 'platforms', 'conversations', 'all_conversations', 'start', 'end', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS, *CHAT_EXTRA_FLAGS}
+        fields = {'name', 'platforms', 'conversations', 'all_conversations', 'allow_future_imports', 'start', 'end', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS, *CHAT_EXTRA_FLAGS}
         if not isinstance(body, dict) or set(body) - fields:
             raise ValueError('连接配置字段无效。')
         name = body.get('name', '')
@@ -107,7 +107,7 @@ class MCPAccess:
             selection = json.dumps(pair, ensure_ascii=False)
             if selection not in selections:
                 selections.append(selection)
-        for flag in ('all_conversations', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS, *CHAT_EXTRA_FLAGS):
+        for flag in ('all_conversations', 'allow_future_imports', 'media', 'prepare', 'voice', 'onebot', 'send', 'manage', 'chat', *CHAT_MEDIA_FLAGS, *CHAT_EXTRA_FLAGS):
             if flag in body and type(body[flag]) is not bool:
                 raise ValueError('权限开关必须为布尔值。')
         if body.get('all_conversations'):
@@ -142,12 +142,19 @@ class MCPAccess:
             raise ValueError('表情包子功能需要开启持续群聊。')
         if (scope['chat_sticker_send'] or scope['chat_sticker_collect']) and not scope['chat_images']:
             raise ValueError('发送和收藏表情需要先允许持续聊天看图。')
+        accounts = self.accounts(platforms)
+        if body.get('allow_future_imports'):
+            if not body.get('all_conversations') or scope['send'] or scope['manage'] or scope['chat'] or scope['onebot']:
+                raise ValueError('预先连接仅支持明确授权全部会话的只读资料访问。')
+            with self.store.connect() as db:
+                scope['pending_platforms'] = [p for p in platforms if not accounts[p] and
+                    not db.execute('SELECT 1 FROM messages WHERE platform=? LIMIT 1', (p,)).fetchone()]
         if chat_account:scope['chat_account'] = chat_account
         token = secrets.token_urlsafe(32)
         gid = uuid.uuid4().hex
         with self.connect() as db:
             db.execute('INSERT INTO grants(id,name,token_hash,scope,epoch,accounts,created_at) VALUES(?,?,?,?,?,?,?)',
-                       (gid, name.strip(), self.digest(token), json.dumps(scope), self.epoch(), json.dumps(self.accounts(platforms)), time.time()))
+                       (gid, name.strip(), self.digest(token), json.dumps(scope), self.epoch(), json.dumps(accounts), time.time()))
         return dict(id=gid, token=token)
 
     @staticmethod
@@ -176,6 +183,29 @@ class MCPAccess:
         grant = dict(row)
         grant['scope'] = json.loads(grant['scope'])
         if not source:return grant  # Authentication only. Tool-specific checks still apply.
+        if grant['scope'].get('pending_platforms'):
+            # Explicit read-only preauthorization pins each initially empty
+            # platform once. Later native account changes still invalidate it.
+            with self.connect() as db:
+                db.execute('BEGIN IMMEDIATE')
+                current = db.execute('SELECT * FROM grants WHERE id=? AND revoked=0', (grant['id'],)).fetchone()
+                if not current or current['epoch'] != self.epoch():
+                    raise AccessDenied('数据来源或账号已改变，请在 Tulpa 重新授权。')
+                scope = json.loads(current['scope']);accounts = json.loads(current['accounts'])
+                actual = self.accounts(scope['platforms'])
+                pending = scope.get('pending_platforms', [])
+                if any(actual[p] != accounts[p] for p in scope['platforms'] if p not in pending):
+                    raise AccessDenied('数据来源或账号已改变，请在 Tulpa 重新授权。')
+                remaining = []
+                with self.store.connect() as source_db:
+                    for p in pending:
+                        if actual[p] or source_db.execute('SELECT 1 FROM messages WHERE platform=? LIMIT 1', (p,)).fetchone():
+                            accounts[p] = actual[p]
+                        else:remaining.append(p)
+                scope['pending_platforms'] = remaining
+                db.execute('UPDATE grants SET scope=?,accounts=? WHERE id=?',
+                    (json.dumps(scope), json.dumps(accounts), grant['id']))
+                grant = dict(current);grant['scope'] = scope;grant['accounts'] = json.dumps(accounts)
         try:
             valid = grant['epoch'] == self.epoch() and json.loads(grant['accounts']) == self.accounts(grant['scope']['platforms'])
         except ValueError:
@@ -194,7 +224,11 @@ class MCPAccess:
             for row in rows:
                 row['scope'] = json.loads(row['scope'])
                 row['accounts'] = json.loads(row['accounts'])
-                try:row['valid']=not row['revoked'] and row.pop('epoch')==self.epoch() and row['accounts']==self.accounts(row['scope']['platforms'])
+                try:
+                    actual = self.accounts(row['scope']['platforms'])
+                    pending = row['scope'].get('pending_platforms', [])
+                    row['valid'] = not row['revoked'] and row.pop('epoch') == self.epoch() and all(
+                        p in pending or row['accounts'][p] == actual[p] for p in row['scope']['platforms'])
                 except ValueError:row['valid']=False
                 row.pop('epoch',None)
                 row['calls'] = db.execute('SELECT count(*) FROM calls WHERE grant_id=?', (row['id'],)).fetchone()[0]

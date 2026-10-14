@@ -17,7 +17,7 @@ from .config import ROOT, DATA, DB
 from .sync import message_commit_lock
 
 PLATFORMS=('qq','wechat')
-DEFAULT=dict(qq='database',wechat='database',load_stickers=False)
+DEFAULT=dict(qq='database',wechat='database',load_stickers=False,wechat_read_images=True)
 LIVE_SCOPE_KEY=json.dumps(dict(enabled=True,conversations=None),sort_keys=True)
 DETAILS={
     'source_busy':'客户端正在写入，正在重试；未推进进度。',
@@ -63,6 +63,13 @@ def resume_checkpoint(platform,old,cold,account):
 
 def process_names():
     """Read Windows process names without spawning a shell every poll."""
+    if sys.platform == 'darwin':
+        result = subprocess.run(['ps','-axo','comm='],capture_output=True,text=True,timeout=5,check=True)
+        names = set()
+        for command in result.stdout.splitlines():
+            if command.strip().endswith('.app/Contents/MacOS/QQ'):names.add('qq.exe')
+            if command.strip().endswith(('.app/Contents/MacOS/WeChat','.app/Contents/MacOS/Weixin')):names.add('wechat.exe')
+        return names
     import ctypes
     from ctypes import wintypes as w
     class Entry(ctypes.Structure):
@@ -110,7 +117,7 @@ class Worker:
         self.last_stage='runtime'
         self.process=subprocess.Popen([sys.executable,str(ROOT/'scripts/live_reader.py'),platform],cwd=ROOT,
             env=dict(os.environ,PYTHONUTF8='1'),stdin=subprocess.PIPE,stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,text=True,encoding='utf-8',creationflags=subprocess.CREATE_NO_WINDOW)
+            stderr=subprocess.DEVNULL,text=True,encoding='utf-8',creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.output=queue.Queue(maxsize=2)
         def receive():
             try:
@@ -159,7 +166,7 @@ class LiveManager:
 
     def configure(self, body):
         value={k:body.get(k,self.settings[k]) for k in DEFAULT}
-        if any(value[p] not in ('off','database') for p in PLATFORMS) or type(value['load_stickers']) is not bool:
+        if any(value[p] not in ('off','database') for p in PLATFORMS) or any(type(value[k]) is not bool for k in ('load_stickers','wechat_read_images')):
             raise ValueError('实时模式或表情设置无效')
         with self.guard:
             with self.store.connect() as db:
@@ -232,10 +239,15 @@ class LiveManager:
                     cold=json.loads(db.execute('SELECT checkpoint FROM sync_state WHERE platform=?',(p,)).fetchone()[0])
                 checkpoint=resume_checkpoint(p,old,cold,signature[0])
                 if checkpoint and checkpoint.get('account')!=signature[0]:raise ValueError('account_changed')
+                since=int(time.time())-300
+                if p=='wechat' and not checkpoint:
+                    from scripts.incremental_common import bootstrap_time
+                    since=bootstrap_time(self.store,p)
                 self.update(p,status='receiving',detail='正在检查数据库新增消息')
                 read_started=time.time()
                 result=self.worker(p).read(dict(checkpoint=checkpoint,conversations=None,
-                    since=int(time.time())-300,load_stickers=settings['load_stickers']))
+                    since=since,load_stickers=settings['load_stickers'],
+                    wechat_read_images=settings['wechat_read_images']))
                 if not result['ok']:raise ValueError(result['error'])
                 # Only a live settings/disable change cancels this batch.
                 # One-off historical imports have an independent scope.

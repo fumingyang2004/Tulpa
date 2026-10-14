@@ -74,7 +74,7 @@ def install_mcp_routes(app, store=None):
             with store.connect() as db:
                 for platform in body.get('platforms',[]):
                     if platform=='qq' and body.get('chat') is True and body.get('send') is True:continue
-                    if not db.execute('SELECT 1 FROM messages WHERE platform=? LIMIT 1',(platform,)).fetchone():
+                    if not db.execute('SELECT 1 FROM messages WHERE platform=? LIMIT 1',(platform,)).fetchone() and body.get('allow_future_imports') is not True:
                         raise ValueError('请先导入所选平台的聊天，确认来源账号后再创建连接。')
             return access.create(body)
         except ValueError as exc:

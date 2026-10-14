@@ -163,7 +163,7 @@ def run_batches(store, platform, arguments, output, *, progress=None, cancelled=
             pos=command.index('--incremental-request')+1
             shutil.copyfile(command[pos],attempt/'request.json');command[pos]=str(attempt/'request.json')
         stderr=deque(maxlen=160);stdout=deque(maxlen=30)
-        process=subprocess.Popen(command,cwd=ROOT,env=dict(os.environ,PYTHONUTF8='1',CHATLOCAL_SYNC_METRICS=str(attempt/'metrics.json'),**(env or {})),
+        process=subprocess.Popen(command,cwd=ROOT,env={**os.environ,'PYTHONUTF8':'1','CHATLOCAL_SYNC_METRICS':str(attempt/'metrics.json'),**(env or {})},
             stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',errors='replace',
             creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         def collect(stream, tail):

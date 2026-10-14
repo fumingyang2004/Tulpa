@@ -4,11 +4,15 @@ Never rescan client memory (including the optional image cfg) in a hot poll.
 New shards remain explicit failures until manual import refreshes their keys.
 """
 from pathlib import Path
+import sys
 from wechatauto.db import WeChatDB, _verify_enc_key
 
 
 class LiveWeChatDB(WeChatDB):
     def _cache_paths(self):
+        if sys.platform == 'darwin':
+            path = self._stable_key_file()
+            return [Path(path)] if path else []
         return [Path(p) for p in (self._stable_key_file(), self.keys_file, self.keys_file + '.bak') if p]
 
     def _load_or_extract_keys(self, master_key=None):

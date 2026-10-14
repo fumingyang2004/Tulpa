@@ -81,7 +81,7 @@ def prepare(store,body):
 def run_local(request,output):
     completed=subprocess.run([sys.executable,str(ROOT/'scripts/refresh_media.py'),'--request',str(request),'--output',str(output)],
         cwd=ROOT,env=dict(os.environ,PYTHONUTF8='1'),capture_output=True,text=True,encoding='utf-8',errors='replace',
-        timeout=600,creationflags=subprocess.CREATE_NO_WINDOW)
+        timeout=600,creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if completed.returncode:
         log=ROOT/'reports/private/media-refresh-error.log';log.parent.mkdir(exist_ok=True,parents=True)
         log.write_text(completed.stderr,'utf-8')

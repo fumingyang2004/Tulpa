@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 import gradio as gr
 import uvicorn
+import sys
 
 
 def create_app():
@@ -60,6 +61,8 @@ def create_app():
         }
         if request.query_params.get('desktop')=='1':
             page=(web/'index.html').read_text(encoding='utf-8').replace('<html lang="zh-CN">','<html lang="zh-CN" data-desktop="true">')
+            if sys.platform == 'darwin':
+                page=page.replace('<html lang="zh-CN" data-desktop="true">','<html lang="zh-CN" data-desktop="true" data-platform="macos">')
             return HTMLResponse(page,headers=headers)
         return FileResponse(web/'index.html',headers=headers)
 

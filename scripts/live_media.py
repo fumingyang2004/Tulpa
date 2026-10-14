@@ -24,6 +24,9 @@ class WeChatMediaRetries:
         self.scope=None
 
     def collect(self,media,wxid,wanted,*,exclude=(),now=None):
+        # This guard also prevents opening the retry DB or provenance archives.
+        # QQMedia has no read_images flag and retains its existing behavior.
+        if not getattr(media,'read_images',True):return [],{}
         now=time.time() if now is None else now
         scope=(wxid,tuple(sorted(wanted)) if wanted is not None else None,media.load_stickers)
         if scope!=self.scope:

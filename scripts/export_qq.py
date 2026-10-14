@@ -96,6 +96,13 @@ def export(args):
     unchanged=previous.get('method')=='native-id-inventory-v1' and message_files_unchanged(previous,meta,'qq')
     reader = q.QQDBReader(data_root=DATA/'qq-snapshot', account_id=meta['account'], live_key_timeout_s=75)
     if not reader.is_available():
+        if sys.platform == 'darwin':
+            from chatlog_keeper.macos_key import last_error
+            if last_error() == 'process_access_denied':
+                raise ValueError('macOS 已阻止读取 QQ 进程内存，无法取得聊天数据库密钥。这与文稿文件夹授权或模型 API Key 无关；重复登录不能解决。可先导入 QCE JSON / JSONL。')
+            if not q._get_qq_pids():
+                raise ValueError('未检测到正在运行的 Mac QQ，请打开并登录 QQ 后重试；已导入记录保留。')
+            raise ValueError('Mac QQ 数据库密钥未取得，当前客户端或系统权限可能不兼容；可先导入 QCE JSON / JSONL。')
         raise ValueError('QQ 被动读取未获得有效密钥；请登录 QQ 后重试，或导入 QCE JSON。')
     if previous and previous['account']!=meta['account']:raise ValueError('账号变化；请确认账号，未推进同步进度。')
     work = DATA/'qq-reader'/'decrypted'

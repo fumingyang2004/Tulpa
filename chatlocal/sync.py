@@ -13,14 +13,24 @@ from .sync_state import now
 
 @contextmanager
 def _file_lock(name):
-    import msvcrt
     path=ROOT/'.tmp'/name
     with path.open('a+b') as handle:
         handle.seek(0);handle.write(b'0');handle.flush();handle.seek(0)
-        try:msvcrt.locking(handle.fileno(),msvcrt.LK_NBLCK,1)
+        try:
+            if os.name == 'nt':
+                import msvcrt
+                msvcrt.locking(handle.fileno(),msvcrt.LK_NBLCK,1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(),fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:raise ValueError('正在读取或导入数据，请稍后重试。') from None
         try:yield
-        finally:handle.seek(0);msvcrt.locking(handle.fileno(),msvcrt.LK_UNLCK,1)
+        finally:
+            if os.name == 'nt':
+                handle.seek(0);msvcrt.locking(handle.fileno(),msvcrt.LK_UNLCK,1)
+            else:
+                fcntl.flock(handle.fileno(),fcntl.LOCK_UN)
+
 
 
 @contextmanager
@@ -46,6 +56,7 @@ def status(store):
 
 def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, runner=None, cancelled=None):
     from .import_scope import get_scope
+    from .read_preferences import wechat_images_enabled
     scope=get_scope(store)
     platforms=[p for p,v in scope.items() if v['enabled']] if platforms is None else platforms
     if not isinstance(platforms,list) or not platforms or any(p not in ('qq','wechat') for p in platforms):raise ValueError('无效平台')
@@ -82,6 +93,8 @@ def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, 
                     command=[sys.executable,str(ROOT/'scripts'/f'export_{platform}.py'),'--refresh',
                         '--incremental-request',str(request),'--output',str(output),'--account',account]
                     if not load_stickers:command.append('--no-stickers')
+                    read_images=platform!='wechat' or wechat_images_enabled(store)
+                    if not read_images:command.append('--no-images')
                     batch_result={}
                     if runner is None:
                         from .import_pipeline import run_batches
@@ -90,9 +103,9 @@ def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, 
                             timing['attempts']=attempt+1
                             try:
                                 batch_result=run_batches(store,platform,
-                                    ['--incremental-request',str(request),'--account',account]+([] if load_stickers else ['--no-stickers']),output,
+                                    ['--incremental-request',str(request),'--account',account]+([] if load_stickers else ['--no-stickers'])+([] if read_images else ['--no-images']),output,
                                     progress=progress,cancelled=cancelled,automatic=True,
-                                    key=dict(checkpoint=checkpoint,account=account,conversations=scope[platform]['conversations'],load_stickers=load_stickers),
+                                    key=dict(checkpoint=checkpoint,account=account,conversations=scope[platform]['conversations'],load_stickers=load_stickers,read_images=read_images),
                                     env={'CHATLOCAL_SYNC_METRICS':str(folder/'metrics.json')})
                                 break
                             except ValueError as exc:
@@ -103,7 +116,7 @@ def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, 
                         for attempt in range(3):
                             read_started=time.perf_counter()
                             result=runner(command,cwd=ROOT,env=dict(os.environ,PYTHONUTF8='1',CHATLOCAL_SYNC_METRICS=str(folder/'metrics.json')),capture_output=True,
-                                text=True,encoding='utf-8',errors='replace',timeout=600,creationflags=subprocess.CREATE_NO_WINDOW)
+                                text=True,encoding='utf-8',errors='replace',timeout=600,creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
                             timing['reader_seconds']=timing.get('reader_seconds',0)+time.perf_counter()-read_started
                             timing['attempts']=attempt+1
                             try:

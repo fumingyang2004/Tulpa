@@ -5,6 +5,7 @@ import io
 import json
 import re
 import os
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -135,18 +136,23 @@ def resolve_qq_quote(db,spec,peer,reply):
 
 
 class WeChatMedia:
-    def __init__(self,reader,metadata,load_stickers=True,*,live=False):
+    def __init__(self,reader,metadata,load_stickers=True,*,live=False,read_images=True):
         self.load_stickers=load_stickers
         self.live=live
-        from wechatauto.media import MediaDownloader
-        root=Path(metadata['source_db']).parent
-        self.root=root
-        proxy=SimpleNamespace(account_dir=str(root),account=reader.account,wxid=reader.wxid,
-            cfg_dword=reader.cfg_dword,workdir=str(DATA/'wechat-reader/work'),_find_weixin_pids=reader._find_weixin_pids)
-        self.decoder=MediaDownloader(proxy,save_dir=str(DATA/'media'))
+        self.read_images=read_images
+        self.root=Path(metadata['source_db']).parent
         self.index=collections.defaultdict(list)
         self.cache={}
         self.key=None;self.xor=None
+        self.index_walk=None;self.next_index=0
+        # Keep message metadata/quote parsing available without initializing a
+        # downloader, probing keys or touching any attachment filesystem.
+        if not read_images:return
+        from wechatauto.media import MediaDownloader
+        root=self.root
+        proxy=SimpleNamespace(account_dir=str(root),account=reader.account,wxid=reader.wxid,
+            cfg_dword=reader.cfg_dword,workdir=str(DATA/'wechat-reader/work'),_find_weixin_pids=reader._find_weixin_pids)
+        self.decoder=MediaDownloader(proxy,save_dir=str(DATA/'media'))
         if live:
             # No process scan, recursive attachment walk or key probe here.
             # Locate a new message's own image and validate the cached key on it.
@@ -154,7 +160,7 @@ class WeChatMedia:
             return
         derived=self.decoder._derive_cfg_key()
         self.key=derived[0] if derived else self.decoder._load_persisted_key()
-        if not self.key:self.key=self.decoder._scan_aes_key(monitor=False)
+        if not self.key and sys.platform != 'darwin':self.key=self.decoder._scan_aes_key(monitor=False)
         self.xor=derived[1] if derived else self.decoder._install_xor_key()
         if self.key:self.decoder._persist_key(self.key)
         self.index=collections.defaultdict(list)
@@ -164,6 +170,7 @@ class WeChatMedia:
         self.cache={}
 
     def live_image_key(self,path):
+        if not getattr(self,'read_images',True):return None
         # The key file is produced by the existing manual media/import path.
         # Re-read when an image is retried so recovery needs no worker restart.
         try:
@@ -177,6 +184,7 @@ class WeChatMedia:
 
     def advance_index(self):
         """Incremental fallback for unusual layouts; never block a poll on a walk."""
+        if not getattr(self,'read_images',True):return
         if not self.live or time.monotonic()<self.next_index:return
         if self.index_walk is None:
             def walk():
@@ -200,6 +208,7 @@ class WeChatMedia:
         Consume the upstream attachment layout, never invoke a download. The
         hashed conversation and validated resource ID cannot introduce paths.
         """
+        if not getattr(self,'read_images',True):return []
         paths=list(self.index.get(str(md5).lower(),[]))
         if not isinstance(md5,str) or not re.fullmatch('[a-fA-F0-9]{32}',md5):return paths
         chat=message.get('chat')
@@ -230,6 +239,8 @@ class WeChatMedia:
         md5=message.get('md5')
         element=xml.find('.//emoji' if kind==47 else './/img') if xml is not None else None
         if not md5 and element is not None:md5=element.get('md5')
+        if not getattr(self,'read_images',True):
+            return '',[unavailable(media_kind,reason='图片读取已关闭',md5=md5)],None
         key=(md5,media_kind)
         # Only successful/explicitly omitted media is cached. Missing or partially
         # written attachments can become readable after the message is committed.

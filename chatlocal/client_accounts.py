@@ -94,6 +94,8 @@ def accounts_view(store):
             if selected and selected not in candidates:
                 detail = '上次使用的账号当前未找到，不会自动选择其他账号。'
             result[platform] = dict(accounts=candidates, selected=selected, detail=detail)
-        except (OSError, ValueError):
-            result[platform] = dict(accounts=[], selected=selected, detail='账号检测未完成，请重新检测；已有数据保留。')
+        except (OSError, ValueError) as exc:
+            detail = str(exc) if sys.platform == 'darwin' and platform == 'wechat' else '账号检测未完成，请重新检测；已有数据保留。'
+            result[platform] = dict(accounts=[], selected=selected, detail=detail)
+        result[platform]['supported'] = True
     return result
