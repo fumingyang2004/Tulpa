@@ -5,6 +5,7 @@ imported, and that only works before Textual owns stdin, so the import happens
 here at module level: app.py imports this module before the TUI starts.
 """
 from pathlib import Path
+import logging
 
 from textual import events
 from textual.app import ComposeResult
@@ -13,11 +14,22 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Static, TextArea
 
+class _QuietUnsupportedTerminal(logging.Filter):
+    def filter(self, record):
+        return not (record.getMessage() == 'Failed to probe terminal capabilities'
+                    and record.exc_info and isinstance(record.exc_info[1], TimeoutError))
+
+
+# An unanswered graphics probe is normal on plain terminals/SSH. The library
+# already falls back to half-cell rendering; avoid a misleading startup stack.
+_probe_log = logging.getLogger('textual_image._terminal')
+_probe_filter = _QuietUnsupportedTerminal()
 try:
     from PIL import Image as PILImage
 except ImportError:  # Pillow missing: the dialog says so instead of crashing.
     PILImage = None
 
+_probe_log.addFilter(_probe_filter)
 try:
     from textual_image._terminal import get_cell_size
     from textual_image.renderable import Image as _AutoRenderable
@@ -35,6 +47,8 @@ except Exception as exc:  # noqa: BLE001 - missing library or a failed terminal 
     ImageWidget = None
     get_cell_size = None
     IMAGE_ERROR = f'无法加载 textual-image：{type(exc).__name__}'
+finally:
+    _probe_log.removeFilter(_probe_filter)
 
 SEQUENCE = ('up', 'up', 'down', 'down', 'left', 'right', 'left', 'right', 'b', 'a', 'b', 'a')
 ARROWS = 8  # After this many matched arrows, b/a belong to the sequence, not the page.

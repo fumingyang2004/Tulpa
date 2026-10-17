@@ -24,14 +24,14 @@ def pip_install(requirement):
 def main():
     p=argparse.ArgumentParser();p.add_argument('component',choices=['readers','voice','ocr','office','full']);args=p.parse_args()
     choice=args.component
-    if choice=='full':pip_install('requirements/linux-full.txt')
+    if choice=='full':pip_install('requirements/macos.txt' if sys.platform == 'darwin' else 'requirements/linux-full.txt')
     if choice in ('readers','full'):
-        pip_install('requirements/linux-readers.txt')
+        pip_install('requirements/macos.txt' if sys.platform == 'darwin' else 'requirements/linux-readers.txt')
         subprocess.run([sys.executable,str(ROOT/'scripts/install_readers.py')],cwd=ROOT,check=True)
-    if choice=='ocr':pip_install('requirements/linux-ocr.txt')
+    if choice=='ocr' or (choice=='full' and sys.platform == 'darwin'):pip_install('requirements/linux-ocr.txt')
     if choice in ('ocr','full'):
         subprocess.run([sys.executable,str(ROOT/'scripts/setup_linux_ocr.py')],cwd=ROOT,check=True)
-    if choice=='office':pip_install('requirements/artifacts.txt')
+    if choice=='office' or (choice=='full' and sys.platform == 'darwin'):pip_install('requirements/artifacts.txt')
     if choice in ('voice','full'):
         pip_install('requirements/voice.txt')
         subprocess.run([sys.executable,str(ROOT/'scripts/setup_voice.py')],cwd=ROOT,check=True)

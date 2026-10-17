@@ -232,7 +232,7 @@
       <p id="read-window-summary" class="read-window-summary" aria-live="polite" hidden></p>
     </fieldset>
     <label class="sticker-option"><input id="load-stickers" type="checkbox">手动读取 / 刷新时加载表情包 <span>含 GIF / 动态图片</span></label>
-    <p class="field-hint">勾选后点击“按以上设置读取”，会同时补载选定会话、日期范围内已导入的表情包；这一步不受“每会话条数上限”限制，也不会多导入历史。取消时，本次读取的表情包只保留 [动画表情]，普通静态图片照常加载。仅恢复本机仍可获取的媒体；增量“刷新消息”只处理新增记录。</p>
+    <p class="field-hint">勾选后点击“按以上设置读取”，会同时补载选定会话、日期范围内已导入的表情包；这一步不受“每会话条数上限”限制，也不会多导入历史。取消时，本次读取的表情包只保留 [动画表情]。微信图片是否读取，以“实时摄取”中的图片开关为准。仅恢复本机仍可获取的媒体；增量“刷新消息”只处理新增记录。</p>
     <button id="read-latest" class="primary-button">按以上设置读取</button>
     <p class="field-hint">这里的平台和会话选择用于本次历史读取，以及后续手动与定时“刷新消息”；不会关闭或缩小实时监听。日期和条数仅用于本次补读。扩大会话范围时须在这里补读，之前跳过的历史不会自动补回。其他已导入记录保留。</p>
     <section id="import-meter" class="import-meter" hidden aria-label="导入进度">
@@ -288,6 +288,8 @@
     <details id="live-settings-panel" class="import-section"><summary>实时摄取</summary>
       <div class="date-fields"><label>QQ<select id="live-qq"><option value="database">数据库监听</option><option value="off">关闭</option></select></label><label>微信<select id="live-wechat"><option value="database">数据库监听</option><option value="off">关闭</option></select></label></div>
       <label class="checkbox-field"><input id="live-stickers" type="checkbox">实时载入表情包</label>
+      <label class="checkbox-field"><input id="wechat-read-images" type="checkbox">读取微信图片（历史导入和新增消息）</label>
+      <p class="field-hint">关闭微信图片读取后，图片和表情只保留消息占位，不读取图片文件。文字、文件名称和引用消息仍会入库；已有图片缓存保留。</p>
       <p class="field-hint">实时监听独立于上方的历史导入选择。启用后读取该平台本机可识别会话的新增消息；临时只导入某个好友或只勾选 QQ，不会暂停其他会话或微信监听。关闭监听请在这里选择“关闭”并保存。</p>
       <p class="field-hint">表情包默认关闭，实时设置在重启后保留。新消息直接进入本机数据库，不逐条调用 AI。已移除启动、定期和故障时的自动补同步；读取受限或需补漏时，请手动刷新，或开启上方独立的自动刷新。旧版本曾因导入范围跳过的历史仍需按会话、日期补读。</p>
       <div id="live-detail" class="field-hint" aria-live="polite"></div><button id="live-save" class="quiet-button">保存实时设置</button>

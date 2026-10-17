@@ -97,6 +97,7 @@ def check(rows=50101):
         digest=hashlib.sha256(source.read_bytes()).hexdigest()
         store=Store(folder/'messages.sqlite3');out=folder/'final.json';events=[];mode=['qq'];peak=[0,0]
         def spawn(command,**kwargs):
+            if mode[0]=='wechat_delta':assert kwargs['env']['CHATLOCAL_SYNC_METRICS']==str(folder/'caller-metrics.json')
             return popen([sys.executable,'-u',str(Path(__file__).resolve()),'--worker','--mode',mode[0],
                 '--fixture',str(folder),'--',*command[3:]],**kwargs)
         def progress(event):
@@ -163,7 +164,8 @@ def check(rows=50101):
                 db.commit()
         mode[0]='wechat_delta'
         with patch('chatlocal.import_pipeline.subprocess.Popen',side_effect=spawn):
-            try:delta=run_batches(store,'wechat',['--no-stickers'],out,key='wechat_delta',automatic=True)
+            try:delta=run_batches(store,'wechat',['--no-stickers'],out,key='wechat_delta',automatic=True,
+                env={'CHATLOCAL_SYNC_METRICS':str(folder/'caller-metrics.json')})
             except ImportInterrupted:
                 print((pipeline.REPORTS/'data-wechat-error.log').read_text('utf-8'))
                 raise

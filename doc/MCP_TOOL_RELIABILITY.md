@@ -5,7 +5,7 @@
 ## 调用协议
 
 - 有新输入才规划；空闲直接等待。`input_batch.plan_call` 给出规划参数，`next_call` 给出发送或继续等待的参数。带 `requires` 的模板需补齐所列字段。编号原样保留为 JSON 字符串。
-- `plan_chat_reply` 的 `idempotency_key` 可省略，由程序按会话、读取批次和完整决定生成。`send_chat_reply` 按计划和气泡内容去重，调用方不必另起编号。旧参数继续兼容；同一计划改内容会被拒绝。
+- `plan_chat_reply` 的 `idempotency_key` 可省略，由程序按会话、读取批次和完整决定生成。`send_chat_reply` 按计划和气泡内容去重；待复核草稿仅可由 `review_chat_reply(decision="replace")` 修改，已经开始派发的队列不能更改。
 - 等待默认建议 180 秒，空闲不增加一次空规划。有成功发送回执的连续自身回声由等待工具确认，仍保留在上下文中；同账号手机手动消息正常交付。不会只因 `is_self` 就丢弃消息。
 - 重复确认旧游标不再报错，也不倒退进度或覆盖新便签。未来游标依然拒绝；普通上下文读取不能跳过未返回的分页。
 - `get_chat_session` 补读覆盖全部未确认输入时，继续等待模板可确认至补读末尾，减少重复交付；读取本身不推进确认游标。最近 20 条之前仍有未确认消息时，继续按页读取，不跨过缺口。
@@ -16,13 +16,18 @@
 | 结果 | 下一步 |
 | --- | --- |
 | `invalid_arguments` | 按 `argument_errors` 修正字段；程序尚未执行，不原样反复调用 |
-| `stale`、读取批次或计划过期 | 按 `recovery.next_call` 补读并重新规划，不能重发旧答案 |
+| `REVIEW_REQUIRED` | 原草稿尚未发送；读 `review.messages` 后沿 `next_call` 决定 keep/replace/cancel，最多复核一次 |
+| `stale`（strict 模式）、读取批次或计划过期 | 按 `recovery.next_call` 补读并重新规划，不能重发旧答案 |
 | `needs_wait`、冷却、暂时忙碌 | 沿用 `recovery.next_call`；等待工具用 `minimum_wait_seconds` 在程序内退避，可被停止或取消打断 |
 | 已知成功，重复相同计划及内容 | 返回已有回执，没有新增发送 |
-| `UNKNOWN`、`INTERRUPTED` | 通过 `get_chat_session.recent_turns` 查看实际结果；不换编号补发，不恢复旧尾部 |
+| `UNKNOWN`、`INTERRUPTED` | 通过 `get_chat_session(response_format="full").recent_turns` 查看实际结果；不换编号补发，不恢复旧尾部 |
+| `idle_window_elapsed`（桥接） | 空闲合并窗口结束，沿 `next_call` 继续 wait；不是群聊任务完成 |
+| `duration_elapsed`（桥接） | 总时长已到，停止新写入并核对 `stop_result`；失败时不能宣称远端会话已停止 |
 | 权限、停止、无效目标等拒绝 | 修正请求或停止；不自动开权限、替换目标或换表达方式 |
 
 程序无法阻止所有外部宿主反复发出错误调用，但不会因此重复已知发送或自动重试不确定的 QQ 写入。
+
+专用群聊建议使用 [stdio 桥接](MCP_CHAT_BRIDGE.md)，减少空轮询唤醒。人设只在首次、版本变化或显式恢复时完整返回；新上下文应省略 `known_prompt_version`，不能假定宿主仍记得旧卡。
 
 ## DSH 的模型请求重试
 

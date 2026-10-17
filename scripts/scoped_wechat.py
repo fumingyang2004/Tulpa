@@ -8,7 +8,7 @@ from chatlocal.import_scope import bounds
 from incremental_wechat import checked_open
 
 
-def export_selected(reader, selected_chats, metadata, output, limit, coverage,load_stickers=True,start='',end='',batch_dir=None):
+def export_selected(reader, selected_chats, metadata, output, limit, coverage,load_stickers=True,start='',end='',batch_dir=None,*,read_images=True):
     from wechatauto.db import MSG_TYPE_NAMES
     from reader_media import WeChatMedia
     lo,hi=bounds(start,end)
@@ -68,7 +68,7 @@ def export_selected(reader, selected_chats, metadata, output, limit, coverage,lo
                     is_self=sender==reader.wxid if sender else None,source_db=rel.replace('\\','/'),source_table=table)
                 if int(message.get('type_code',0))&0xffffffff==34:text,media,reply=None,[],None
                 else:
-                    if media_reader is None:media_reader=WeChatMedia(reader,metadata,load_stickers=load_stickers)
+                    if media_reader is None:media_reader=WeChatMedia(reader,metadata,load_stickers=load_stickers,read_images=read_images)
                     text,media,reply=media_reader.parse(message)
                 if text is not None:message['text']=text
                 message.update(media=media,reply_to=reply);messages.append(message);unknown+=not bool(sender)

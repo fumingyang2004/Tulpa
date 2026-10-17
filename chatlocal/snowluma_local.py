@@ -22,6 +22,8 @@ def fingerprint(value):
 
 def runtime_files(manifest):
     if os.name=='nt':return manifest['required_files']
+    if platform.system() == 'Darwin':
+        raise ManagedError('platform_unsupported', 'SnowLuma 没有 macOS 原生运行包，请选择 Docker 托管。')
     arch={'x86_64':'x64','AMD64':'x64','aarch64':'arm64','arm64':'arm64'}.get(platform.machine())
     if platform.system()!='Linux' or not arch:
         raise ManagedError('platform_unsupported','托管运行支持 Windows x64、Linux x64 和 ARM64。')

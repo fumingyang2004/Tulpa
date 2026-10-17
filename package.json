@@ -1,0 +1,18 @@
+{
+  "name": "tulpa-frontend-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/frontend/eslint-check.mjs && node tests/frontend/smoke.mjs && node tests/frontend/vnc-login.mjs && node tests/frontend/sl-platforms.mjs",
+    "test:browser": "node tests/frontend/browser.cjs"
+  },
+  "devDependencies": {
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
+    "jsdom": "29.1.1",
+    "playwright-core": "1.63.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

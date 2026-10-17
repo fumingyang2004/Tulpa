@@ -1,7 +1,7 @@
 'use strict';
 let liveLastId=0,liveBusy=false,liveEditing=false,liveRefreshAt=0;
-const liveLabels={starting:'正在启动',listening:'监听中',receiving:'读取新增',retrying:'正在重试',degraded:'实时读取受限',client_stopped:'客户端未运行',needs_baseline:'需先导入'};
-const liveShortLabels={starting:'启动中',listening:'监听中',receiving:'更新中',retrying:'重试中',degraded:'读取受限',client_stopped:'未运行',needs_baseline:'待导入'};
+const liveLabels={unsupported:'Mac 尚未支持',starting:'正在启动',listening:'监听中',receiving:'读取新增',retrying:'正在重试',degraded:'实时读取受限',client_stopped:'客户端未运行',needs_baseline:'需先导入'};
+const liveShortLabels={unsupported:'Mac 未适配',starting:'启动中',listening:'监听中',receiving:'更新中',retrying:'重试中',degraded:'读取受限',client_stopped:'未运行',needs_baseline:'待导入'};
 function liveLabel(p,short=false) {
   if(p.status==='off')return '监听已关闭';
   return (short?liveShortLabels:liveLabels)[p.status]||'状态未知';
@@ -30,6 +30,7 @@ async function pollLive() {
     if(!liveEditing) {
       $('live-qq').value=data.settings.qq;$('live-wechat').value=data.settings.wechat;
       $('live-stickers').checked=data.settings.load_stickers;
+      $('wechat-read-images').checked=data.settings.wechat_read_images!==false;
     }
     const upper=Math.max(...data.platforms.map(p=>p.last_id||0));
     if(upper>liveLastId && state.ready && !state.busy && !state.loading && Date.now()-liveRefreshAt>5000) {
@@ -51,11 +52,11 @@ $('live-summary').onclick=()=>{
   $('open-data').click();$('live-settings-panel').open=true;
   setTimeout(()=>$('live-settings-panel').scrollIntoView({block:'center',behavior:'smooth'}),100);
 };
-for(const id of ['live-qq','live-wechat','live-stickers']) $(id).onchange=()=>{liveEditing=true;};
+for(const id of ['live-qq','live-wechat','live-stickers','wechat-read-images']) $(id).onchange=()=>{liveEditing=true;};
 $('live-save').onclick=async()=>{
   try {
     await watchApi('/api/live-settings',{qq:$('live-qq').value,wechat:$('live-wechat').value,
-      load_stickers:$('live-stickers').checked},'PUT');
+      load_stickers:$('live-stickers').checked,wechat_read_images:$('wechat-read-images').checked},'PUT');
     liveEditing=false;toast('实时设置已保存');await pollLive();
   } catch(error) {toast(error.message);}
 };

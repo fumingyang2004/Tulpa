@@ -29,6 +29,9 @@ def component_status(root=ROOT):
         ('PP-OCRv6_det_small.onnx','PP-OCRv6_rec_small.onnx','ch_ppocr_mobile_v2.0_cls_mobile.onnx'))
     result['readers'].update(architecture=platform.machine(),active_key_supported=platform.machine() in ('x86_64','AMD64'),
         detail='Linux 自动启动取钥按上游 x86_64 已验证版本开放；其他架构可使用经数据库验证的已有密钥。')
+    if sys.platform == 'darwin':
+        result['readers'].update(active_key_supported=False,
+            detail='macOS 支持已有密钥与只读导入；主动恢复需另装隔离组件并核对客户端版本，见 macos/README.md。')
     result['voice']=dict(installed=voice['status']=='installed' and executable.is_file(),model=voice,
         executable=executable.is_file(),build_tools=all(shutil.which(p) for p in ('cmake','c++','cc')) or
         all(importlib.util.find_spec(p) is not None for p in ('cmake','ninja','ziglang')))

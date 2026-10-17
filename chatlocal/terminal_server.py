@@ -3,11 +3,12 @@ import os
 from pathlib import Path
 import platform
 import secrets
+import sys
 import threading
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from .config import ROOT
 from .mcp_routes import install_mcp_routes
@@ -31,7 +32,7 @@ def ensure_token(path):
         return read_token(path)
 
 
-def create_app(*, root=ROOT, store=None, token=None):
+def create_app(*, root=ROOT, store=None, token=None, desktop=None, legacy=True):
     root = Path(root).resolve()
     store = store or Store(root/'data/chats.sqlite3')
     token = token or ensure_token(root/'data/terminal-admin.token')
@@ -40,6 +41,16 @@ def create_app(*, root=ROOT, store=None, token=None):
     access, chat = service.access, service.tools.chat
     app.state.terminal_root = root
     mutation_lock = threading.RLock()
+    desktop = sys.platform == 'darwin' if desktop is None else desktop
+    from .desktop_session import DesktopSessions
+    browser = DesktopSessions(root) if desktop else None
+
+    if browser:
+        @app.post('/api/terminal/desktop-ticket')
+        def desktop_ticket(request: Request, body: dict):
+            if body or not secrets.compare_digest(request.headers.get('authorization', '').encode(), ('Bearer '+token).encode()):
+                raise HTTPException(403, '请从本机 Tulpa 启动桌面窗口。')
+            return dict(path='/_desktop/open?ticket='+browser.issue())
 
     @app.middleware('http')
     async def authorize(request: Request, call_next):
@@ -49,14 +60,25 @@ def create_app(*, root=ROOT, store=None, token=None):
                 or request.headers.get('origin') not in (None, str(request.base_url).rstrip('/'))
                 or request.headers.get('sec-fetch-site') == 'cross-site'):
             return JSONResponse({'detail': '仅允许本机同源管理请求。'}, status_code=403)
+        if browser and request.url.path == '/_desktop/open' and request.method == 'GET':
+            session = browser.exchange(request.query_params.get('ticket'))
+            if not session:
+                return JSONResponse({'detail': '桌面启动凭证已过期，请重新打开 Tulpa。'}, status_code=401)
+            response = RedirectResponse('/?desktop=1', status_code=303)
+            response.set_cookie(browser.cookie, session, httponly=True, samesite='strict', max_age=86400)
+            response.headers['Cache-Control'] = 'no-store'
+            response.headers['Referrer-Policy'] = 'no-referrer'
+            return response
         if request.url.path != '/health':
-            if not secrets.compare_digest(request.headers.get('authorization', '').encode(), ('Bearer '+token).encode()):
+            bearer = secrets.compare_digest(request.headers.get('authorization', '').encode(), ('Bearer '+token).encode())
+            if not bearer and not (browser and browser.valid(request.cookies.get(browser.cookie))):
                 return JSONResponse({'detail': '管理凭据无效。'}, status_code=401)
             if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
-                if request.headers.get('content-type', '').split(';')[0] != 'application/json':
+                legacy_upload = bool(browser and request.url.path == '/legacy/gradio_api/upload')
+                if not legacy_upload and request.headers.get('content-type', '').split(';')[0] != 'application/json':
                     return JSONResponse({'detail': '请求须为 JSON。'}, status_code=415)
                 raw = bytearray()
-                limit = 65536 if request.url.path.startswith('/api/terminal/') else 512000
+                limit = 101*1024*1024 if legacy_upload else (65536 if request.url.path.startswith('/api/terminal/') else 512000)
                 async for chunk in request.stream():
                     raw.extend(chunk)
                     if len(raw) > limit:
@@ -112,7 +134,7 @@ def create_app(*, root=ROOT, store=None, token=None):
                     storage=str(root/'data'), mcp=service.status(), sl=sl_config(),
                     counts=dict(messages=messages, connections=connections, active_sessions=sessions),
                     capabilities=dict(native_import=True, managed_snowluma=True,
-                                      managed_snowluma_docker=platform.system()=='Linux',full_application=True,
+                                      managed_snowluma_docker=platform.system() in ('Linux', 'Darwin'),full_application=True,
                                       multi_instance=True),
                     receiver=chat.receiver.status())
 
@@ -205,7 +227,7 @@ def create_app(*, root=ROOT, store=None, token=None):
             raise ValueError('请选择有效平台。')
         with store.connect() as db:
             for source in platforms:
-                if source == 'qq' and live_grant(body):
+                if body.get('allow_future_imports') or (source == 'qq' and live_grant(body)):
                     continue
                 if not db.execute('SELECT 1 FROM messages WHERE platform=? LIMIT 1', (source,)).fetchone():
                     raise ValueError('请先导入所选平台的聊天，确认来源账号后再创建连接。')
@@ -331,6 +353,9 @@ def create_app(*, root=ROOT, store=None, token=None):
     for route in list(app.routes):
         if getattr(route,'path','').startswith('/media/'):
             app.add_api_route('/api'+route.path,route.endpoint,methods=['GET'])
+    if desktop:
+        from .web_frontend import install_web_ui
+        app = install_web_ui(app, root=root, store=store, legacy=legacy)
     return app
 
 
@@ -343,6 +368,7 @@ def run(port=7861, token_file=None):
         with file_lock(ROOT/'.tmp/terminal-service.lock'):
             token = ensure_token(token_file or os.environ.get('TULPA_TOKEN_FILE') or ROOT/'data/terminal-admin.token')
             app = create_app(token=token)
+            app.state.tulpa_mcp.source_base = f'http://127.0.0.1:{port}'
             server = uvicorn.Server(uvicorn.Config(app, host='127.0.0.1', port=port,
                 access_log=False, timeout_graceful_shutdown=15))
             app.state.terminal_shutdown = lambda: setattr(server, 'should_exit', True)

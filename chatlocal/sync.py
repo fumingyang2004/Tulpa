@@ -48,6 +48,7 @@ def status(store):
 
 def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, runner=None, cancelled=None):
     from .import_scope import get_scope
+    from .read_preferences import wechat_images_enabled
     scope=get_scope(store)
     platforms=[p for p,v in scope.items() if v['enabled']] if platforms is None else platforms
     if not isinstance(platforms,list) or not platforms or any(p not in ('qq','wechat') for p in platforms):raise ValueError('无效平台')
@@ -84,6 +85,8 @@ def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, 
                     command=[sys.executable,str(ROOT/'scripts'/f'export_{platform}.py'),'--refresh',
                         '--incremental-request',str(request),'--output',str(output),'--account',account]
                     if not load_stickers:command.append('--no-stickers')
+                    read_images=platform!='wechat' or wechat_images_enabled(store)
+                    if not read_images:command.append('--no-images')
                     batch_result={}
                     if runner is None:
                         from .import_pipeline import run_batches
@@ -92,9 +95,9 @@ def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, 
                             timing['attempts']=attempt+1
                             try:
                                 batch_result=run_batches(store,platform,
-                                    ['--incremental-request',str(request),'--account',account]+([] if load_stickers else ['--no-stickers']),output,
+                                    ['--incremental-request',str(request),'--account',account]+([] if load_stickers else ['--no-stickers'])+([] if read_images else ['--no-images']),output,
                                     progress=progress,cancelled=cancelled,automatic=True,
-                                    key=dict(checkpoint=checkpoint,account=account,conversations=scope[platform]['conversations'],load_stickers=load_stickers),
+                                    key=dict(checkpoint=checkpoint,account=account,conversations=scope[platform]['conversations'],load_stickers=load_stickers,read_images=read_images),
                                     env={'CHATLOCAL_SYNC_METRICS':str(folder/'metrics.json')})
                                 break
                             except ValueError as exc:
@@ -130,7 +133,7 @@ def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, 
                     if not checkpoint:detail+='；首次接续上次已导入快照（回叠5分钟），更早历史仍按补读范围获取'
                     transition=dict(platform=platform,previous=checkpoint,next=next_checkpoint,detail=detail)
                     if batch_result:transition['added']=batch_result['imported']
-                    if platform=='qq' and not payload.get('unchanged'):
+                    if platform=='qq' and next_checkpoint.get('method')=='native-id-inventory-v1' and not payload.get('unchanged'):
                         import hashlib
                         blobs={name:(folder/(name+'.next.bin')).read_bytes() for name in ('c2c_msg_table','group_msg_table')}
                         if any(hashlib.sha256(data).hexdigest()!=next_checkpoint['cursors'][name]['inventory_sha256'] for name,data in blobs.items()):raise ValueError('QQ 新身份目录校验失败')

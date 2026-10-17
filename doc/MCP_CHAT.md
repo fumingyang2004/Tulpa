@@ -2,7 +2,7 @@
 
 作用于外部 Agent 的持续 QQ 群聊及已授权好友私聊。完整版的 MCP 与轻量 MCP 使用相同实现；普通问答、帮我回复、记忆、关注卡和工作区不使用这些提示词。只依赖 SnowLuma 实时事件和独立的小型 MCP 缓存，不读大型历史数据库。私聊、实时附件和其他扩展见 [SL 扩展工具](SL_TOOLS.md)。
 
-0.5.5 加入 [Planner / Replyer 与发送队列](MCP_CHAT_TURNS.md)：get/wait → plan_chat_reply → send_chat_reply。单条兼容发送也需计划；程序检查静默、相关新消息和气泡间中止。新增独立“小鲸鱼2号”（`little_whale_v2`），保留原卡。升级后重连 MCP，停止旧群聊并用新开始编号选择人物卡。
+0.5.5 加入 [Planner / Replyer 与发送队列](MCP_CHAT_TURNS.md)：get/wait → plan_chat_reply → send_chat_reply。当前默认在相关新消息到来时保留草稿，沿 `review_chat_reply` 最多复核一次；停止、撤权等仍中断。长时间群聊可使用 [专用桥接](MCP_CHAT_BRIDGE.md) 合并空闲轮询并按版本加载人设。新增独立“小鲸鱼2号”（`little_whale_v2`），保留原卡。升级后重连 MCP，停止旧群聊并用新开始编号选择人物卡。
 
 ## 使用
 

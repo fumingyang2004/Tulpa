@@ -15,7 +15,6 @@ def extract(source,account=None,method='passive',confirm=False):
     from chatlocal.native_sources import configured_root
     from chatlocal.client_accounts import choose_account
     from chatlog_keeper import qq_db as q,wechat_db as wx
-    from chatlog_keeper import linux_key
     if source=='qq':
         root=configured_root(source) or q.find_qq_data_root()
         accounts=q.find_qq_account_databases(root) if root else {}
@@ -25,6 +24,12 @@ def extract(source,account=None,method='passive',confirm=False):
     account=choose_account(source,accounts,account)
     if method=='active':
         if not confirm:raise ValueError('主动取钥会启动一次官方客户端；请正常退出原客户端后使用 --confirm-start-client。')
+        if sys.platform == 'darwin':
+            sys.path.insert(0, str(ROOT/'macos'))
+            from reader_recovery import recover_qq, recover_wechat
+            result = recover_qq() if source == 'qq' else recover_wechat()
+            return dict(result, account=account, method=method)
+        from chatlog_keeper import linux_key
         if platform.machine() not in ('x86_64','AMD64'):
             raise ValueError('上游主动取钥未验证当前 CPU 架构，请使用已有密钥 JSON 或被动读取。')
         if source=='qq':

@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tarfile
 
 from .config import ROOT
@@ -18,6 +19,9 @@ def _systemctl(*args,check=False):
 
 
 def service_name(root=ROOT):
+    if sys.platform == 'darwin':
+        from .macos_service import service_name as action_impl
+        return action_impl(root)
     from .terminal_instances import metadata
     root=Path(root).resolve()
     instance=metadata(root)
@@ -27,6 +31,9 @@ def service_name(root=ROOT):
 
 
 def service_status(root=ROOT):
+    if sys.platform == 'darwin':
+        from .macos_service import service_status as action_impl
+        return action_impl(root)
     if not shutil.which('systemctl'):return dict(available=False,installed=False,active=False,detail='未安装 systemd，可直接运行 tulpa serve。')
     name=service_name(root)
     unit=Path(os.environ.get('XDG_CONFIG_HOME',Path.home()/'.config'))/'systemd/user'/name
@@ -64,6 +71,9 @@ def unit_text(root=ROOT,port=7861):
 
 
 def service_action(action,*,root=ROOT,port=7861,start=False,enable=True):
+    if sys.platform == 'darwin':
+        from .macos_service import service_action as action_impl
+        return action_impl(action, root=root, port=port, start=start, enable=enable)
     if os.name=='nt' or not shutil.which('systemctl'):raise ValueError('此命令需要 Linux 用户 systemd。')
     name=service_name(root)
     unit=Path(os.environ.get('XDG_CONFIG_HOME',Path.home()/'.config'))/'systemd/user'/name
@@ -94,6 +104,9 @@ def service_action(action,*,root=ROOT,port=7861,start=False,enable=True):
 
 
 def desktop_install(root=ROOT):
+    if sys.platform == 'darwin':
+        from macos.build_app import build
+        return dict(path=str(build(Path.home()/'Applications/Tulpa.app', root=root)))
     root=Path(root).resolve()
     from .terminal_instances import metadata
     instance=metadata(root)
@@ -110,7 +123,10 @@ def desktop_install(root=ROOT):
 
 def source_archive(output,root=ROOT):
     """Explicit public source allowlist; never package accounts, tokens or caches."""
-    from .linux_distribution import release_path, source_files
+    if sys.platform == 'darwin':
+        from .macos_distribution import release_path, source_files
+    else:
+        from .linux_distribution import release_path, source_files
     root=Path(root).resolve();output=Path(output).expanduser().absolute()
     chosen=source_files(root)
     fd=os.open(output,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)

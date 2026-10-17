@@ -16,6 +16,7 @@ sys.path.insert(0,str(ROOT))
 from PIL import Image
 from chatlocal import media as cache
 from chatlocal.store import Store
+from chatlocal.normalize import TZ
 from chatlocal.data_delete import preview,purge
 from reader_media import WeChatMedia
 from live_media import WeChatMediaRetries
@@ -77,7 +78,7 @@ def main():
         head=dict(reader='wechatauto-replica',wxid='self',identity_method='per-shard',chats=[dict(username=chat,name='测试群')])
         img=io.BytesIO();Image.new('RGB',(20,12),'red').save(img,'PNG')
         png=img.getvalue()
-        date=datetime.fromtimestamp(now).strftime('%Y-%m')
+        date=datetime.fromtimestamp(now, TZ).strftime('%Y-%m')
         target=media.root/'msg/attach'/hashlib.md5(chat.encode()).hexdigest()/date/'Img'/(digest+'_h.dat')
         target.parent.mkdir(parents=True)
         store=Store(folder/'messages.sqlite3');source=folder/'live.json'
@@ -113,7 +114,7 @@ def main():
             # In-flight media recovery cannot restore a user's deleted message.
             rows,_=WeChatMediaRetries(store.path).collect(media,'self',None,now=now+40)
             assert len(rows)==1
-            today=datetime.fromtimestamp(now).strftime('%Y-%m-%d')
+            today=datetime.fromtimestamp(now, TZ).strftime('%Y-%m-%d')
             scope=dict(platform='wechat',conversations=[chat],start=today,end=today)
             purge(store,scope,preview(store,scope)['fingerprint'])
             source.write_text(json.dumps(dict(head,messages=rows)),'utf-8')

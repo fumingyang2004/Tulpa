@@ -13,6 +13,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from PIL import Image
 from chatlocal.store import Store
+from chatlocal.normalize import TZ
 from chatlocal import media as cache
 from chatlocal.media_refresh import refresh,prepare,selection
 from chatlocal.data_delete import purge,preview
@@ -23,9 +24,9 @@ from refresh_media import recover
 
 def main():
     with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='qq-media-check-') as tmp:
-        folder=Path(tmp);now=time.time();today=datetime.fromtimestamp(now).strftime('%Y-%m-%d')
+        folder=Path(tmp);now=time.time();today=datetime.fromtimestamp(now, TZ).strftime('%Y-%m-%d')
         parser=QQMedia(SimpleNamespace(),folder/'client/nt_db',load_stickers=False)
-        target=parser.root/'Pic'/datetime.fromtimestamp(now).strftime('%Y-%m')/'Ori'/('a'*32+'.jpg')
+        target=parser.root/'Pic'/datetime.fromtimestamp(now, TZ).strftime('%Y-%m')/'Ori'/('a'*32+'.jpg')
         target.parent.mkdir(parents=True)
         image=io.BytesIO();Image.new('RGB',(20,12),'red').save(image,'PNG');png=image.getvalue()
         missing=cache.unavailable('image',md5='a'*32,filename='A'*32+'.jpg')

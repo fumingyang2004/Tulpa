@@ -68,14 +68,16 @@ class TerminalClient:
             raise TerminalError('实例管理凭据路径无效。')
         return TerminalClient(descriptor['url'], token_file, timeout=self.timeout)
 
-    def request(self, method, path, *, params=None, body=None, native=False):
+    def request(self, method, path, *, params=None, body=None, native=False, timeout=None):
         import httpx
         if not isinstance(path,str) or not path.startswith('/api/' if native else '/') or any(x in path for x in ('?', '#', '..', '://', '%', '\\')):
             raise TerminalError('管理接口路径无效。')
         token = read_token(self.token_file)
         try:
-            timeout = max(self.timeout, 60) if not native and method != 'GET' and path.startswith('/instances') else self.timeout
-            with httpx.Client(timeout=timeout, trust_env=False, follow_redirects=False) as client:
+            request_timeout = self.timeout if timeout is None else timeout
+            if not native and method != 'GET' and path.startswith('/instances'):
+                request_timeout = max(request_timeout, 60)
+            with httpx.Client(timeout=request_timeout, trust_env=False, follow_redirects=False) as client:
                 response = client.request(method, self.base_url+('' if native else '/api/terminal')+path,
                     params=params, json=body, headers=self.headers(token))
             if response.status_code == 401:
@@ -118,8 +120,8 @@ class TerminalClient:
     def api_get(self, path, **params):
         return self.request('GET',path,params=params,native=True)
 
-    def api_post(self, path, body=None):
-        return self.request('POST',path,body={} if body is None else body,native=True)
+    def api_post(self, path, body=None, *, timeout=None):
+        return self.request('POST',path,body={} if body is None else body,native=True,timeout=timeout)
 
     def api_put(self, path, body):
         return self.request('PUT',path,body=body,native=True)

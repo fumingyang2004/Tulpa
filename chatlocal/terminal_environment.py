@@ -27,7 +27,7 @@ def required_packages(root=ROOT):
                 raise ValueError('终端依赖清单格式无效，请检查 requirements。')
             packages[name] = pinned
 
-    for name in ('linux.txt', 'tui.txt'):
+    for name in (('macos.txt',) if sys.platform == 'darwin' else ('linux.txt', 'tui.txt')):
         read(Path(root) / 'requirements' / name)
     return packages
 
@@ -50,7 +50,8 @@ def prepare_environment(root=ROOT):
     if not missing_packages(root):
         return
     print('正在准备 Tulpa 运行环境，首次安装需要联网……', file=sys.stderr, flush=True)
-    result = subprocess.run(['sh', str(Path(root) / 'setup-linux.sh')], cwd=root,
+    script = 'setup-macos.sh' if sys.platform == 'darwin' else 'setup-linux.sh'
+    result = subprocess.run(['sh', str(Path(root) / script)], cwd=root,
                             stdout=sys.stderr, stderr=sys.stderr)
     if result.returncode or missing_packages(root):
         raise ValueError('依赖安装未完成，请检查上方错误后重新运行 ./tulpa。')

@@ -22,7 +22,7 @@ def checked_open(reader,rel):
         conn.close();raise
 
 
-def export_delta(reader,metadata,request,load_stickers,batch_dir=None):
+def export_delta(reader,metadata,request,load_stickers,batch_dir=None,*,read_images=True):
     from wechatauto.db import MSG_TYPE_NAMES
     from export_wechat import SYSTEM_CHATS
     from reader_media import WeChatMedia
@@ -84,7 +84,7 @@ def export_delta(reader,metadata,request,load_stickers,batch_dir=None):
                     message.update(chat=user,sender_username=sender,sender_name=nicks.get(sender,sender) or '未知发送者',
                         is_self=sender==reader.wxid if sender else None,source_db=rel.replace('\\','/'),source_table=table)
                     if base not in (1,34):
-                        if media_reader is None:media_reader=WeChatMedia(reader,metadata,load_stickers=load_stickers)
+                        if media_reader is None:media_reader=WeChatMedia(reader,metadata,load_stickers=load_stickers,read_images=read_images)
                         text,media,reply=media_reader.parse(message)
                         if text is not None:message['text']=text
                         message.update(media=media,reply_to=reply)

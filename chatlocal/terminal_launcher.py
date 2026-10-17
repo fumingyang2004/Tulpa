@@ -71,6 +71,9 @@ def service_busy(root):
 
 def installed_service(root, port, token_file):
     """Reuse an owned systemd unit; never install or replace a service implicitly."""
+    if sys.platform == 'darwin':
+        from .macos_service import installed_service as mac_installed
+        return mac_installed(root, port, token_file)
     from .linux_service import service_status
     status = service_status(root)
     unit = Path(status['unit']) if status.get('unit') else None
@@ -132,7 +135,7 @@ def ensure_backend(base_url=None, token_file=None, *, root=ROOT, timeout=30, not
             from .linux_service import service_action
             service_action('start', root=root)
             wait_ready(client, deadline, root=root)
-            return dict(running=True, started=True, mode='systemd', url=client.base_url)
+            return dict(running=True, started=True, mode='launchd' if sys.platform == 'darwin' else 'systemd', url=client.base_url)
         log_path = root / '.tmp/terminal-service.log'
         fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, 'O_NOFOLLOW', 0), 0o600)
         process = None

@@ -67,6 +67,7 @@ class Reader:
         self.media = None
         self.media_at = 0
         self.media_stickers = None
+        self.media_read_images = None
         self.maps_at = 0
         self.nicks = {}
         self.idx = {}
@@ -248,6 +249,12 @@ class Reader:
             self.reader=LiveWeChatDB(db_dir=str(Path(meta['source_db']).parent.parent),account=meta['account'],
                 workdir=str(DATA/'live/wechat'),keys_file=str(DATA/'wechat-reader/keys.json'))
         reader=self.reader
+        read_images=self.request.get('wechat_read_images',True)
+        if (self.media is None or self.media_stickers!=self.request['load_stickers']
+                or self.media_read_images!=read_images):
+            self.media=WeChatMedia(reader,meta,load_stickers=self.request['load_stickers'],live=True,read_images=read_images)
+            self.media_stickers=self.request['load_stickers'];self.media_read_images=read_images
+            self.media_retries=None
         self.progress('open_pages')
         rels=reader._message_dbs()
         opened={}
@@ -323,8 +330,6 @@ class Reader:
                     message.update(chat=user,sender_username=sender,sender_name=self.nicks.get(sender,sender) or '未知发送者',
                         is_self=sender==reader.wxid if sender else None,source_db=rel.replace('\\','/'),source_table=table)
                     if base not in (1,34):
-                        if self.media is None or self.media_stickers!=self.request['load_stickers']:
-                            self.media=WeChatMedia(reader,meta,load_stickers=self.request['load_stickers'],live=True);self.media_stickers=self.request['load_stickers']
                         text,media,reply=self.media.parse(message)
                         if text is not None: message['text']=text
                         message.update(media=media,reply_to=reply)
@@ -338,15 +343,15 @@ class Reader:
         if set(previous.get('cursors',{}))-set(cursors): raise ValueError('shard_removed')
         # Messages may commit before their attachment files arrive. Retry a few
         # recent incomplete items even on a pass with no new native rows.
-        self.progress('media_retry')
-        if self.media is None or self.media_stickers!=self.request['load_stickers']:
-            self.media=WeChatMedia(reader,meta,load_stickers=self.request['load_stickers'],live=True);self.media_stickers=self.request['load_stickers']
-        if self.media_retries is None:
-            from live_media import WeChatMediaRetries
-            self.media_retries=WeChatMediaRetries()
-        self.media.advance_index()
-        recovered,recovered_chats=self.media_retries.collect(self.media,reader.wxid,wanted,
-            exclude={(m['chat'],str(m.get('server_id'))) for m in messages})
+        recovered=[];recovered_chats={}
+        if read_images:
+            self.progress('media_retry')
+            if self.media_retries is None:
+                from live_media import WeChatMediaRetries
+                self.media_retries=WeChatMediaRetries()
+            self.media.advance_index()
+            recovered,recovered_chats=self.media_retries.collect(self.media,reader.wxid,wanted,
+                exclude={(m['chat'],str(m.get('server_id'))) for m in messages})
         messages.extend(recovered)
         for user,chat in recovered_chats.items():chats.setdefault(user,chat)
         return dict(reader='wechatauto-replica',wxid=reader.wxid,chats=list(chats.values()),messages=messages,

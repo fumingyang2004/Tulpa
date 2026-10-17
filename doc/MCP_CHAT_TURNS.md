@@ -4,13 +4,15 @@
 
 ## 使用顺序
 
-1. 更新并启动实际使用目录的 Tulpa，重连 MCP，确认可发现 `plan_chat_reply`、`send_chat_reply`。原连接的账号、群范围和媒体权限继续有效，不自动扩权。
-2. 调用 `list_chat_personas`。新增 `little_whale_v2` 显示为“小鲸鱼2号”；原 `little_whale` 和自定义卡仍可选。
+1. 更新并启动实际使用目录的 Tulpa，重连 MCP，确认可发现 `plan_chat_reply`、`send_chat_reply`、`review_chat_reply`。原连接的账号、群范围和媒体权限继续有效，不自动扩权。
+2. 调用 `list_chat_personas`，默认返回目录摘要，`include_content=true` 可读取全部全文。新增 `little_whale_v2` 显示为“小鲸鱼2号”；原 `little_whale` 和自定义卡仍可选。
 3. 停止原群聊会话，用新开始编号 `start_chat_session(persona_preset="little_whale_v2", ...)`。返回的 `session.persona_preset` 和 `chat_prompt.persona` 应为新卡；重复使用旧开始编号仍返回旧快照，不能用它切人格。
 4. `get_chat_session` / `wait_chat_messages` 返回 `input_batch`，包含批次 ID、水位、收集原因及同人短连发的 ID 分组。单条时间、来源和消息 ID 不丢失。
 5. Planner 调用 `plan_chat_reply`，传批次、`wait / silence / reply`、简短沟通意图；参与时选目标、相关话题消息及表达类型。除了 `text / sticker / reaction`，独立授权后还可用 `voice / video / file / ai_voice / qq_action`，字段与示例见 [SL 扩展工具](SL_TOOLS.md)。可附少量主题词。这里只记决定，不发送推理或规划文本。
 6. `READY` 后先遵循 `next_call`：有表达候选的文字计划先调用 `select_chat_expressions`，选 0–5 条参考或用 `expression_ids=[]` 明确不用；未选择直接发送返回 `expression_selection_required`，不会派发。没有候选、学习关闭和纯媒体计划自动跳过选择。之后同一个 Agent 组织内容，调用 `send_chat_reply` 提交 1–3 个完整语义气泡。程序先检查，再依次发送，后续气泡有间隔。一个长解释可以仍是一条；不按标点切句。
-7. 看回执，确认已处理消息水位后继续等待。沉默、只用图或小回应同样是完整参与；程序不补发说明文字。
+7. 若返回 `REVIEW_REQUIRED`，读取新增消息并按 `next_call` 调用 `review_chat_reply`，选择保留、替换或取消草稿；保留/替换直接发送。否则看回执，确认已处理消息水位后继续等待。沉默、只用图或小回应同样是完整参与；程序不补发说明文字。
+
+人设首次只在 `chat_prompt.persona` 返回一份。后续 get/wait 带 `known_prompt_version`，相同版本省略人设和固定说明；新上下文需要省略版本重新加载。完整诊断用 `response_format="full"`。长期等待可采用 [专用 stdio 桥接](MCP_CHAT_BRIDGE.md)，让空轮询留在本地进程。
 
 ```json
 {
@@ -44,11 +46,17 @@
 
 沿用尾部静默，默认 2 秒。等待的首条未处理群友消息作为本次收集锚点；同一话题的连续补充、引用或 @ 机器人会延长它。该发言者转去引用其他话题或 @ 别人后，旁边的对话及其无标记续句不再延长当前等待。最多收集 8 秒，分页仍最多 50 条。超时/达到页上限只返回材料重新评估，不授权抢答；Planner 会按相同的指向规则重新核对所选目标的静默。
 
-相关性从所选目标与话题消息开始，按事件顺序跟踪原生引用链、明确 @ 本人、Agent 提供的少量主题词及参与者的连续补充。明确转向别人的消息优先于“同一发言者”判断；再次引用原话题、@ 本人或命中主题词时仍会触发补读。没有明确转向时，较晚的无标记更正仍保守地视为相关，不按经过时间直接丢弃。未指定目标的主动发言把全部新群友输入视为相关。第二条前还会识别别人引用第一条的插话。这不是完美语义理解：无标记切换话题可能误判；换说话者或转向别人后，没有引用、@ 或共同关键词的含蓄纠正可能漏判，Agent 仍应读上下文并谨慎选目标。普通 get 不绕过静默。
+相关性从所选目标与话题消息开始，按事件顺序跟踪原生引用链、明确 @ 本人、Agent 提供的少量主题词及参与者的连续补充。明确转向别人的消息优先于“同一发言者”判断；再次引用原话题、@ 本人或命中主题词时仍视为相关。没有明确转向时，较晚的无标记更正仍保守地视为相关，不按经过时间直接丢弃。未指定目标的主动发言把全部新群友输入视为相关。这不是完美语义理解：无标记切换话题可能误判；换说话者或转向别人后，没有引用、@ 或共同关键词的含蓄纠正可能漏判，Agent 仍应读上下文并谨慎选目标。普通 get 不绕过静默。
+
+默认 `new_message_policy="review"` 固定所读批次的收集窗口。相关新消息不会取消正在组织的草稿或反复重置窗口；发送前返回 `REVIEW_REQUIRED`，保存完整草稿和最多 50 条新增事件。Agent 用 `review_chat_reply(session_id, plan_id, review_id, decision)` 决定 `keep`、`replace` 或 `cancel`；仅 `replace` 传完整 `bubbles`。目标和表达类型不能在复核里更换。超过新增事件上限则要求分页补读。
+
+每个计划最多复核一次。保留/替换通过检查后立即提交短队列，后到的普通新消息留到下一轮，不打断气泡尾部；停止、撤权、目标撤回、连接/缓存缺口、过期及取消仍逐次检查。复核不会自动确认新增消息，下一次等待仍能处理它们。相同复核编号及决定幂等返回原结果，已提交的决定不能修改。
+
+指定 `new_message_policy="strict"` 可保留原行为：规划或每次派发前发现相关插话返回 `stale`，取消旧计划/未发尾部；别人引用第一气泡也会阻止后续气泡。默认模式在繁忙群中能完成短回复，代价是复核之后仍可能出现新的更正。
 
 补读 `get_chat_session` 后，若最近上下文覆盖了全部未确认输入，返回的继续等待模板允许一次确认至补读末尾，避免下一次等待重复交付。读取本身不确认处理进度；若最近 20 条之前仍有未确认消息，模板不会跨过缺口，须继续按页读取并确认。
 
-`stale`、`needs_refresh`、`plan_expired`、`target_expired` 表示补读后重新规划；`needs_wait` 表示继续等。发送中的相关插话、停止、撤权会取消尚未发送的尾部；已发内容保留。返回每个气泡的 `SUCCEEDED / NOOP / FAILED / UNKNOWN / CANCELLED` 和原操作回执。`UNKNOWN` 不自动重试；重复提交同一计划不会再次发送成功气泡，也不能更改其队列。
+`stale`（strict 模式）、`needs_refresh`、`plan_expired`、`target_expired` 表示补读后重新规划；`needs_wait` 表示继续等。硬中断取消尚未发送的尾部，已发内容保留。返回每个气泡的 `SUCCEEDED / NOOP / FAILED / UNKNOWN / CANCELLED` 和操作回执。桥接会精简成功回执，可按操作 ID 查询详情；完整近期计划用 `get_chat_session(response_format="full")`。`UNKNOWN` 不自动重试；重复提交同一计划不会再次发送成功气泡，也不能更改其队列。
 
 不能强制取消所有外部宿主正在生成的文字。可保证的是进入发送接口及每次派发前的检查，不能撤销已交给 QQ 的请求；网络派发与收到新消息仍存在不可消除的极短竞争窗口。服务重启使旧读取批次和未发送计划失效，旧队列不会在后台续发。中断时已派发但没取得回执的气泡保留 UNKNOWN。
 
@@ -69,7 +77,7 @@
 
 间隔为上一条字数 × 系数 + 最小间隔，封顶；只加在真实的两次发送之间。不同轮默认冷却 3 秒；小回应原有 10 秒冷却及各工具全局限流仍生效。混合队列不会绕过表情发送额度。
 
-`session.turn_process` 显示 COLLECTING、WAITING、DECIDING、REPLYING、SENDING、STOPPED 及最近计划结果。每会话保留最多 64 个读取批次、近期 200 个普通闭合计划；未解决 UNKNOWN 和底层操作回执不按此清理。计划仅保存在本机 MCP 数据库，不形成长期记忆/群友画像，也不新增模型调用。
+`session.turn_process` 显示 COLLECTING、WAITING、DECIDING、REPLYING、REVIEW_REQUIRED、SENDING、STOPPED 及最近计划结果。每会话保留最多 64 个读取批次、近期 200 个普通闭合计划；未解决 UNKNOWN 和底层操作回执不按此清理。计划仅保存在本机 MCP 数据库，不形成长期记忆/群友画像，也不新增模型调用。
 
 ## 校验与回滚
 

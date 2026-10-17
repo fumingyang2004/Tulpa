@@ -33,7 +33,7 @@ def main():
             db.execute("INSERT OR REPLACE INTO client_settings VALUES('live_ingestion',?)",(json.dumps(dict(qq='database',wechat='off',load_stickers=True,reconcile_minutes=5)),))
         Watches(store)
         assert not Watches(store).get(card['id'])['load_stickers']
-        live=LiveManager(store);assert live.settings==dict(qq='database',wechat='off',load_stickers=False)
+        live=LiveManager(store);assert live.settings==dict(qq='database',wechat='off',load_stickers=False,wechat_read_images=True)
         live.configure(dict(load_stickers=True));Watches(store)
         assert LiveManager(store).settings['load_stickers'] is True
         assert not hasattr(live,'reconcile')

@@ -1,5 +1,6 @@
 """Reuse unchanged DB families; publish only upstream-verified private copies."""
 import json
+import errno
 import hashlib
 import os
 import shutil
@@ -7,6 +8,27 @@ import tempfile
 from pathlib import Path
 from incremental_common import fingerprint
 from reader_metrics import count
+
+
+def publish_verified_copy(source, destination):
+    """Publish an upstream-verified private copy, including across volumes."""
+    try:
+        os.replace(source, destination)
+    except OSError as error:
+        if error.errno != errno.EXDEV:
+            raise
+        # macOS may choose its system TMPDIR on the SSD even when this
+        # checkout is on another volume. Stage beside the destination so a
+        # failed copy cannot truncate a previously usable cache.
+        fd, name = tempfile.mkstemp(dir=destination.parent, prefix='.snapshot-publish-')
+        os.close(fd)
+        staged = Path(name)
+        try:
+            shutil.copy2(source, staged)
+            os.replace(staged, destination)
+            source.unlink()
+        finally:
+            staged.unlink(missing_ok=True)
 
 
 def quarantine_unreadable_cache(target):
@@ -103,7 +125,7 @@ def refresh_families(source, target, databases, *, _recovered=False):
                     dest=destination.with_name(destination.name+suffix)
                     if src.exists():
                         count('snapshot_copied_bytes',src.stat().st_size)
-                        os.replace(src,dest)
+                        publish_verified_copy(src,dest)
                     else:dest.unlink(missing_ok=True)
             count('snapshot_wal_only_databases')
             count('snapshot_reused_bytes',family[name][0])
@@ -115,9 +137,9 @@ def refresh_families(source, target, databases, *, _recovered=False):
                     dest = destination.with_name(destination.name+suffix)
                     if src.exists():
                         count('snapshot_copied_bytes', src.stat().st_size)
-                        # Both paths are on the workspace volume. Moving the
-                        # private stable copy avoids a second multi-GB copy.
-                        os.replace(src, dest)
+                        # Avoid another multi-GB copy when the upstream
+                        # private snapshot already uses the workspace volume.
+                        publish_verified_copy(src, dest)
                     else:
                         dest.unlink(missing_ok=True)
             count('snapshot_copied_databases')

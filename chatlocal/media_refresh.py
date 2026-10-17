@@ -79,6 +79,12 @@ def prepare(store,body):
 
 
 def run_local(request,output):
+    from .snowluma_history import selected, refresh_media_messages
+    payload=json.loads(Path(request).read_text('utf-8'))
+    if payload.get('platform')=='qq' and selected():
+        from .reader_batches import atomic_json
+        atomic_json(output,refresh_media_messages(payload))
+        return
     completed=subprocess.run([sys.executable,str(ROOT/'scripts/refresh_media.py'),'--request',str(request),'--output',str(output)],
         cwd=ROOT,env=dict(os.environ,PYTHONUTF8='1'),capture_output=True,text=True,encoding='utf-8',errors='replace',
         timeout=600,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))

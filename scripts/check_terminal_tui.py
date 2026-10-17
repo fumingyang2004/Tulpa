@@ -1321,7 +1321,7 @@ async def check_real_client_offline():
         async with app.run_test(size=SIZE) as pilot:
             await settle(app, pilot)
             assert app.conn_state == 'offline'
-            assert 'tulpa serve' in str(app.query_one('#offline').render())
+            assert 'tulpa start' in str(app.query_one('#offline').render())
 
 
 # ---- full Linux port pages ---------------------------------------------------

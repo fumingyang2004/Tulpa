@@ -122,7 +122,7 @@ class OfflinePanel(Static):
             + (f'实例：{esc(instance)}\n' if instance else '') +
             f'地址：{esc(base_url)}\n'
             f'原因：{esc(message)}\n\n'
-            '请在另一个终端运行 [b #22d3ee]./tulpa serve[/]（或交给 systemd 等守护进程），\n'
+            '请在另一个终端运行 [b #22d3ee]./tulpa start[/] 启动后台，\n'
             '然后按 [b]r[/] 重试。关闭本界面不会停止后台服务。\n'
             '按 [b]F2[/] 打开实例管理，可切回默认实例或通过主后台启动所选实例。')
 

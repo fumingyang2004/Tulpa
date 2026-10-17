@@ -61,7 +61,8 @@ def bootstrap_time(store,platform,full_only=False):
             head=json.loads(local_path(row[0]).read_text(encoding='utf-8-sig'))
             if head.get('_partial_export'):continue
             if full_only and head.get('sync_checkpoint'):continue
-            if head.get('reader') != {'qq':'chatlog-keeper','wechat':'wechatauto-replica'}[platform]:continue
+            readers = ('chatlog-keeper','snowluma-history-v1') if platform=='qq' else ('wechatauto-replica',)
+            if head.get('reader') not in readers:continue
             when=head.get('snapshot',{}).get('snapshot_at') if platform=='qq' else head.get('snapshot_at')
             if when:return int(float(when) if isinstance(when,(int,float)) else datetime.fromisoformat(when).timestamp())-300
         except (ValueError,OSError,AttributeError):continue

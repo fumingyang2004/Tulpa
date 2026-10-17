@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f6f4ee">
+  <title>Tulpa</title>
+  <link rel="icon" type="image/png" href="/ui/tulpa-logo.png">
+  <link rel="stylesheet" href="/ui/app.css">
+  <link rel="stylesheet" href="/ui/desktop.css">
+  <link rel="stylesheet" href="/ui/mcp.css">
+  <link rel="stylesheet" href="/ui/tulpa.css">
+  <script type="module" src="/ui/desktop.js"></script>
+</head>
+<body>
+  <svg class="icon-sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1Z"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 17V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H9l-5 4Z"/><path d="M8 8h8M8 12h5"/></symbol>
+    <symbol id="i-chats" viewBox="0 0 24 24"><path d="M8 6h11a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-1v3l-4-3H9a2 2 0 0 1-2-2"/><path d="M16 15H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3"/></symbol>
+    <symbol id="i-watch" viewBox="0 0 24 24"><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16l-6-4Z"/></symbol>
+    <symbol id="i-files" viewBox="0 0 24 24"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"/></symbol>
+    <symbol id="i-collection" viewBox="0 0 24 24"><path d="M4 7V5a1 1 0 0 1 1-1h5l2 3h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-memory" viewBox="0 0 24 24"><path d="M9 3a3 3 0 0 0-3 3 3 3 0 0 0-1 5.8V15a3 3 0 0 0 4 2.8V21M15 3a3 3 0 0 1 3 3 3 3 0 0 1 1 5.8V15a3 3 0 0 1-4 2.8V21"/><path d="M12 3v18"/></symbol>
+    <symbol id="i-workspace" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></symbol>
+    <symbol id="i-data" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/></symbol>
+    <symbol id="i-agents" viewBox="0 0 24 24"><path d="M12 3v3M5 8h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/><path d="M8 13h.01M16 13h.01M9 17h6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h7m4 0h5M4 17h3m4 0h9"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M3 6h5m4 0h9M3 12h11m4 0h3M3 18h3m4 0h11"/><circle cx="10" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+    <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3Z"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m5 9 7 7 7-7"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5m6-6-6 6 6 6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5.6 7a7 7 0 0 1 11.6-2L20 8M4 16l2.8 3A7 7 0 0 0 18.4 17"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4 10 14"/><path d="M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2.8 19h18.4Z"/><path d="M12 9v4M12 16.5h.01"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 6.2A11 11 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.8M6.1 6.8C3.4 8.6 2 12 2 12s3.5 6 10 6c1.2 0 2.3-.2 3.3-.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8Z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6Z"/><path d="M14 3v6h5"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m4 18 5-5 4 4 3-3 4 4"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 19h16"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m-5 5 5-5 5 5M4 20h16"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8Z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.4l6.1-.9Z"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1L10.6 5.3"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.4-1.4"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 4h16v16H4Z"/><path d="M4 14h5l1 2h4l1-2h5"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></symbol>
+    <symbol id="i-database" viewBox="0 0 24 24"><path d="M4 6c0-2 16-2 16 0s-16 2-16 0Zm0 0v6c0 2 16 2 16 0V6M4 12v6c0 2 16 2 16 0v-6"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 5"/></symbol>
+    <symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M8 12h.01M16 12h.01M9 16h6"/></symbol>
+  </svg>
+
+  <div class="app-shell" id="app-shell">
+    <button class="scrim" id="sidebar-scrim" type="button" aria-label="关闭导航" hidden></button>
+
+    <aside class="sidebar" id="app-sidebar" aria-label="主导航">
+      <div class="brand-row">
+        <span class="brand-mark"><img src="/ui/tulpa-logo.png" alt="" width="28" height="28"></span>
+        <span class="brand-copy"><strong>Tulpa</strong><small>本机聊天工作台</small></span>
+        <button class="icon-button sidebar-collapse" id="sidebar-collapse" type="button" aria-label="收起侧栏" title="收起侧栏">
+          <svg><use href="#i-panel"/></svg>
+        </button>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="new-chat-button" id="quick-new-chat" type="button">
+          <svg aria-hidden="true"><use href="#i-plus"/></svg><span>新对话</span><kbd>⌘N</kbd>
+        </button>
+        <button class="search-button" id="open-palette" type="button">
+          <svg aria-hidden="true"><use href="#i-search"/></svg><span>搜索或跳转</span><kbd>⌘K</kbd>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebar-nav" aria-label="功能">
+        <p class="nav-group-label">日常</p>
+        <button class="nav-item" type="button" data-route="home"><svg aria-hidden="true"><use href="#i-home"/></svg><span>工作台</span></button>
+        <button class="nav-item" type="button" data-route="chat"><svg aria-hidden="true"><use href="#i-chat"/></svg><span>对话</span></button>
+        <button class="nav-item" type="button" data-route="chats"><svg aria-hidden="true"><use href="#i-chats"/></svg><span>聊天记录</span></button>
+        <button class="nav-item" type="button" data-route="watches"><svg aria-hidden="true"><use href="#i-watch"/></svg><span>关注</span><span class="nav-count" id="watch-nav-count" hidden></span></button>
+
+        <p class="nav-group-label">知识</p>
+        <button class="nav-item" type="button" data-route="files"><svg aria-hidden="true"><use href="#i-files"/></svg><span>资料 / 文件</span></button>
+        <button class="nav-item" type="button" data-route="collections"><svg aria-hidden="true"><use href="#i-collection"/></svg><span>证据集合</span></button>
+        <button class="nav-item" type="button" data-route="memory"><svg aria-hidden="true"><use href="#i-memory"/></svg><span>记忆</span></button>
+        <button class="nav-item" type="button" data-route="workspaces"><svg aria-hidden="true"><use href="#i-workspace"/></svg><span>工作区</span></button>
+
+        <p class="nav-group-label">连接</p>
+        <button class="nav-item" type="button" data-route="data"><svg aria-hidden="true"><use href="#i-data"/></svg><span>数据与同步</span></button>
+        <button class="nav-item" type="button" data-route="agents"><svg aria-hidden="true"><use href="#i-agents"/></svg><span>外部 Agent</span></button>
+        <button class="nav-item" type="button" data-route="settings"><svg aria-hidden="true"><use href="#i-settings"/></svg><span>设置</span></button>
+      </nav>
+
+      <section class="sidebar-history" id="sidebar-history" aria-label="最近对话" hidden>
+        <div class="sidebar-history-head">
+          <span>最近对话</span>
+          <div>
+            <button class="icon-button" id="toggle-history-search" type="button" aria-label="搜索对话" title="搜索对话"><svg><use href="#i-search"/></svg></button>
+            <button class="icon-button" id="history-new" type="button" aria-label="新建对话" title="新建对话"><svg><use href="#i-plus"/></svg></button>
+          </div>
+        </div>
+        <label class="history-search" id="history-search-wrap" hidden>
+          <svg aria-hidden="true"><use href="#i-search"/></svg>
+          <input id="history-search" type="search" placeholder="筛选对话标题" autocomplete="off" aria-label="筛选对话标题">
+        </label>
+        <div class="history-list" id="history-list"></div>
+      </section>
+      <div class="sidebar-spacer"></div>
+
+      <footer class="sidebar-foot">
+        <button class="health-row" id="sidebar-health" type="button" title="打开数据与同步">
+          <span class="status-dot" id="health-dot"></span>
+          <span id="health-text">正在连接本机服务</span>
+          <svg aria-hidden="true"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="sidebar-foot-actions">
+          <button class="quiet-button compact" id="appearance-quick" type="button" title="切换浅色 / 深色">
+            <svg aria-hidden="true" id="appearance-quick-icon"><use href="#i-moon"/></svg><span id="appearance-quick-label">深色</span>
+          </button>
+          <button class="quiet-button compact" id="help-shortcuts" type="button" title="键盘快捷键">
+            <svg aria-hidden="true"><use href="#i-keyboard"/></svg><span>快捷键</span>
+          </button>
+        </div>
+        <p class="privacy-line"><svg aria-hidden="true"><use href="#i-lock"/></svg>对话与原始记录保存在本机</p>
+      </footer>
+    </aside>
+
+    <main class="main" id="main">
+      <header class="topbar">
+        <button class="icon-button menu-button" id="menu-button" type="button" aria-label="展开导航"><svg><use href="#i-panel"/></svg></button>
+        <div class="topbar-title">
+          <h1 id="view-title">工作台</h1>
+          <p id="view-subtitle">本机聊天资料与运行状态</p>
+        </div>
+        <div class="topbar-status" id="topbar-status" aria-label="运行状态"></div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="topbar-theme" type="button" aria-label="切换外观" title="切换外观"><svg><use href="#i-moon"/></svg></button>
+          <button class="icon-button" id="topbar-settings" type="button" aria-label="打开设置" title="设置"><svg><use href="#i-settings"/></svg></button>
+        </div>
+      </header>
+
+      <div class="view-root" id="view-root" tabindex="-1"></div>
+
+      <footer class="statusbar" id="statusbar" hidden>
+        <div class="statusbar-progress" id="statusbar-progress"><span></span></div>
+        <div class="statusbar-copy">
+          <strong id="statusbar-label">正在处理</strong>
+          <span id="statusbar-detail"></span>
+        </div>
+        <button class="quiet-button compact" id="statusbar-open" type="button">查看过程</button>
+        <button class="quiet-button compact danger-text" id="statusbar-stop" type="button">停止</button>
+      </footer>
+    </main>
+  </div>
+
+  <dialog class="dialog command-palette" id="command-palette" aria-labelledby="palette-label">
+    <div class="palette-search">
+      <svg aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="palette-input" type="text" placeholder="输入功能、对话标题或操作…" autocomplete="off" spellcheck="false" aria-labelledby="palette-label" aria-controls="palette-results">
+      <kbd>esc</kbd>
+    </div>
+    <p class="sr-only" id="palette-label">命令面板</p>
+    <div class="palette-results" id="palette-results" role="listbox" aria-label="命令结果"></div>
+    <div class="palette-foot"><span>↑↓ 选择</span><span>↵ 打开</span><span>⌘K 随时呼出</span></div>
+  </dialog>
+
+  <dialog class="dialog" id="shortcuts-dialog" aria-labelledby="shortcuts-title">
+    <header class="dialog-head">
+      <div><h2 id="shortcuts-title">键盘快捷键</h2><p>不离开键盘完成常见操作</p></div>
+      <button class="icon-button" type="button" data-close-dialog aria-label="关闭"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <div class="dialog-body">
+      <dl class="shortcut-list">
+        <div><dt><kbd>⌘</kbd><kbd>K</kbd></dt><dd>搜索或跳转</dd></div>
+        <div><dt><kbd>⌘</kbd><kbd>N</kbd></dt><dd>新建对话</dd></div>
+        <div><dt><kbd>↵</kbd></dt><dd>发送消息（输入框内）</dd></div>
+        <div><dt><kbd>⇧</kbd><kbd>↵</kbd></dt><dd>输入换行</dd></div>
+        <div><dt><kbd>esc</kbd></dt><dd>关闭弹窗或面板</dd></div>
+        <div><dt><kbd>⌘</kbd><kbd>,</kbd></dt><dd>打开设置</dd></div>
+        <div><dt><kbd>⌘</kbd><kbd>1</kbd> … <kbd>⌘</kbd><kbd>9</kbd></dt><dd>切换主要页面</dd></div>
+      </dl>
+      <p class="fine-print">Windows 或 Linux 浏览器请将 ⌘ 替换为 Ctrl。原生 Mac 窗口关闭后后台仍可继续运行。</p>
+    </div>
+  </dialog>
+
+  <dialog class="dialog side-dialog" id="generic-side-dialog" aria-labelledby="generic-side-title">
+    <header class="dialog-head">
+      <div><h2 id="generic-side-title">详情</h2><p id="generic-side-subtitle"></p></div>
+      <button class="icon-button" type="button" data-close-dialog aria-label="关闭"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <div class="dialog-body" id="generic-side-body"></div>
+    <footer class="dialog-foot" id="generic-side-foot" hidden></footer>
+  </dialog>
+
+  <dialog class="dialog image-dialog" id="image-dialog" aria-label="图片预览">
+    <header class="dialog-head">
+      <div><h2>原图预览</h2><p>原始媒体保存在本机</p></div>
+      <button class="icon-button" type="button" data-close-dialog aria-label="关闭"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <div class="image-stage"><img id="image-preview" alt="聊天图片"></div>
+    <footer class="dialog-foot"><span class="muted">GIF / 动态图片会自动播放。</span><a id="image-open-tab" class="quiet-button" href="#" target="_blank" rel="noopener">在新标签打开</a></footer>
+  </dialog>
+
+  <div id="dialog-root"></div>
+  <div class="toast-stack" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

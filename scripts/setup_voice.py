@@ -51,6 +51,8 @@ def linux_build():
         command=['cmake','-G',generator,'-S',str(source),'-B',str(build),*cmake_options,'-DCMAKE_BUILD_TYPE=Release',
             '-DBUILD_SHARED_LIBS=OFF','-DGGML_NATIVE=OFF','-DGGML_OPENMP=OFF',
             '-DWHISPER_BUILD_TESTS=OFF','-DWHISPER_BUILD_SERVER=OFF','-DWHISPER_CURL=OFF']
+        if sys.platform == 'darwin':
+            command += ['-DGGML_METAL=OFF']
         subprocess.run(command,env=env,check=True)
         subprocess.run(['cmake','--build',str(build),'--target','whisper-cli','--parallel','2'],env=env,check=True)
         target.parent.mkdir(parents=True,exist_ok=True)
@@ -77,7 +79,7 @@ def main():
             finally:temp.unlink(missing_ok=True)
     if os.name!='nt':
         linux_build()
-        print('Local Linux voice runtime and model ready.')
+        print('Local CPU voice runtime and model ready.')
         return
     archive=ASSETS[0][1]
     with zipfile.ZipFile(archive) as z:

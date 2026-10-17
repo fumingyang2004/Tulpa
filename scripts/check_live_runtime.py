@@ -122,16 +122,26 @@ def wechat(folder):
     path.write_bytes(b''.join(encrypt(p,n,key,'wechat') for n,p in pages.items()))
     cache=folder/'keys.json';cache.write_text(json.dumps({'message/message_0.db':(b'x'*32).hex()}))
     Path(str(cache)+'.bak').write_text(json.dumps({'message/message_0.db':key.hex()}))
+    stable=folder/'bound-keys'/(account+'.json')
     fail=AssertionError('hot path attempted expensive key/media scan')
+    if sys.platform == 'darwin':
+        # HMAC authenticates pages, but a shared work cache cannot identify its
+        # owner. Even a valid generic .bak must not be consumed by a Mac poll.
+        with patch.object(WeChatDB,'extract_master_key',side_effect=fail),patch.object(WeChatDB,'extract_keys',side_effect=fail), \
+             patch.object(WeChatDB,'_stable_key_file',return_value=None),patch.object(WeChatDB,'_save_keys',side_effect=fail):
+            unbound=LiveWeChatDB(db_dir=str(folder),account=account,keys_file=str(cache),workdir=str(folder/'work'))
+            assert not unbound._keys and unbound.unkeyed==['message/message_0.db']
+        stable.parent.mkdir()
+        stable.write_text(json.dumps({'message/message_0.db':key.hex()}))
     with patch.object(WeChatDB,'extract_master_key',side_effect=fail),patch.object(WeChatDB,'extract_keys',side_effect=fail), \
-         patch.object(WeChatDB,'_stable_key_file',return_value=None),patch.object(WeChatDB,'_save_keys',side_effect=fail):
+         patch.object(WeChatDB,'_stable_key_file',return_value=str(stable) if sys.platform=='darwin' else None),patch.object(WeChatDB,'_save_keys',side_effect=fail):
         reader=LiveWeChatDB(db_dir=str(folder),account=account,keys_file=str(cache),workdir=str(folder/'work'))
         rel=reader._message_dbs()[0];assert reader._keys[rel]==key
         with ReadView(path,key,'wechat') as view:
             assert list(view.db.execute('SELECT length(value) FROM fixture'))==[(15000,)]
         new=base/'message/message_1.db';new.write_bytes(path.read_bytes())
         rels=reader._message_dbs();missing=[r for r in rels if r not in reader._keys];assert len(missing)==1
-        cache.write_text(json.dumps({r:key.hex() for r in rels}))
+        (stable if sys.platform=='darwin' else cache).write_text(json.dumps({r:key.hex() for r in rels}))
         assert len(reader._message_dbs())==2 and not reader.unkeyed
         with patch.object(Path,'rglob',side_effect=fail),patch.object(MediaDownloader,'_scan_aes_key',side_effect=fail), \
              patch.object(MediaDownloader,'_probe_ct',side_effect=fail),patch.object(MediaDownloader,'_collect_templates',side_effect=fail):
@@ -158,7 +168,8 @@ def wechat(folder):
             raw=dict(type_code=3,chat=chat,md5=md5,create_time=now,content='')
             assert media.parse(raw)[1][0]['status']=='available'
             assert media.parse(raw)[1][0]['width']==20
-    print('PASS WeChat native encrypted pages, stale cache fallback, new shard detection/cache reload, no memory scans or whole media walk at startup, stickers default omitted.')
+    cache_check='Mac account cache binding' if sys.platform=='darwin' else 'stale cache fallback'
+    print(f'PASS WeChat native encrypted pages, {cache_check}, new shard detection/cache reload, no memory scans or whole media walk at startup, stickers default omitted.')
 
 
 if __name__=='__main__':

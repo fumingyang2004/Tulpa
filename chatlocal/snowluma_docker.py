@@ -36,8 +36,8 @@ def release(manifest):
     arch = {'aarch64': 'arm64', 'arm64': 'arm64', 'x86_64': 'amd64', 'AMD64': 'amd64'}.get(platform.machine())
     cfg = manifest.get('docker', {})
     digest = cfg.get('platforms', {}).get(arch)
-    if platform.system() != 'Linux' or not digest:
-        raise ManagedError('docker_platform', 'Docker 托管支持 Linux ARM64 和 x64。')
+    if platform.system() not in ('Linux', 'Darwin') or not digest:
+        raise ManagedError('docker_platform', 'Docker 托管支持 Linux / macOS 的 ARM64 和 x64；macOS 需要本机 Linux 虚拟机。')
     return dict(image=cfg['repository']+':'+cfg['tag'], image_ref=cfg['repository']+'@'+digest,
                 platform='linux/'+arch, digest=digest, version=manifest['version'])
 
@@ -51,12 +51,22 @@ class DockerRuntime:
 
     def _command(self):
         executable = self.executable or shutil.which('docker')
+        if not executable and platform.system() == 'Darwin':
+            for path in (self.root/'.runtime/container/bin/docker', Path.home()/'.local/bin/docker', Path('/usr/local/bin/docker'),
+                         Path('/opt/homebrew/bin/docker'), Path('/Applications/Docker.app/Contents/Resources/bin/docker')):
+                if path.is_file() and os.access(path, os.X_OK):
+                    executable = str(path)
+                    break
         if not executable:
             raise ManagedError('docker_missing', '未安装 Docker。请先安装并启动 Docker Engine，再检测。', retryable=True)
         endpoint = self.endpoint or os.environ.get('DOCKER_HOST')
         if not endpoint:
             user = Path(f'/run/user/{os.getuid()}/docker.sock')
-            endpoint = 'unix://'+str(user if user.exists() else Path('/var/run/docker.sock'))
+            sockets = [user, Path('/var/run/docker.sock')]
+            if platform.system() == 'Darwin':
+                sockets = [Path.home()/'.colima/tulpa/docker.sock', Path.home()/'.colima/default/docker.sock',
+                           Path.home()/'.docker/run/docker.sock', Path('/var/run/docker.sock')]
+            endpoint = 'unix://'+str(next((p for p in sockets if p.exists()), sockets[0]))
         if not endpoint.startswith('unix:///') or any(c in endpoint for c in ('\n', '\r', '\0')):
             raise ManagedError('docker_remote', '托管只支持本机 Docker Unix socket；请移除远程 DOCKER_HOST 设置。')
         return [executable, '--host', endpoint]
@@ -99,7 +109,7 @@ class DockerRuntime:
                 if 'permission denied' in lower and ('docker.sock' in lower or 'connect' in lower):
                     raise ManagedError('docker_permission', '当前 Tulpa 用户无权连接 Docker。加入 Docker 用户组并重新登录或重启用户服务后重试。', retryable=True)
                 if any(x in lower for x in ('cannot connect', 'connection refused', 'is the docker daemon running', 'failed to connect to the docker')):
-                    raise ManagedError('docker_unavailable', 'Docker 引擎未运行或不可访问，请检查 docker.service。', retryable=True)
+                    raise ManagedError('docker_unavailable', 'Docker 引擎未运行或不可访问；macOS 请启动 Colima / Docker Desktop，Linux 请检查 docker.service。', retryable=True)
                 if args and args[0] == 'pull':
                     raise ManagedError('docker_pull_failed', '官方固定版本镜像下载失败，请检查 Docker 的网络或代理后重试。', retryable=True)
                 if any(x in lower for x in ('port is already allocated', 'address already in use')):

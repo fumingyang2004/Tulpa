@@ -2,9 +2,19 @@
 let dataSettings=null,deleteToken=null;
 let accountDiscovery=null,accountLoading=false;
 const readSelection={qq:new Set(),wechat:new Set()},deleteSelection=new Set(),mediaRefreshSelection=new Set();
+function unsupportedReadPlatform(p) {
+  return accountDiscovery?.[p]?.supported===false;
+}
 function syncDataControls(locked) {
   document.querySelectorAll('#client-scope-controls input,#client-scope-controls select,#client-scope-controls button,#delete-section input,#delete-section select,#delete-section button,#media-refresh-section input,#media-refresh-section select,#media-refresh-section button').forEach(n=>n.disabled=locked);
   for(const p of ['qq','wechat']) {
+    if(unsupportedReadPlatform(p)) {
+      $('read-enable-'+p).checked=false;
+      const section=$('read-enable-'+p).closest('.scope-platform');
+      section.classList.add('read-disabled');
+      section.querySelectorAll('input,select,button').forEach(n=>n.disabled=true);
+      continue;
+    }
     const enabled=$('read-enable-'+p).checked,section=$('read-enable-'+p).closest('.scope-platform');
     section.classList.toggle('read-disabled',!enabled);
     section.querySelectorAll('input:not([type=checkbox]),select,.conversation-options input').forEach(n=>n.disabled=locked||!enabled);
@@ -70,7 +80,7 @@ async function loadDataSettings({keepDraft=false}={}) {
   for(const p of ['qq','wechat']) {
     if(!keepDraft) {
       const scope=dataSettings.scope[p];readSelection[p]=new Set(scope.conversations||[]);
-      $('read-enable-'+p).checked=scope.enabled;$('read-mode-'+p).value=scope.conversations===null?'all':'selected';
+      $('read-enable-'+p).checked=scope.enabled&&!unsupportedReadPlatform(p);$('read-mode-'+p).value=scope.conversations===null?'all':'selected';
     }
     for(const id of readSelection[p])if(!dataSettings.conversations.some(r=>r.platform===p&&r.conversation_id===id))dataSettings.conversations.push({platform:p,conversation_id:id,conversation:id+'（当前目录缺失）',count:0});
     renderReadScope(p);
@@ -85,7 +95,7 @@ async function loadDataSettings({keepDraft=false}={}) {
 function clientReadScope() {
   const scope={};
   for(const p of ['qq','wechat']) {
-    const selected=$('read-mode-'+p).value==='selected',enabled=$('read-enable-'+p).checked;
+    const selected=$('read-mode-'+p).value==='selected',enabled=$('read-enable-'+p).checked&&!unsupportedReadPlatform(p);
     if(enabled&&selected&&!readSelection[p].size)throw new Error(`请勾选 ${p==='qq'?'QQ':'微信'} 会话，或选择全部会话`);
     scope[p]={enabled,conversations:selected&&readSelection[p].size?[...readSelection[p]]:null};
     if(enabled)scope[p].account=selectedReadAccount(p);

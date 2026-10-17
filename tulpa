@@ -2,8 +2,16 @@
 set -eu
 TULPA_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$TULPA_ROOT"
+if [ "$(uname -s)" = Darwin ]; then
+    umask 077
+    mkdir -p .tmp
+    export TMPDIR="$TULPA_ROOT/.tmp"
+fi
 if [ ! -x "$TULPA_ROOT/.venv/bin/python" ]; then
     printf '%s\n' '首次启动：正在准备 Tulpa 运行环境……' >&2
-    sh "$TULPA_ROOT/setup-linux.sh" >&2
+    case "$(uname -s)" in
+        Darwin) sh "$TULPA_ROOT/setup-macos.sh" >&2 ;;
+        *) sh "$TULPA_ROOT/setup-linux.sh" >&2 ;;
+    esac
 fi
 exec "$TULPA_ROOT/.venv/bin/python" -m chatlocal.terminal_cli "$@"

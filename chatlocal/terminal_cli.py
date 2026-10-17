@@ -18,7 +18,7 @@ def parser():
     from .terminal_instances import metadata
     instance = metadata(ROOT)
     management_port = instance['management_port'] if instance else 7861
-    p = argparse.ArgumentParser(prog='tulpa', description='Tulpa · Linux 终端与 MCP 管理')
+    p = argparse.ArgumentParser(prog='tulpa', description='Tulpa · 终端与 MCP 管理')
     p.add_argument('--version', action='version', version='Tulpa '+VERSION)
     p.add_argument('--url', help='本机管理地址，默认 http://127.0.0.1:7861')
     p.add_argument('--token-file', help='本机管理凭据文件；不是 SL 或 MCP 客户端 Token')
@@ -27,7 +27,7 @@ def parser():
     commands.add_parser('tui', help='准备依赖、启动后台并打开终端界面（默认操作）')
     commands.add_parser('start', help='准备依赖并启动或复用本机后台')
     commands.add_parser('stop', help='停止本目录的后台服务')
-    serve = commands.add_parser('serve', help='运行 Tulpa 服务；可由 systemd 等进程管理器托管')
+    serve = commands.add_parser('serve', help='运行 Tulpa 后台服务')
     serve.add_argument('--port', type=int, default=management_port)
     instances = commands.add_parser('instances', help='在主实例管理独立 QQ/SL 后台').add_subparsers(dest='action', required=True)
     instances.add_parser('list')
@@ -40,6 +40,8 @@ def parser():
         sub = instances.add_parser(action); sub.add_argument('id')
         if action == 'rename': sub.add_argument('--name', required=True)
     commands.add_parser('status', help='查看本实例状态')
+    from .mcp_client_config import add_bridge_arguments as bridge_arguments
+    bridge_arguments(commands.add_parser('chat-bridge',help='专用 stdio MCP 聊天连接，合并空闲等待'))
     commands.add_parser('setup', help='交互配置已有 SnowLuma 服务')
     sl = commands.add_parser('sl', help='查看或检测 SL 连接').add_subparsers(dest='action', required=True)
     sl.add_parser('show')
@@ -82,10 +84,10 @@ def parser():
     search = commands.add_parser('search'); search.add_argument('query'); search.add_argument('--limit', type=int, default=20)
     imp = commands.add_parser('import'); imp.add_argument('path'); imp.add_argument('--platform', choices=['qq','wechat'], default='')
     commands.add_parser('events', help='最近 MCP 工具调用记录')
-    service=commands.add_parser('service',help='用户 systemd 常驻服务').add_subparsers(dest='action',required=True)
+    service=commands.add_parser('service',help='用户常驻服务（Linux systemd / macOS launchd）').add_subparsers(dest='action',required=True)
     for action in ('status','start','stop','restart','uninstall'):service.add_parser(action)
     install=service.add_parser('install');install.add_argument('--port',type=int,default=management_port);install.add_argument('--start',action='store_true')
-    commands.add_parser('desktop-install',help='安装终端桌面入口')
+    commands.add_parser('desktop-install',help='安装桌面启动入口')
     package=commands.add_parser('package',help='生成不含账号数据和凭据的源码包');package.add_argument('output')
     model=commands.add_parser('model',help='模型配置').add_subparsers(dest='action',required=True)
     model.add_parser('show');config=model.add_parser('configure')
@@ -295,6 +297,12 @@ def main(argv=None):
         if args.command == 'serve':
             from .terminal_server import run
             run(args.port, args.token_file)
+            return 0
+        if args.command == 'chat-bridge':
+            from .mcp_chat_bridge import run
+            try:run(args)
+            except ValueError:raise
+            except Exception:raise TerminalError('Tulpa 桥接连接失败，请检查后台及 MCP 凭据文件。') from None
             return 0
         client = TerminalClient(args.url, args.token_file)
         try:

@@ -270,7 +270,9 @@
       if(!body.all_conversations&&!body.conversations.length)throw Error('请选择会话，或明确勾选允许所选平台全部会话。');
       if(body.start&&body.end&&body.start>body.end)throw Error('截止日期不能早于开始日期。');
       const latest=await api('');serviceState(latest);
-      if(body.platforms.some(p=>!latest.data_platforms?.[p]&&!(p==='qq'&&body.chat&&body.send)))throw Error('请先导入所选平台的聊天；仅 QQ 持续群聊可直接通过 OneBot 授权。');
+      const empty=body.platforms.some(p=>!latest.data_platforms?.[p]&&!(p==='qq'&&body.chat&&body.send));
+      if(empty&&body.all_conversations&&!body.send&&!body.manage&&!body.chat&&!body.onebot)body.allow_future_imports=true;
+      else if(empty)throw Error('请先导入所选平台的聊天；预先连接需要选择全部会话并保持只读。');
       if(!current.running){
         if(!allowStart)throw Error('本机 MCP 服务尚未运行。请点击「开启服务并创建连接」继续。');
         if(!Number.isInteger(port)||port<1024||port>65535)throw Error('服务端口应为 1024 至 65535 的整数。');

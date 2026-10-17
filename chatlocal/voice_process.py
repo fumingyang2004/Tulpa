@@ -1,7 +1,7 @@
 """Tie native decoder/ASR lifetime to its parent even on force-close (Windows)."""
 import ctypes
-from ctypes import wintypes
 import os
+from ctypes import wintypes
 
 class _Basic(ctypes.Structure):
     _fields_=[('process_time',ctypes.c_longlong),('job_time',ctypes.c_longlong),('flags',wintypes.DWORD),

@@ -444,7 +444,7 @@ class ManagedView(View):
     def docker_consent(self, preview):
         if preview.get('mode') != 'docker':
             return 'error', '检测结果不是 Docker 托管，请刷新后重试。'
-        head = ['方式：Docker 运行环境（适合没有桌面的 Linux）', f'SnowLuma 版本：{preview.get("version") or "—"}',
+        head = ['方式：Docker 运行环境（支持 Linux / macOS）', f'SnowLuma 版本：{preview.get("version") or "—"}',
                 f'运行环境：{preview.get("image") or "—"}' + (f'（{preview["platform"]}）' if preview.get('platform') else ''),
                 str(preview.get('message') or ''), '首次启动需要下载运行环境，可能需要几分钟并占用一定磁盘空间。']
         self.ask_consent(preview, head, preview.get('agreements') or [], preview.get('scope') or [], DOCKER_SCOPE,
@@ -681,7 +681,7 @@ class ComponentsView(View):
         if s.get('detail'):
             lines.append(f'[#7f8a9a]{esc(model.one_line(s["detail"], 140))}[/]')
         lines.append('[#7f8a9a]用户级服务由 ./tulpa 命令行安装和管理；本界面只显示状态。[/]')
-        self.query_one('#cp-service', Static).update('[b #a78bfa]Linux 后台服务[/]\n' + '\n'.join(lines))
+        self.query_one('#cp-service', Static).update('[b #a78bfa]本机后台服务[/]\n' + '\n'.join(lines))
         if m.get('status') in ('downloading', 'cancelling'):
             self.poll('voice', lambda cl: cl.api_get('/api/components/voice'), self.voice_tick, interval=2)
 

@@ -1,0 +1,5 @@
+# Cocoa window and TUI share the same complete backend.
+-r readers.txt
+-r mcp.txt
+-r tui.txt
+pywebview==6.2.1

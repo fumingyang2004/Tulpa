@@ -16,6 +16,7 @@ import sys
 import tempfile
 import threading
 import time
+from test_environment import system_environment
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).parent))
@@ -65,7 +66,7 @@ def main():
         network.append(address);return connect(address,*args,**kwargs)
     results=[];counter=0
     try:
-        with tempfile.TemporaryDirectory(prefix='tulpa-turns-') as tmp,patch.dict('os.environ',{},clear=True),patch('socket.create_connection',restrict):
+        with tempfile.TemporaryDirectory(prefix='tulpa-turns-') as tmp,patch.dict('os.environ',system_environment(),clear=True),patch('socket.create_connection',restrict):
             root=Path(tmp);store=Store(root/'chats.sqlite3')
             (root/'.env').write_text(f'REPLY_ONEBOT_URL=http://127.0.0.1:{upstream.server_port}\nREPLY_ONEBOT_WS_URL=ws://127.0.0.1:{events.port}\nREPLY_ONEBOT_WS_TOKEN=event-fixture\n','utf-8')
             with patch('chatlocal.onebot.ROOT',root),patch('chatlocal.message_sender.ROOT',root):
@@ -100,6 +101,7 @@ def main():
                         if group==222:eventually(lambda:stored(mid));return stored(mid)
                     def read():return call('get_chat_session',session_id=sid)
                     def plan(target=None,expression=None,action='reply',batch=None,**extra):
+                        extra.setdefault('new_message_policy','strict')
                         args=dict(session_id=sid,batch_id=(batch or read())['input_batch']['id'],action=action,intent='fixture communication',
                             expressions=expression or (['text'] if action=='reply' else []),idempotency_key=key(),**extra)
                         if target:args['target_event_id']=target
@@ -396,11 +398,104 @@ def main():
                         time.sleep(.1);cancelled.set()
                         assert future.result(2).structuredContent['event']=='cancelled'
                     results.append('retry backoff happens in wait tool, cancellation interrupts it')
+
+                    # Buffered turns retain their draft, review once, then finish
+                    # even when more messages arrive before/between dispatches.
+                    clear_budget()
+                    last=add('明天几点见');time.sleep(.18);batch=read()
+                    correction=add('更正，是后天')
+                    p=plan(last,batch=batch,new_message_policy='review')
+                    assert p['state']=='READY',p
+                    draft=[dict(kind='text',text='明天见'),dict(kind='text',text='记住啦')]
+                    prior=len(ReactionBot.sent);review=send(p,draft)
+                    assert review['state']=='REVIEW_REQUIRED' and len(ReactionBot.sent)==prior,review
+                    assert review['review']['draft']==draft
+                    assert correction in [m['id'] for m in review['review']['messages']]
+                    assert send(p,draft)['review']['id']==review['review']['id']
+                    assert send(p,[dict(kind='text',text='偷偷换掉')])['error_code']=='idempotency_conflict'
+                    before_review=add('再补充，到时再商量')
+                    replacement=[dict(kind='text',text='后天见'),dict(kind='text',text='具体时间再说')]
+                    later=[]
+                    def arrive_during_send(action,body):
+                        if action=='send_group_msg' and not later:
+                            later.append(add('我又想到一件事'))
+                    ReactionBot.intercept=arrive_during_send
+                    args=dict(review['next_call']['arguments'],decision='replace',bubbles=replacement)
+                    try:out=call('review_chat_reply',**args)
+                    finally:ReactionBot.intercept=None
+                    assert out['state']=='SUCCEEDED' and len(ReactionBot.sent)==prior+2,out
+                    assert [b['expression'] for b in out['bubbles']]==replacement
+                    assert call('review_chat_reply',**args)['state']=='SUCCEEDED' and len(ReactionBot.sent)==prior+2
+                    conflict=call('review_chat_reply',**dict(args,decision='keep',bubbles=None))
+                    assert conflict.get('error_code') in ('invalid_arguments','idempotency_conflict'),conflict
+                    # Reviewing input is not an ACK of the later conversation.
+                    follow=call('wait_chat_messages',**dict(out['next_call']['arguments'],timeout_seconds=1,quiet_seconds=0))
+                    assert {correction,before_review,*later}<={m['id'] for m in follow['messages']},follow
+                    results.append('one bounded review preserves/replaces draft, no starvation, stable retries, new input remains pending')
+
+                    for decision in ('keep','cancel'):
+                        clear_budget();last=add('保留还是取消');time.sleep(.18)
+                        p=plan(last,new_message_policy='review');add('顺便补充')
+                        prior=len(ReactionBot.sent);review=send(p)
+                        args=dict(review['next_call']['arguments'],decision=decision)
+                        out=call('review_chat_reply',**args)
+                        assert out['state']==('SUCCEEDED' if decision=='keep' else 'CANCELLED'),out
+                        assert len(ReactionBot.sent)==prior+(decision=='keep')
+                        assert call('review_chat_reply',**args)['state']==out['state']
+                    results.append('keep/cancel review decisions are durable and idempotent')
+
+                    clear_budget();last=add('从发送前一直安静到第一条');time.sleep(.18)
+                    p=plan(last,new_message_policy='review');arrived=[];prior=len(ReactionBot.sent)
+                    def after_commit(action,body):
+                        if action=='send_group_msg' and not arrived:arrived.append(add('第一条之后的普通插话'))
+                    ReactionBot.intercept=after_commit
+                    try:out=send(p,[dict(kind='text',text='第一条'),dict(kind='text',text='完整的第二条')])
+                    finally:ReactionBot.intercept=None
+                    assert out['state']=='SUCCEEDED' and len(ReactionBot.sent)==prior+2,out
+
+                    clear_budget();last=add('复核数量有上限');time.sleep(.18)
+                    p=plan(last,new_message_policy='review')
+                    for i in range(51):add('新增条件 '+str(i))
+                    prior=len(ReactionBot.sent);out=send(p)
+                    assert out['error_code']=='needs_refresh' and len(ReactionBot.sent)==prior,out
+                    clear_budget();last=add('服务重启不会恢复待复核草稿');time.sleep(.18)
+                    p=plan(last,new_message_policy='review');add('补充')
+                    review=send(p);assert review['state']=='REVIEW_REQUIRED'
+                    tools.chat.turns=ChatTurns(tools.chat)
+                    persisted=tools.chat.turns.load(p['plan_id'],sid)
+                    assert persisted['state']=='CANCELLED' and persisted['reason']=='service_restarted'
+                    out=call('review_chat_reply',**dict(review['next_call']['arguments'],decision='keep'))
+                    assert out['error_code']=='plan_not_ready' and len(ReactionBot.sent)==prior,out
+                    results.append('ordinary input after commit buffers, review bound enforces refresh, restart never resumes draft')
+
+                    # Review grants no exemption for recall, gaps or expiry.
+                    for mode in ('recall','gap','expiry','source'):
+                        clear_budget();last=add('硬中断仍生效');time.sleep(.18)
+                        p=plan(last,new_message_policy='review');add('补充')
+                        review=send(p);prior=len(ReactionBot.sent)
+                        args=dict(review['next_call']['arguments'],decision='keep')
+                        if mode=='recall':
+                            with access.connect() as db:
+                                item=db.execute('SELECT payload FROM chat_inbox WHERE id=?',(last,)).fetchone()
+                                payload=json.loads(item[0]);payload['recalled']=True
+                                db.execute('UPDATE chat_inbox SET payload=? WHERE id=?',(json.dumps(payload),last))
+                        elif mode=='gap':
+                            with access.connect() as db:db.execute('UPDATE chat_sessions SET gap_count=gap_count+1 WHERE id=?',(sid,))
+                        elif mode=='expiry':
+                            with access.connect() as db:db.execute('UPDATE chat_turn_plans SET created=created-100 WHERE id=?',(p['plan_id'],))
+                        if mode=='source':
+                            with patch.object(tools.chat.receiver,'status',return_value={'state':'disconnected','account':'111'}):
+                                out=call('review_chat_reply',**args)
+                        else:out=call('review_chat_reply',**args)
+                        assert out.get('error_code')==dict(recall='target_expired',gap='needs_refresh',expiry='plan_expired',source='source_unavailable')[mode],out
+                        assert len(ReactionBot.sent)==prior
+                    results.append('buffered review retains recall/gap/expiry/disconnect checks')
+
                     # Stop/revoke can run while queue sleeps; they cancel remaining work.
                     for mode in ('stop','revoke'):
                         if mode=='revoke':
                             sid=call('start_chat_session',conversation_id='111:group:222',persona_preset='little_whale',idempotency_key=key())['session']['id']
-                        p=plan();prior=len(ReactionBot.sent)
+                        time.sleep(.18);p=plan(new_message_policy='review');prior=len(ReactionBot.sent)
                         with ThreadPoolExecutor() as pool:
                             future=pool.submit(send,p,[dict(kind='text',text='已发'),dict(kind='text',text='未发')])
                             eventually(lambda:len(ReactionBot.sent)==prior+1)

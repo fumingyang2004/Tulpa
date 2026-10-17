@@ -16,7 +16,7 @@ from .jobs import follow, stop_job
 from .modals import ConfirmModal
 
 PLATFORMS = ('qq', 'wechat')
-LIVE_MODES = (('database', '监听数据库新增'), ('off', '关闭'))
+LIVE_MODES = (('database', '监听新增消息'), ('off', '关闭'))
 REFRESH_MINUTES = ((0, '关闭'), (5, '5 分钟'), (15, '15 分钟'), (30, '30 分钟'), (60, '1 小时'), (360, '6 小时'),
                    (720, '12 小时'), (1440, '1 天'), (4320, '3 天'), (10080, '7 天'))
 LIVE_STATES = dict(starting='启动中', off='已关闭', client_stopped='客户端未运行', needs_baseline='需先读取一次历史',
@@ -29,7 +29,7 @@ def conv_label(c):
 
 class NativeView(View):
     title = '本机数据'
-    subtitle = 'QQ / 微信本机数据库读取、导入与实时同步；不会发送消息'
+    subtitle = 'QQ / 微信数据来源、历史导入与实时同步；不会发送消息'
     BINDINGS = [Binding('p', 'paths', '路径'), Binding('k', 'keys', '密钥'), Binding('a', 'account', '账号'),
                 Binding('c', 'catalog', '会话目录'), Binding('g', 'read', '导入'), Binding('s', 'sync', '增量同步'),
                 Binding('l', 'live', '实时'), Binding('t', 'schedule', '定时'), Binding('m', 'media', '补载媒体'),
@@ -76,7 +76,7 @@ class NativeView(View):
               str(imported.get((c.get('platform'), c.get('conversation_id')), 0)),
               model.one_line(c.get('conversation_id'), 30))) for c in rows])
         if not rows:
-            self.set_state('empty', '尚无会话目录。先设置路径（p）、确认账号（a），再按 c 读取会话目录（不导入消息）。')
+            self.set_state('empty', '尚无会话目录。先确认来源（p）和账号（a），再按 c 读取会话目录（不导入消息）。SL Docker 会自动检测。')
         running = refresh.get('running_jobs') or []
         if running and not self.polling('job'):
             job = running[0]
@@ -89,10 +89,13 @@ class NativeView(View):
         live = next((s for s in self.live.get('platforms') or [] if s.get('platform') == p), {})
         sync = next((s for s in self.refresh_status.get('platforms') or [] if s.get('platform') == p), {})
         readers = self.components.get('readers') if isinstance(self.components.get('readers'), dict) else {}
+        sl = src.get('source_type') == 'snowluma'
+        source = src.get('source_label') or '本机数据库'
         lines = [f'[b #a78bfa]{model.platform_label(p)}[/]',
-                 f'[#7f8a9a]数据目录[/] {esc(model.one_line(src.get("data_root") or "未设置", 44))}',
-                 f'[#7f8a9a]密钥[/] {"已配置" if src.get("keys_file") or src.get("configured") else "未配置"}'
-                 f' · [#7f8a9a]读取器[/] {"已安装" if readers.get("installed") else "未安装"}',
+                 f'[#7f8a9a]来源[/] {esc(source)}',
+                 f'[#7f8a9a]数据目录[/] {"由 SL 托管" if sl else esc(model.one_line(src.get("data_root") or "自动检测", 44))}',
+                 f'[#7f8a9a]密钥[/] {"无需配置" if sl else "已配置" if src.get("keys_file") else "自动获取 / 未配置"}'
+                 f' · [#7f8a9a]读取器[/] {"SL 接口" if sl else "已安装" if readers.get("installed") else "未安装"}',
                  f'[#7f8a9a]账号[/] {esc(acc.get("selected") or "未选择")}（发现 {len(acc.get("accounts") or [])} 个）',
                  f'[#7f8a9a]实时[/] {esc(LIVE_STATES.get(live.get("status"), live.get("status") or "—"))}'
                  f' · {esc(model.one_line(live.get("detail") or "", 40))}',
@@ -137,7 +140,8 @@ class NativeView(View):
             src = self.native.get(p) or {}
 
             def validate(v):
-                body = dict(data_root=required(v['data_root'], '客户端数据目录', 2048))
+                body = dict(source=v['source'],data_root=v['data_root'].strip())
+                if len(body['data_root']) > 2048: raise ValueError('数据目录过长。')
                 if v['keys_file'].strip():
                     body['keys_file'] = v['keys_file'].strip()
                 return body
@@ -148,6 +152,8 @@ class NativeView(View):
                              lambda r: self.reload_with('info', f'{model.platform_label(p)} 来源已保存。'),
                              '正在核对并保存路径…', '保存失败')
             self.app.push_screen(FormModal(f'{model.platform_label(p)} 本机来源', [
+                Field('source', '读取来源', 'select', src.get('source') or 'auto',
+                      by_value([('auto','自动检测'),('database','本机数据库')]+([('snowluma','SL Docker 历史消息')] if p=='qq' else []))),
                 Field('data_root', '数据目录', value=src.get('data_root') or '', placeholder='客户端数据所在的绝对路径'),
                 Field('keys_file', '密钥 JSON', value=src.get('keys_file') or '', placeholder='可选：已有密钥文件的绝对路径',
                       hint='只填写路径；密钥内容由后台在本机读取，不会显示。留空表示保留现有设置。'),
@@ -159,6 +165,9 @@ class NativeView(View):
         active_ok = bool(readers.get('active_key_supported'))
 
         def chosen(p):
+            if (self.native.get(p) or {}).get('source_type') == 'snowluma':
+                self.set_state('info', 'SL 历史读取无需数据库密钥；保持 SL 中的 QQ 登录，按 c 读取会话目录。')
+                return
             account = (self.accounts.get(p) or {}).get('selected')
             methods = [('passive', '被动读取（不重启客户端）')] + ([('active', '主动捕获（需重启客户端）')] if active_ok else [])
 

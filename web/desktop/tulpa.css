@@ -1,0 +1,54 @@
+/* Tulpa · social memory page */
+.memory-page { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+.memory-head { display: flex; align-items: flex-start; gap: 12px; padding: 13px 18px; border-bottom: 1px solid var(--line); flex: none; }
+.memory-head-copy { flex: 1; min-width: 0; }
+.memory-head h2 { font-size: 15px; letter-spacing: -.02em; }
+.memory-head p { color: var(--muted); font-size: 10.8px; line-height: 1.6; margin-top: 3px; max-width: 72ch; }
+.memory-head-actions { display: flex; align-items: center; gap: 7px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.memory-layout { display: grid; grid-template-columns: 246px minmax(0, 1fr); flex: 1; min-height: 0; }
+.memory-directory { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: color-mix(in srgb, var(--bg-deep) 45%, var(--bg)); }
+.memory-search { padding: 9px 10px 5px; flex: none; }
+.memory-search input { min-height: 30px; font-size: 11px; }
+.memory-list { overflow-y: auto; min-height: 0; flex: 1; padding: 2px 7px 10px; }
+.memory-card {
+  display: flex; flex-direction: column; width: 100%; border: 0; border-radius: 8px;
+  background: transparent; padding: 7px 8px; margin-bottom: 1px; text-align: left; min-width: 0;
+}
+.memory-card:hover { background: var(--surface-2); }
+.memory-card.selected { background: var(--surface); box-shadow: var(--shadow-sm); }
+.memory-card strong { color: var(--ink); font-size: 11.6px; font-weight: 560; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memory-card small { color: var(--faint); font-size: 9.6px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memory-list-label { color: var(--faint); font-size: 9.4px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; padding: 9px 8px 4px; }
+.memory-detail { overflow-y: auto; min-width: 0; padding: 16px 20px 30px; }
+.memory-detail-inner { max-width: 680px; margin: 0 auto; }
+.memory-detail h3 { font-size: 15px; overflow-wrap: anywhere; }
+.memory-status-line { color: var(--muted); font-size: 10.8px; line-height: 1.6; margin: 3px 0 7px; }
+.memory-detail .progress { margin: 5px 0 9px; }
+.memory-detail h4 { font-size: 11.5px; margin: 13px 0 5px; }
+.memory-detail p { color: var(--muted); font-size: 10.8px; line-height: 1.65; overflow-wrap: anywhere; }
+.memory-block { border: 1px solid var(--line); border-radius: 9px; background: var(--surface); padding: 10px 12px; font-size: 11.2px; line-height: 1.7; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.memory-detail textarea { min-height: 130px; font-size: 11.2px; }
+.memory-detail .primary-button { margin-top: 6px; }
+.memory-detail details { margin-top: 8px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--surface-2); }
+.memory-detail details > summary { padding: 7px 9px; color: var(--muted); font-size: 10.5px; cursor: pointer; }
+.memory-detail details > div, .memory-detail details > p { padding: 0 9px 8px; }
+.memory-sources { display: flex; gap: 4px; flex-wrap: wrap; padding: 0 9px 9px; }
+.memory-episode { border-top: 1px solid var(--line-soft); padding: 7px 9px; }
+.memory-episode:first-child { border-top: 0; }
+.memory-episode > div { color: var(--muted); font-size: 10.2px; line-height: 1.55; }
+.memory-episode pre { margin-top: 5px; }
+.memory-empty { color: var(--muted); font-size: 11px; line-height: 1.65; padding: 18px; text-align: center; }
+.memory-error { color: var(--danger); font-size: 11px; line-height: 1.6; }
+.memory-freeze { color: var(--warning); background: var(--warning-soft); border-radius: 8px; padding: 8px 10px; font-size: 10.8px; line-height: 1.6; margin-bottom: 9px; }
+.memory-switch { display: flex; align-items: center; gap: 7px; }
+.memory-switch-label { color: var(--muted); font-size: 10.5px; }
+
+@media (max-width: 740px) {
+  .memory-head { padding: 10px 12px; flex-wrap: wrap; }
+  .memory-layout { grid-template-columns: 1fr; }
+  .memory-directory { border-right: 0; border-bottom: 1px solid var(--line); max-height: 190px; }
+  .memory-detail { padding: 12px 13px 24px; }
+  .memory-list { display: flex; flex-wrap: wrap; gap: 3px; }
+  .memory-card { width: auto; min-width: 130px; max-width: 220px; }
+  .memory-list-label { width: 100%; }
+}

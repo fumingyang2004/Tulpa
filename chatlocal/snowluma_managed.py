@@ -3,6 +3,7 @@ import atexit
 import hashlib
 import json
 import os
+import sys
 from pathlib import Path
 import secrets
 import threading
@@ -128,7 +129,7 @@ class ManagedSnowLuma:
         selected = state.get('selected') or {}
         manifest = self.docker.manifest if state.get('backend') == 'docker' else self.manifest
         public.update(phase=phase, phase_label=PHASES.get(phase,'状态未知'),
-            backend=state.get('backend','local'), supported_backends=['local','docker'] if os.name!='nt' else ['local'],
+            backend=state.get('backend','local'), supported_backends=(['docker'] if sys.platform == 'darwin' else ['local','docker']) if os.name!='nt' else ['local'],
             version=self.manifest['version'], real_pc_verified=self.manifest['compatibility']['real_pc_verified'],
             available=self.manifest.get('mode') == 'user_selected_local_directory',
             consent_current=self._consented(state), has_consent=bool(state.get('consent')), consent_fingerprint=consent_key(manifest),

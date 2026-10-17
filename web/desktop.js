@@ -6,6 +6,12 @@
   const el=id=>document.getElementById(id);
   if(isDesktop){
     document.title='Tulpa';
+    if(document.documentElement.dataset.platform==='macos'){
+      const notice=document.createElement('p');notice.textContent='Mac 预览版：支持 QQ、微信本地历史读取、导入、检索和 MCP。本机读取需要有效的账号数据库密钥；图片和文件取决于本地缓存是否可用。';
+      document.querySelector('#welcome').append(notice);
+      const link=document.createElement('a');link.href='/legacy';link.textContent='导入 JSON / JSONL 聊天记录（高级界面）';
+      document.querySelector('#welcome').append(link);
+    }
     document.querySelector('#welcome h2').textContent='从真实交流中，慢慢懂你。';
     document.querySelector('#welcome > p').textContent='留住重要的消息，理清值得继续的事。';
     const eyebrow=document.createElement('div');eyebrow.className='desktop-eyebrow';eyebrow.textContent='TULPA / 通信工作区';

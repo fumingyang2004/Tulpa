@@ -22,12 +22,20 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools/qq-reader'))
 sys.path.insert(0, str(ROOT / 'tools/wechat-reader'))
 _qq_worker = False
+_qq_windows_lock = False
 
 
 def configure_qq_worker():
     """Call once in the dedicated QQ worker, before opening any client views."""
-    global _qq_worker
+    global _qq_worker, _qq_windows_lock
     if _qq_worker:
+        return
+    if sys.platform == 'darwin':
+        # Mac QQ uses normal SQLite locking. Never load the Windows extension
+        # or enable its unauthenticated zero-page exception on this platform.
+        if apsw.connections():
+            raise ValueError('qq_live_runtime_mismatch')
+        _qq_worker = True
         return
     if sys.platform.startswith('linux'):
         # Linux NTQQ uses the normal SQLite pending byte. Do not load or apply
@@ -52,6 +60,7 @@ def configure_qq_worker():
     finally:
         if 'db' in locals(): db.close()
     _qq_worker = True
+    _qq_windows_lock = True
 
 
 class SourceBusy(OSError):
@@ -198,7 +207,7 @@ class PageView:
             self.main.seek(self.offset + (number - 1) * 4096)
             encrypted = self.main.read(4096)
         self.bytes_read += len(encrypted)
-        if self.platform == 'qq' and _qq_worker and number == 262144:
+        if self.platform == 'qq' and _qq_windows_lock and number == 262144:
             if encrypted != bytes(4096) or number in self.pages:
                 raise ValueError('qq_live_lock_page_invalid')
             plain = encrypted

@@ -75,7 +75,7 @@ def install_mcp_routes(app, store=None):
             with store.connect() as db:
                 for platform in body.get('platforms',[]):
                     if platform=='qq' and live_grant(body):continue
-                    if not db.execute('SELECT 1 FROM messages WHERE platform=? LIMIT 1',(platform,)).fetchone():
+                    if not db.execute('SELECT 1 FROM messages WHERE platform=? LIMIT 1',(platform,)).fetchone() and body.get('allow_future_imports') is not True:
                         raise ValueError('请先导入所选平台的聊天，确认来源账号后再创建连接。')
             result=access.create(body)
             if body.get('qq_friends'):service.tools.chat.receiver.start()
@@ -89,6 +89,19 @@ def install_mcp_routes(app, store=None):
         try:return service.update_permissions(gid, body)
         except GrantConflict as exc:raise HTTPException(409, str(exc)) from None
         except ValueError as exc:raise HTTPException(400, str(exc)) from None
+
+    @app.get('/api/mcp/permissions')
+    def permissions(request: Request):
+        local(request)
+        from .mcp_qq_permissions import QQ_FLAGS, ACCOUNT_FLAGS
+        labels = dict(media='提供历史图片', prepare='下载文件和提取文字', voice='本地转写语音',
+                      onebot='查询 QQ 群资料', send='直接发送 QQ 消息', manage='QQ 群管理',
+                      chat='持续聊天', chat_images='聊天看图和表情目录',
+                      chat_sticker_send='发送表情', chat_sticker_collect='收藏表情',
+                      chat_reactions='消息表情回应', **QQ_FLAGS)
+        return dict(items=[dict(id=k, label=v, extended=k in QQ_FLAGS,
+                               scope='account' if k in ACCOUNT_FLAGS else 'conversation')
+                           for k, v in labels.items()])
 
     def token_for(body, *, extra=()):
         if set(body)-{'token',*extra} or not isinstance(body.get('token'),str):raise HTTPException(400,'连接凭据字段无效。')
@@ -191,6 +204,18 @@ def install_mcp_routes(app, store=None):
             rows=client.call('get_group_list', {})
             return dict(items=[dict(platform='qq',conversation_id=f'{account}:group:{r["group_id"]}',name=str(r.get('group_name') or r['group_id']),count='OneBot')
                                for r in rows if isinstance(r,dict) and str(r.get('group_id','')).isdigit()])
+        except ValueError as exc:raise HTTPException(400,str(exc)) from None
+
+    @app.get('/api/mcp/live-friends')
+    def live_friends(request: Request):
+        local(request)
+        from .onebot import Client
+        try:
+            client=Client(timeout=4); account=client.login()
+            rows=client.call('get_friend_list', {})
+            return dict(items=[dict(platform='qq',conversation_id=f'{account}:direct:{r["user_id"]}',
+                               name=str(r.get('remark') or r.get('nickname') or r['user_id']),count='OneBot')
+                               for r in rows if isinstance(r,dict) and str(r.get('user_id','')).isdigit()])
         except ValueError as exc:raise HTTPException(400,str(exc)) from None
 
     @app.get('/api/mcp/chats/{sid}/learning')

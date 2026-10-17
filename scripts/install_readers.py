@@ -6,12 +6,13 @@ import sys
 import os
 import tarfile
 import tempfile
+import time
 from pathlib import Path
 from urllib.request import urlopen
 
 ROOT=Path(__file__).resolve().parent.parent
 sys.path.insert(0,str(ROOT))
-from reader_patches import patch_qq_proxy,patch_wechat_db,patch_qq_helper,patch_qq_configured_root,patch_qq_passive_scan
+from reader_patches import patch_qq_proxy,patch_wechat_db,patch_qq_helper,patch_qq_configured_root,patch_qq_passive_scan,patch_wechat_media
 
 QQ_COMMIT='b55675779e50edec913fab9d891e4185c8f7c9ac'
 WX_COMMIT='492a8fb70b95865613d6d8d9740323233dbfa197'
@@ -21,7 +22,8 @@ CORE=['__init__.py','_macos.py','_paths.py','_path_resolver.py','_private_temp.p
       '_secrets.py','_snapshot.py','_wal.py','_windows_process_memory.py','trace_sink.py']
 QQ_FILES=['LICENSE','chatlog_keeper/__init__.py','chatlog_keeper/qq_db.py',
           'chatlog_keeper/stream_protocol.py','chatlog_keeper/_qq_sqlite_proxy.py',
-          'chatlog_keeper/_qq_sqlite_helper.py']+['chatlog_keeper/core/'+p for p in CORE]
+          'chatlog_keeper/_qq_sqlite_helper.py','chatlog_keeper/macos_key.py',
+          'chatlog_keeper/scripts/macos_memory_scan.c']+['chatlog_keeper/core/'+p for p in CORE]
 
 
 def install_target(directory,relative):
@@ -39,17 +41,21 @@ def download(job):
     repo,commit,relative,directory=job
     target=install_target(directory,relative)
     url=f'https://raw.githubusercontent.com/{repo}/{commit}/{relative}'
-    with urlopen(url,timeout=45) as response:
-        data=response.read()
+    for attempt in range(3):
+        try:
+            with urlopen(url,timeout=45) as response:
+                data=response.read()
+            break
+        except Exception:
+            if attempt == 2:raise
+            time.sleep(1)
     source_hash=hashlib.sha256(data).hexdigest()
     if relative=='chatlog_keeper/_qq_sqlite_proxy.py':data=patch_qq_proxy(data)
     if relative=='chatlog_keeper/_qq_sqlite_helper.py':data=patch_qq_helper(data)
+    if relative=='wechatauto/media.py':data=patch_wechat_media(data)
     if relative=='wechatauto/db.py':
         data=patch_wechat_db(data)
         if sys.platform.startswith('linux'):
-            start=data.index(b'_k32 = ctypes.WinDLL(')
-            end=data.index(b'\n\ndef _md5_hex',start)
-            data=data[:start]+b'_k32 = None  # Windows extraction replaced by the Linux adapter.\n'+data[end:]
             data+=b'\nfrom chatlocal.linux_readers import install_wechat as _tulpa_linux\n_tulpa_linux(globals())\n'
     if relative=='wechatauto/media.py' and sys.platform.startswith('linux'):
         data+=b'\nfrom chatlocal.linux_readers import install_media as _tulpa_linux\n_tulpa_linux(globals())\n'
@@ -60,6 +66,13 @@ def download(job):
         data=data.replace(original,b'return " ".join(out)')
         data=patch_qq_configured_root(data)
         data=patch_qq_passive_scan(data)
+        # macOS accounts are opaque names. Tulpa's private snapshots retain
+        # the Windows-compatible nt_qq/nt_db layout, which must be discoverable
+        # alongside the Mac client's native nt_db layout.
+        original=b'and (item / "nt_db" / "nt_msg.db").is_file()'
+        if data.count(original)!=1:
+            raise ValueError('Upstream QQ discovery changed; review Mac snapshot patch')
+        data=data.replace(original,b'and ((item / "nt_db" / "nt_msg.db").is_file() or (item / "nt_qq" / "nt_db" / "nt_msg.db").is_file())')
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_bytes(data)
     return dict(file=str(target.relative_to(ROOT.resolve())),url=url,source_sha256=source_hash,

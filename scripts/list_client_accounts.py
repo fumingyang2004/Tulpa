@@ -10,6 +10,9 @@ sys.path.insert(0,str(ROOT))
 
 def discover(platform):
     if platform == 'qq':
+        from chatlocal.snowluma_history import selected, accounts
+        if selected(ROOT):
+            return accounts(ROOT)
         sys.path.insert(0, str(ROOT/'tools/qq-reader'))
         from chatlog_keeper.qq_db import find_qq_data_root, find_qq_account_databases
         root = find_qq_data_root()

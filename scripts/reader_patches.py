@@ -140,7 +140,50 @@ def patch_wechat_db(data):
         if discovery.count(before)!=1:
             raise ValueError('WeChat directory discovery changed; review drive-root preservation')
         discovery=discovery.replace(before,name+b' = os.path.normpath('+name+b')')
-    return notice+data[:start]+discovery+data[end:]
+    data=data[:start]+discovery+data[end:]
+    before=b'''_k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+_k32.OpenProcess.restype = wintypes.HANDLE
+_k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+_k32.VirtualQueryEx.argtypes = [
+    wintypes.HANDLE, ctypes.c_void_p, ctypes.POINTER(_MBI), ctypes.c_size_t,
+]
+_k32.VirtualQueryEx.restype = ctypes.c_size_t
+_k32.ReadProcessMemory.argtypes = [
+    wintypes.HANDLE, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t,
+    ctypes.POINTER(ctypes.c_size_t),
+]'''
+    if data.count(before)!=1:raise ValueError('WeChat Windows initialization changed; review Mac isolation')
+    after=b'if sys.platform == "win32":\n'+b'\n'.join(b'    '+line for line in before.splitlines())+b'\nelse:\n    _k32 = None'
+    data=data.replace(before,after)
+    notice=b'# Modified by Tulpa contributors: bounded Windows recovery and Mac cache-only reads; see scripts/reader_patches.py.\n'
+    adapter=b'''\n\n# Keep parser/crypto portable; Mac process-key recovery is an explicit separate action.
+if sys.platform == "darwin":
+    from pathlib import Path as _TulpaPath
+    _tulpa_root = str(_TulpaPath(__file__).resolve().parents[3])
+    if _tulpa_root not in sys.path:
+        sys.path.insert(0, _tulpa_root)
+    from scripts.wechat_macos import install as _tulpa_install_macos
+    _tulpa_install_macos(globals())
+'''
+    return notice+data+adapter
+
+
+def patch_wechat_media(data):
+    before=b'''        probe = self._probe_ct()
+        if not probe:
+            return None
+        pids = self.db._find_weixin_pids()'''
+    after=b'''        # Mac media consumes only an authenticated account cache. Process
+        # recovery is a separate explicit operation, never a media fallback.
+        if sys.platform == "darwin":
+            return None
+        probe = self._probe_ct()
+        if not probe:
+            return None
+        pids = self.db._find_weixin_pids()'''
+    if data.count(before)!=1:raise ValueError('WeChat media scanning changed; review Mac isolation')
+    if data.count(b'import sys\n')!=0:raise ValueError('WeChat media imports changed; review Mac isolation')
+    return b'# Modified by Tulpa contributors: Mac media never falls back to Windows process scanning.\n'+data.replace(b'import struct\n',b'import struct\nimport sys\n',1).replace(before,after)
 
 
 def patch_qq_helper(data):

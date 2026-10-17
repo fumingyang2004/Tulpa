@@ -56,6 +56,7 @@ def read_clients(store,scope,limits,ranges,stickers,independent,progress,*,all_m
     Their outcomes remain separate: restored media cannot conceal a failed read.
     """
     from .media_refresh import refresh_for_import
+    from .read_preferences import wechat_images_enabled
     from datetime import datetime
     from .normalize import TZ
     started=datetime.now(TZ).isoformat();results=[]
@@ -81,6 +82,7 @@ def read_clients(store,scope,limits,ranges,stickers,independent,progress,*,all_m
             if begin:args+=['--start',begin]
             if end:args+=['--end',end]
             if not stickers:args+=['--no-stickers']
+            if platform=='wechat' and not wechat_images_enabled(store):args+=['--no-images']
             entry=dict(platform=platform,status='ok',added=0,duplicate=0)
             output=Path(folder)/(platform+'-real.json')
             read_receipt={}
@@ -121,7 +123,7 @@ def read_clients(store,scope,limits,ranges,stickers,independent,progress,*,all_m
                 partial=getattr(exc,'result',read_receipt)
                 if partial.get('job_id'):entry.update(added=partial['imported'],duplicate=partial['duplicate'],job_id=partial['job_id'])
                 progress(f"{label} 聊天记录读取失败：{entry['detail']}")
-            if stickers and source_selected and not (cancelled and cancelled.is_set()):
+            if stickers and source_selected and (platform!='wechat' or wechat_images_enabled(store)) and not (cancelled and cancelled.is_set()):
                 # Explicit opt-in also repairs previously omitted rows outside
                 # the latest-N export. Existing archives suffice even if the
                 # client snapshot is busy; that is reported as partial success.

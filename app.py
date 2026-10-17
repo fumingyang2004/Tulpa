@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 import gradio as gr
 import uvicorn
+import sys
 
 
 def create_app():
@@ -51,33 +52,8 @@ def create_app():
         except ValueError as exc:return dict(default='ocr',native_available=False,note=str(exc))
         return dict(default='ocr',native_available=True,note='开启后仅在按需看图时，将指定图片和附近少量消息发送给当前 DeepSeek API；关闭使用本地 OCR。')
 
-    @app.get('/')
-    def index(request:Request):
-        headers={
-            'Cache-Control':'no-store',
-            'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'",
-            'Referrer-Policy':'no-referrer',
-        }
-        if request.query_params.get('desktop')=='1':
-            page=(web/'index.html').read_text(encoding='utf-8').replace('<html lang="zh-CN">','<html lang="zh-CN" data-desktop="true">')
-            return HTMLResponse(page,headers=headers)
-        return FileResponse(web/'index.html',headers=headers)
-
-    @app.get('/ui/{name}')
-    def asset(name:str):
-        if name not in ('app.css','app.js','chat.js','reply.js','group-admin.js','watch.js','data.js','live.js','artifacts.js','voice.js','collections.js','workspaces.js','desktop.css','desktop.js','snowluma.js','tulpa-logo.png','tulpa.js','tulpa.css','mcp.js','mcp.css'):
-            raise HTTPException(404)
-        return FileResponse(web/name,headers={'Cache-Control':'no-cache'})
-
-    # The native chat page uses the existing, tested Gradio queue callbacks.
-    # Keep the old controls available as an advanced view, with the same data
-    # and file-access boundaries. No second agent or persistence implementation.
-    return gr.mount_gradio_app(app,build_app().queue(max_size=8),path='/legacy',
-        server_name='127.0.0.1',server_port=7860,show_error=False,
-        enable_monitoring=False,footer_links=[],ssr_mode=False,
-        theme=THEME,css=CSS,js=JS,
-        blocked_paths=[str(ROOT/p) for p in ('.env','.git','.tmp','data','imports','tools','reports/private')],
-        max_file_size='100mb')
+    from chatlocal.web_frontend import install_web_ui
+    return install_web_ui(app)
 
 if __name__ == '__main__':
     uvicorn.run(create_app(),host='127.0.0.1',port=7860,access_log=False)

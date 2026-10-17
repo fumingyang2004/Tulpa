@@ -47,7 +47,8 @@ def independent_import_scope(root):
             seen.append(request);save_scope(store,changed)
             return dict(ok=True,payload=dict(messages=[]),checkpoint=dict(account='test',cursors={'tail':[10,20]}),
                         observed_at=time.time(),metrics={})
-        with patch('chatlocal.live.wake_signature',return_value=('test',('unchanged',))), \
+        with patch('scripts.incremental_common.bootstrap_time',return_value=int(time.time())-300), \
+             patch('chatlocal.live.wake_signature',return_value=('test',('unchanged',))), \
              patch('chatlocal.live.message_commit_lock',side_effect=nullcontext), \
              patch.object(manager,'client_running',return_value=True), \
              patch.object(manager,'worker',return_value=SimpleNamespace(read=read)),patch.object(manager,'log'):

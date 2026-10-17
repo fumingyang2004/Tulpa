@@ -9,11 +9,15 @@ import os
 from pathlib import Path
 import re
 import shutil
+import sys
 import socket
 import tempfile
 from urllib.parse import urlparse
 
-from .linux_distribution import release_path, source_files
+if sys.platform == 'darwin':
+    from .macos_distribution import release_path, source_files
+else:
+    from .linux_distribution import release_path, source_files
 from .platform_lock import file_lock
 from .snowluma_secure import atomic_bytes
 from .terminal_client import TerminalClient, TerminalError
@@ -248,7 +252,7 @@ class InstanceManager:
                 self.copy_source(staging)
                 python_env = self.root / '.venv'
                 if not (python_env / 'bin/python').is_file():
-                    raise ValueError('请先在主实例运行 ./setup-linux.sh 安装运行环境。')
+                    raise ValueError('请先在主实例运行 ./tulpa 准备运行环境。')
                 (staging / '.venv').symlink_to(python_env.resolve(), target_is_directory=True)
                 for folder in ('data', '.tmp', '.cache', 'imports'):
                     (staging / folder).mkdir(mode=0o700, exist_ok=True)

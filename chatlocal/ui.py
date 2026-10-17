@@ -297,6 +297,8 @@ def build_app(store=None,sessions=None):
                 env=dict(os.environ,PYTHONUTF8='1')
                 limits=(['--days',str(options['qq_days']),'--per-chat',str(options['qq_per_chat'])]
                         if platform=='qq' else ['--limit',str(options['wechat_per_chat'])])
+                from .read_preferences import wechat_images_enabled
+                if platform=='wechat' and not wechat_images_enabled(store):limits.append('--no-images')
                 process=subprocess.run(
                     [sys.executable,str(ROOT/'scripts'/f'export_{platform}.py'),'--refresh']+limits+([] if load_stickers else ['--no-stickers']),
                     cwd=ROOT,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True,encoding='utf-8',errors='replace',
@@ -407,7 +409,7 @@ def build_app(store=None,sessions=None):
                 gr.Markdown('时间是已导入的最新消息时间，不是同步时钟。保持 QQ、微信登录后手动读取；不调用 API。')
                 read_progress=gr.Textbox(label='读取进度',value='',interactive=False,lines=2,max_lines=5)
                 with gr.Accordion('从文件导入',open=False):
-                    gr.Markdown('将 JSON / JSONL 导出放入 `C:\\Lab0921\\imports`。仅导入文件已有记录，不使用上方天数/条数设置，不会补读客户端历史。单文件上限 100 MB。支持 QCE、wx-cli、ChatLab、WeFlow 和统一格式。')
+                    gr.Markdown('将 JSON / JSONL 导出放入 `imports`。仅导入文件已有记录，不使用上方天数/条数设置，不会补读客户端历史。单文件上限 100 MB。支持 QCE、wx-cli、ChatLab、WeFlow 和统一格式。')
                     import_path=gr.Textbox(value='imports',label='文件或目录')
                     import_platform=gr.Dropdown(['自动识别','qq','wechat'],value='自动识别',label='导入平台')
                     import_conversation=gr.Textbox(value='',label='会话名（文件缺失时填写）')
