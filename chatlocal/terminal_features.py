@@ -175,7 +175,11 @@ def install_features(app,store,root):
     @app.get('/api/terminal/components')
     def components():return component_status(root)
     @app.get('/api/terminal/native')
-    def native():return source_settings(root)
+    def native():
+        from .snowluma_history import source_info
+        result=source_settings(root)
+        result['platforms']['qq'].update(source_info(root))
+        return result
     @app.put('/api/terminal/native/{platform}')
     def configure_native(platform:str,body:dict):
         previous=source_settings(root)['platforms'].get(platform)

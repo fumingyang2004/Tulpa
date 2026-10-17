@@ -12,17 +12,21 @@ from .platform_lock import file_lock
 def source_settings(root=ROOT):
     path=Path(root)/'data/native-sources.json'
     raw=json.loads(path.read_text('utf-8')) if path.exists() else {}
-    return dict(platforms={p:dict(data_root=raw.get(p,{}).get('data_root',''),
+    return dict(platforms={p:dict(source=raw.get(p,{}).get('source','auto'),data_root=raw.get(p,{}).get('data_root',''),
         keys_file=raw.get(p,{}).get('keys_file',''),configured=bool(raw.get(p,{}).get('data_root')))
         for p in ('qq','wechat')})
 
 
 def save_source(platform,body,root=ROOT):
-    if platform not in ('qq','wechat') or set(body)-{'data_root','keys_file'} or 'data_root' not in body:
+    if platform not in ('qq','wechat') or set(body)-{'data_root','keys_file','source'} or not body:
         raise ValueError('请选择平台及客户端数据根目录。')
-    values={}
+    previous=source_settings(root)['platforms'][platform]
+    source=body.get('source',previous.get('source','auto'))
+    if source not in ('auto','database','snowluma') or platform!='qq' and source=='snowluma':
+        raise ValueError('请选择有效的数据来源。')
+    values=dict(source=source)
     for key in ('data_root','keys_file'):
-        value=body.get(key,'')
+        value=body.get(key,previous.get(key,''))
         if not isinstance(value,str) or any(ord(c)<32 for c in value):raise ValueError('本机路径无效。')
         if value:
             path=Path(value).expanduser()

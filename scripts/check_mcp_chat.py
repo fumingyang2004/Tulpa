@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import time
+from test_environment import system_environment
 from unittest.mock import patch
 from websockets.sync.server import serve
 from websockets.exceptions import ConnectionClosed
@@ -136,6 +137,8 @@ async def hot_personas_protocol(service, token, directory):
                     return response.structuredContent
                 baseline=await call('list_chat_personas')
                 assert baseline['count']==1 and not baseline['warnings']
+                assert all('prompt' not in p for p in baseline['personas'])
+                assert (await call('list_chat_personas',include_content=True))['personas'][0]['prompt']
                 card=directory/'夜猫子.md'
                 card.write_text('# 夜猫子\n\n电影迷，话不多。\n','utf-8')
                 latest=await call('list_chat_personas')
@@ -143,6 +146,12 @@ async def hot_personas_protocol(service, token, directory):
                 args=dict(conversation_id='111:group:229',persona_preset='夜猫子',idempotency_key='hot-persona-original')
                 first=await call('start_chat_session',**args)
                 sid=first['session']['id'];snapshot=first['chat_prompt']['persona'];version=first['chat_prompt']['prompt_version']
+                assert 'persona' not in first['session']
+                delta=await call('get_chat_session',session_id=sid,known_prompt_version=version)
+                assert not delta['prompt_changed'] and 'persona' not in delta['chat_prompt'] and 'instructions' not in delta
+                assert len(json.dumps(delta))<len(json.dumps(first))*.75
+                restored=await call('get_chat_session',session_id=sid,known_prompt_version=version,response_format='full')
+                assert restored['chat_prompt']['persona']==snapshot and restored['instructions']
                 assert snapshot==card.read_text('utf-8') and first['session']['persona_name']=='夜猫子'
                 card.write_text('# 白鹭君\n\n音乐迷，慢慢说。\n','utf-8')
                 latest=await call('list_chat_personas')
@@ -169,7 +178,7 @@ def main():
     upstream=ThreadingHTTPServer(('127.0.0.1',0),OneBot)
     threading.Thread(target=upstream.serve_forever,daemon=True).start()
     try:
-        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='mcp-chat-') as tmp,patch.dict('os.environ',{},clear=True):
+        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='mcp-chat-') as tmp,patch.dict('os.environ',system_environment(),clear=True):
             folder=Path(tmp);store=Store(folder/'chats.sqlite3');serial=0
             persona_dir=folder/'personas';persona_dir.mkdir()
             for name in ('little_whale.md','little_whale.source.json','behavior.md'):

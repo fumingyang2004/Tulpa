@@ -14,6 +14,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+if __name__ == '__main__':
+    from chatlocal.snowluma_history import selected
+    if selected(ROOT):
+        from export_snowluma import main
+        main()
+        raise SystemExit(0)
 from chatlocal.config import DATA, local_path
 from chatlocal.qq_storage import qq_workspace_lock, checked_path, CACHE, RECEIPT, cache_mode
 

@@ -38,7 +38,7 @@ def check_linux_install(root):
     assert not (root/'tools/qq-reader/README.md').exists()
     for row in receipt:
         target=(root/row['file']).resolve()
-        assert target.is_relative_to(root/'tools/qq-reader')
+        assert target.is_relative_to((root/'tools/qq-reader').resolve())
         assert hashlib.sha256(target.read_bytes()).hexdigest()==row['installed_sha256']
     unsafe=linux_archive({'chatlog_keeper/../../escape.py':b'unsafe'})
     for data,digest in ((archive,'0'*64),(unsafe,hashlib.sha256(unsafe).hexdigest())):
@@ -66,7 +66,9 @@ def main():
         with patch.object(installer,'ROOT',root/'nested/..'):
             expected=(root/'tools/wechat-reader/wechatauto/db.py').resolve()
             assert installer.install_target('wechat-reader','wechatauto/db.py')==expected
-        check_linux_install(root)
+        # Exercise a non-canonical checkout on every platform, without needing
+        # symlink privileges on Windows. Receipt targets resolve this alias.
+        check_linux_install(root/'nested/..')
     print('PASS isolated checkout and Linux archive install, digest, canonical root and path containment; no network')
 
 

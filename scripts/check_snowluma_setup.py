@@ -7,6 +7,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
+from test_environment import system_environment
 from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -67,7 +68,7 @@ def main():
     http=ThreadingHTTPServer(('127.0.0.1',0),HTTP)
     thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start();events=Events()
     try:
-        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='snow-setup-') as name,patch.dict('os.environ',{},clear=True):
+        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='snow-setup-') as name,patch.dict('os.environ',system_environment(),clear=True):
             root=Path(name);snow=root/'SnowLuma';product=root/'Tulpa';product.mkdir();snow.mkdir()
             write(snow/'package.json',dict(name='@snowluma/runtime',version='1.14.20'));(snow/'index.mjs').write_text('// fixture')
             h=dict(name='http-fixture',host='127.0.0.1',port=http.server_port,path='/custom/api',accessToken=HTTP.token)
@@ -98,7 +99,9 @@ def main():
             assert apply(dict(body,http_id='not-a-node'))['code']=='selection_required'
             assert apply(dict(body,account='67890'))['code']=='selection_required'
             assert apply(dict(body,token='untrusted'))['code']=='selection_required'
-            HTTP.error=401;assert apply(body)['code']=='http_auth_error';HTTP.error=404
+            HTTP.error=401;result=apply(body)
+            assert result['code']=='http_auth_error', result['code']
+            HTTP.error=404
             assert apply(body)['code']=='http_path_error';HTTP.error=0
             HTTP.account='67890';assert apply(body)['code']=='account_mismatch';HTTP.account='12345'
             with socket.socket() as unused:

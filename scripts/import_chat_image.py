@@ -12,8 +12,6 @@ from pathlib import Path
 import re
 import stat
 import sys
-import tomllib
-from urllib.parse import urlsplit
 
 import httpx
 from mcp import ClientSession
@@ -23,52 +21,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from chatlocal.mcp_chat_media import MAX_BYTES
 
 
-class UploadError(ValueError):
-    """Safe diagnostics authored by this client, without request data."""
-
-
-def connection(path, server=None):
-    try:
-        text = Path(path).expanduser().read_text('utf-8-sig')
-        config = tomllib.loads(text) if str(path).endswith('.toml') else json.loads(text)
-        config = config.get('client_config', config)
-        servers = config.get('mcpServers', config.get('mcp_servers', {}))
-        entries = [servers[server]] if server else list(servers.values())
-    except (OSError, ValueError, AttributeError, KeyError, TypeError):
-        raise UploadError('无法读取 MCP 配置或找不到指定连接；支持 Tulpa 导出的 JSON 和客户端 TOML。') from None
-    found = []
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        url = entry.get('url', '')
-        try:
-            parts = urlsplit(url)
-            if (parts.scheme != 'http' or parts.hostname not in ('127.0.0.1', 'localhost')
-                    or not parts.port or parts.path != '/mcp' or parts.username is not None
-                    or parts.password is not None or parts.query or parts.fragment):
-                continue
-        except (ValueError, TypeError, AttributeError):
-            continue
-        headers = entry.get('headers', entry.get('http_headers', {}))
-        if not isinstance(headers, dict):
-            continue
-        auth = next((v for k, v in headers.items() if k.lower() == 'authorization'), '')
-        env_name = entry.get('bearer_token_env_var')
-        if not auth and isinstance(env_name, str):
-            token = os.environ.get(env_name, '')
-            if token:
-                auth = 'Bearer ' + token
-        if isinstance(auth, str) and auth.startswith('Bearer ') and auth[7:].strip() and '\n' not in auth and '\r' not in auth:
-            found.append((url, auth))
-    if len(found) != 1:
-        raise UploadError('配置需唯一匹配带凭据的本机 Tulpa /mcp 地址；多个连接请用 --server 指定，远程服务请先建立 SSH 本地转发。')
-    return found[0]
+from chatlocal.mcp_client_config import ClientConfigError as UploadError, connection
 
 
 def image_bytes(path):
     try:
-        # Nonblocking open also rejects FIFOs/devices instead of waiting forever.
-        fd = os.open(Path(path).expanduser(), os.O_RDONLY | os.O_NONBLOCK)
+        # POSIX must not wait on FIFOs; Windows has no O_NONBLOCK and needs
+        # binary mode. The fstat check below rejects non-regular handles.
+        flags = os.O_RDONLY | (os.O_BINARY if os.name == 'nt' else os.O_NONBLOCK)
+        fd = os.open(Path(path).expanduser(), flags)
         with os.fdopen(fd, 'rb') as stream:
             info = os.fstat(stream.fileno())
             if not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= MAX_BYTES:

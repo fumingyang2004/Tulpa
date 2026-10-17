@@ -130,7 +130,7 @@ def sync_messages(store, platforms=None, *, load_stickers=False, progress=None, 
                     if not checkpoint:detail+='；首次接续上次已导入快照（回叠5分钟），更早历史仍按补读范围获取'
                     transition=dict(platform=platform,previous=checkpoint,next=next_checkpoint,detail=detail)
                     if batch_result:transition['added']=batch_result['imported']
-                    if platform=='qq' and not payload.get('unchanged'):
+                    if platform=='qq' and next_checkpoint.get('method')=='native-id-inventory-v1' and not payload.get('unchanged'):
                         import hashlib
                         blobs={name:(folder/(name+'.next.bin')).read_bytes() for name in ('c2c_msg_table','group_msg_table')}
                         if any(hashlib.sha256(data).hexdigest()!=next_checkpoint['cursors'][name]['inventory_sha256'] for name,data in blobs.items()):raise ValueError('QQ 新身份目录校验失败')

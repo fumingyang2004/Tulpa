@@ -115,7 +115,7 @@ class ChatLearning:
         if self.config_error:return dict(ready=False,reason='invalid_learning_policy')
         cutoff=time.time()-self.chat.turns.policy()['plan_ttl_seconds']
         with self.chat.access.connect() as db:
-            pending=db.execute("SELECT 1 FROM chat_turn_plans WHERE session_id=? AND (state='SENDING' OR (state='READY' AND created>=?)) LIMIT 1",(b['sid'],cutoff)).fetchone()
+            pending=db.execute("SELECT 1 FROM chat_turn_plans WHERE session_id=? AND (state='SENDING' OR (state IN ('READY','REVIEW_REQUIRED') AND created>=?)) LIMIT 1",(b['sid'],cutoff)).fetchone()
         ready=self.store.readiness(b,reply_pending=bool(pending))
         return dict(ready=False,reason='return_to_wait') if ready['ready'] and b['sid'] in self.yield_required else ready
 
@@ -193,7 +193,7 @@ class ChatLearning:
         except (ValueError,OSError,sqlite3.Error):return None
 
     def plan_context(self,p):
-        if p['state']!='READY':return None
+        if p['state'] not in ('READY','REVIEW_REQUIRED'):return None
         def unavailable(reason):
             result=dict(candidates=[],selected=[],jargon=[],selection_complete=True,selection_required=False,
                         expression_decision=dict(state='not_applicable' if reason=='learning_disabled' else 'unavailable',reason=reason))
@@ -342,7 +342,7 @@ class ChatLearning:
                         # An abandoned, expired READY plan must not starve
                         # learning forever. Never alter the reply queue here.
                         cutoff=time.time()-self.chat.turns.policy()['plan_ttl_seconds']
-                        pending=db.execute("SELECT 1 FROM chat_turn_plans WHERE session_id=? AND (state='SENDING' OR (state='READY' AND created>=?)) LIMIT 1",(sid,cutoff)).fetchone()
+                        pending=db.execute("SELECT 1 FROM chat_turn_plans WHERE session_id=? AND (state='SENDING' OR (state IN ('READY','REVIEW_REQUIRED') AND created>=?)) LIMIT 1",(sid,cutoff)).fetchone()
                     task=self.store.claim(b,args.get('context_id','chat-'+sid),reply_pending=bool(pending),wake_id=args.get('wake_id'))
                     if task:
                         self.yield_required.add(sid)
@@ -358,7 +358,7 @@ class ChatLearning:
                     return dict(result,next_call=self.chat.continuation(sid),continue_waiting=True,note='本阶段结束，先回 wait；新消息优先，下一学习阶段由 wait 自动唤醒。')
                 if name=='select_chat_expressions':
                     p=self.chat.turns.load(args['plan_id'],sid)
-                    if p['state']!='READY':raise LearningError('selection_unavailable')
+                    if p['state'] not in ('READY','REVIEW_REQUIRED'):raise LearningError('selection_unavailable')
                     import threading
                     self.chat.turns.check(p,threading.Event())
                     result=self.store.select(b,p['id'],args['expression_ids'])
@@ -366,7 +366,8 @@ class ChatLearning:
                     result.pop('candidates',None)
                     result['expression_selection']=json.loads(p['payload']).get('expression_selection')
                     result['note']='本轮选择已完成；selected 仅为表达参考，不照抄、不强迫使用，不代表已验证宿主实际注入或措辞效果。'
-                    result['next_call']=dict(tool='send_chat_reply',arguments=dict(session_id=sid,plan_id=p['id']),requires=['bubbles'])
+                    result['next_call']=(self.chat.turns.public(p)['next_call'] if p['state']=='REVIEW_REQUIRED' else
+                        dict(tool='send_chat_reply',arguments=dict(session_id=sid,plan_id=p['id']),requires=['bubbles']))
                     return result
                 raise LearningError('unknown_learning_tool')
         except LearningError as exc:

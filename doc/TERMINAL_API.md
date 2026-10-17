@@ -186,9 +186,12 @@ New `/api/terminal` endpoints:
   running records contain `events` and completed records include `result`.
 - `POST /agent/turns/{id}/stop {}`: `{ok:true}`.
 - `GET /components`: actual status of readers, ASR, OCR, Office and Linux service.
-- `GET /native`: `{platforms:{qq:{data_root,keys_file,configured},wechat:{...}}}`.
-- `PUT /native/{platform}`: `{data_root,keys_file?}`; explicit local client root
-  and optional existing key JSON path. Keys are read locally and never returned.
+- `GET /native`: `{platforms:{qq:{source,data_root,keys_file,configured,source_type,source_label,requires_key},wechat:{...}}}`.
+  QQ Docker sources also report `source_ready`, `source_account` and `detail`.
+- `PUT /native/{platform}`: `{source?:"auto"|"database"|"snowluma",data_root?,keys_file?}`;
+  `snowluma` is QQ-only and reads the owned Docker instance through read APIs.
+  Omitted fields retain their values; an empty path clears it. Database mode accepts
+  a local client root and an optional key JSON path. Keys are read locally and never returned.
 - `POST /native/install {}`: start pinned reader installation; returns `{job_id}`.
 - `POST /native/{platform}/extract {account?,method:"passive"|"active",confirm_start_client?:false}`:
   returns `{job_id}`. Active requires explicit `confirm_start_client:true`, a

@@ -37,4 +37,4 @@ def commit(db, transition, added, last_id):
 
 def record(db, mid, transition):
     db.execute('INSERT OR IGNORE INTO live_events VALUES(?,?,?,?,?,NULL)',
-        (mid,transition['platform']+'_database','database_verified',transition['observed_at'],time.time()))
+        (mid,transition.get('source',transition['platform']+'_database'),transition.get('verification_state','database_verified'),transition['observed_at'],time.time()))

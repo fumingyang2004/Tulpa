@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import time
+from test_environment import system_environment
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).parent))
@@ -43,13 +44,13 @@ async def wire(service,connection,sid,ui):
                             db.execute('INSERT INTO expressions(id,scope,situation,style,count,updated,independence) VALUES(?,?,?,?,2,?,?)',
                                 (f'{i:032x}',scope,f'合成情境{i}',f'合成群友形式{i}',time.time(),'degraded'))
                     ground_fixture_rows(learning.store,scope)
-                async def plan(expressions=('text',),action='reply'):
+                async def plan(expressions=('text',),action='reply',policy='strict'):
                     nonlocal serial
                     serial+=1
                     packet=await call('get_chat_session',session_id=sid)
                     target=next(m for m in reversed(packet['context']['messages']) if not m['is_self'])
                     return await call('plan_chat_reply',session_id=sid,batch_id=packet['input_batch']['id'],
-                        action=action,expressions=list(expressions),target_event_id=target['id'],
+                        action=action,expressions=list(expressions),target_event_id=target['id'],new_message_policy=policy,
                         intent='合成测试意图',idempotency_key=f'usage-plan-{serial}')
                 async def send(p,bubbles=None):
                     return await call('send_chat_reply',session_id=sid,plan_id=p['plan_id'],
@@ -135,6 +136,22 @@ async def wire(service,connection,sid,ui):
                 out=await send(p,[dict(kind='reaction',event_id=p['decision']['target_event_id'],reaction_id='qq_like',operation='remove')])
                 assert out['state']=='SUCCEEDED' and out['expression_selection']['reason']=='non_text_output',out
                 assert len(ReactionBot.sent)==before and len(ReactionBot.writes)==2
+                # A mixed non-text draft can be replaced by text at review, but
+                # it must then complete the same mandatory expression choice.
+                p=await plan(expressions=('text','reaction'),policy='review')
+                tools.chat.receive(dict(post_type='message',message_type='group',self_id=111,group_id=222,user_id=333,
+                    message_id=-9003,time=int(time.time()),sender={'user_id':333},message=[dict(type='text',data={'text':'复核时的新补充'})]))
+                review=await send(p,[dict(kind='reaction',event_id=p['decision']['target_event_id'],reaction_id='qq_like',operation='add')])
+                assert review['state']=='REVIEW_REQUIRED',review
+                args=dict(review['next_call']['arguments'],decision='replace',bubbles=[dict(kind='text',text='复核后改为一句话')])
+                out=await call('review_chat_reply',**args)
+                assert out['error_code']=='expression_selection_required' and len(ReactionBot.sent)==before,out
+                selected=await select(p,[])
+                assert selected['next_call']['tool']=='review_chat_reply'
+                out=await call('review_chat_reply',**args)
+                assert out['state']=='SUCCEEDED' and out['expression_selection']['state']=='none',out
+                before=len(ReactionBot.sent)
+                print('PASS buffered mixed-draft review cannot bypass expression selection')
                 # Selection is never an exemption from stale-message/stop/revoke checks.
                 p=await plan();await select(p,[])
                 event=dict(post_type='message',message_type='group',self_id=111,group_id=222,user_id=333,
@@ -165,7 +182,7 @@ def main():
         assert address[0] in ('127.0.0.1','localhost','::1') and address[1] in ports,address
         return connect(address,*args,**kw)
     try:
-        with tempfile.TemporaryDirectory(prefix='tulpa-language-usage-') as tmp,patch.dict('os.environ',{},clear=True),patch('socket.create_connection',restrict):
+        with tempfile.TemporaryDirectory(prefix='tulpa-language-usage-') as tmp,patch.dict('os.environ',system_environment(),clear=True),patch('socket.create_connection',restrict):
             root=Path(tmp);store=Store(root/'chats.sqlite3')
             (root/'.env').write_text(f'REPLY_ONEBOT_URL=http://127.0.0.1:{server.server_port}\nREPLY_ONEBOT_WS_URL=ws://127.0.0.1:{events.port}\nREPLY_ONEBOT_WS_TOKEN=event-fixture\n','utf-8')
             with patch('chatlocal.onebot.ROOT',root),patch('chatlocal.message_sender.ROOT',root):

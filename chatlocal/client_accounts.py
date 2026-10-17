@@ -86,14 +86,16 @@ def accounts_view(store):
     for platform in PLATFORMS:
         selected = scope[platform].get('account')
         try:
+            from .snowluma_history import source_info
+            source = source_info() if platform == 'qq' else {}
             selected = bound_account(store, platform) or selected
             candidates = discover_accounts(platform)
             if not selected and len(candidates) == 1:
                 selected = candidates[0]
-            detail = '' if candidates else f'未找到 {PLATFORMS[platform]} 本机账号数据，请登录客户端后重新检测。'
+            detail = source.get('detail', '') if candidates else source.get('detail') or f'未找到 {PLATFORMS[platform]} 本机账号数据，请登录客户端后重新检测。'
             if selected and selected not in candidates:
                 detail = '上次使用的账号当前未找到，不会自动选择其他账号。'
-            result[platform] = dict(accounts=candidates, selected=selected, detail=detail)
+            result[platform] = dict(source, accounts=candidates, selected=selected, detail=detail)
         except (OSError, ValueError):
             result[platform] = dict(accounts=[], selected=selected, detail='账号检测未完成，请重新检测；已有数据保留。')
     return result

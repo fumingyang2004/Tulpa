@@ -20,6 +20,7 @@ PLATFORMS=('qq','wechat')
 DEFAULT=dict(qq='database',wechat='database',load_stickers=False)
 LIVE_SCOPE_KEY=json.dumps(dict(enabled=True,conversations=None),sort_keys=True)
 DETAILS={
+    'snowluma_live_overflow':'SL 实时缓存已满，存在消息缺口。请按 s 增量同步补读历史；已入库记录保留。',
     'source_busy':'客户端正在写入，正在重试；未推进进度。',
     'key_unavailable':'密钥不可用；请登录客户端并手动刷新。',
     'new_shard_key_unavailable':'发现新分片但密钥不可用，请刷新消息。',
@@ -91,6 +92,11 @@ def process_names():
 def wake_signature(platform):
     metadata=DATA/f'{platform}-snapshot-info.json'
     meta=json.loads(metadata.read_text(encoding='utf-8'))
+    if platform=='qq' and meta.get('source_type')=='snowluma':
+        from .snowluma_history import selected, state
+        current=state()
+        if not selected() or str(current.get('account'))!=meta['account']:raise ValueError('account_changed')
+        return meta['account'],('snowluma',current.get('generation'),int(time.monotonic()//3))
     root=Path(meta.get('source',meta.get('source_db','')))
     paths=[root/'nt_msg.db'] if platform=='qq' else sorted((root/'message').glob('message_[0-9]*.db'))
     if not paths: raise FileNotFoundError('No source database')
@@ -194,6 +200,11 @@ class LiveManager:
         for thread in self.threads:thread.join(timeout=4)
 
     def client_running(self, p):
+        if p=='qq':
+            from .snowluma_history import selected, state
+            if selected():
+                current=state()
+                return bool(current.get('enabled') and current.get('phase')=='ready')
         with self.guard:
             if time.monotonic()-self.process_checked>3:
                 self.names=process_names();self.process_checked=time.monotonic()
@@ -201,7 +212,12 @@ class LiveManager:
 
     def worker(self, p):
         with self.guard:
-            if p not in self.workers:self.workers[p]=Worker(p)
+            if p not in self.workers:
+                from .snowluma_history import selected
+                if p=='qq' and selected():
+                    from .snowluma_history_live import SnowLumaLiveWorker
+                    self.workers[p]=SnowLumaLiveWorker()
+                else:self.workers[p]=Worker(p)
             return self.workers[p]
 
     def reset_worker(self,p):
@@ -244,6 +260,8 @@ class LiveManager:
                 # One-off historical imports have an independent scope.
                 if self.stop_event.is_set() or revision!=self.revision:continue
                 transition=dict(platform=p,previous=old,next=dict(result['checkpoint'],scope=LIVE_SCOPE_KEY),observed_at=result['observed_at'])
+                if result.get('source'):
+                    transition.update(source=result['source'],verification_state=result['verification_state'])
                 payload=result['payload'];count=len(payload['messages'])
                 with message_commit_lock():
                     if count:
@@ -260,7 +278,10 @@ class LiveManager:
                             commit(db,transition,0,0)
                         added=0
                 metrics=dict(result['metrics'],added=added,elapsed_seconds=round(time.time()-read_started,4))
-                self.update(p,status='listening',detail='等待部分消息取得服务器 ID；其余会话继续读取' if payload.get('pending_ack') else '数据库监听中；只读取新增消息',metrics=metrics,failures=0)
+                detail='等待部分消息取得服务器 ID；其余会话继续读取' if payload.get('pending_ack') else '数据库监听中；只读取新增消息'
+                if result.get('source')=='qq_onebot':
+                    detail='SL 实时消息接收中；启动或断线期间的历史可按 s 增量同步补读。'
+                self.update(p,status='listening',detail=detail,metrics=metrics,failures=0)
                 self.log(p,'batch',metrics)
                 last=None if payload.get('more') else wake
                 last_scan=time.monotonic();failures=0;busy_count=0;next_try=time.time()+2 if payload.get('pending_ack') else 0

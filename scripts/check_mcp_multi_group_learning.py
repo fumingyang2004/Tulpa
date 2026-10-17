@@ -13,6 +13,7 @@ import sys
 import tempfile
 import threading
 import time
+from test_environment import system_environment
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
@@ -120,7 +121,7 @@ def integration():
         assert address[0] in ('127.0.0.1','localhost','::1') and address[1] in ports,address
         return connect(address,*args,**kw)
     try:
-        with tempfile.TemporaryDirectory(prefix='tulpa-multigroup-mcp-') as tmp,patch.dict('os.environ',{},clear=True),patch('socket.create_connection',restrict):
+        with tempfile.TemporaryDirectory(prefix='tulpa-multigroup-mcp-') as tmp,patch.dict('os.environ',system_environment(),clear=True),patch('socket.create_connection',restrict):
             root=Path(tmp);history=Store(root/'chats.sqlite3')
             (root/'.env').write_text(f'REPLY_ONEBOT_URL=http://127.0.0.1:{server.server_port}\nREPLY_ONEBOT_WS_URL=ws://127.0.0.1:{events.port}\nREPLY_ONEBOT_WS_TOKEN=event-fixture\n','utf-8')
             with patch('chatlocal.onebot.ROOT',root),patch('chatlocal.message_sender.ROOT',root):

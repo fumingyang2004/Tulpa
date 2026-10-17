@@ -254,3 +254,25 @@ def packet(row, recent, batch, *, event='messages', has_more=False, stickers=Non
         result['continue_with'] = dict(tool='wait_chat_messages', arguments=dict(session_id=row['id'],known_prompt_version=version(row)),
             when='处理完这一批就实际调用；不发言也调用。已处理完时附 acknowledge_through_id=本批 read_through_id；用户停止则改用 stop_chat_session。')
     return result
+
+
+def compact(packet):
+    """Keep observations/actionable deltas; initial/full packets retain the rules.
+
+    Never shorten message text, image references, new reactions, learning jobs
+    or permission flags. This is output shaping, not a semantic summarizer.
+    """
+    result={k:v for k,v in packet.items() if k not in
+            ('examples','examples_source','data_boundary','resume','behavior','persona')}
+    # Fixed capability instructions were already supplied with the persona.
+    # The middle part contains only conditional observations for this batch.
+    static_prefixes=('表情按语境选择：','看到值得留的图，','reactions 目录可用于',
+                     '附件段的 attachment_index','聊天内的戳戳、','当前是已授权好友的私聊。')
+    fixed={*MODES.values(),ADDRESSING,
+           '先辨认这句话对谁说，再决定接话、看图或沉默。群里只发想说的那句话；不输出你的判断过程、执行报告或例子里的动作说明。'}
+    result['reminders']=[h for h in packet.get('reminders',[]) if h not in fixed and not h.startswith(static_prefixes)]
+    if 'reactions' in result:
+        result['reactions']={k:v for k,v in result['reactions'].items() if k not in ('hint','candidates')}
+    if 'language_learning' in result:
+        result['language_learning']={k:v for k,v in result['language_learning'].items() if k not in ('when','isolation')}
+    return result

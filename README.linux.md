@@ -75,7 +75,7 @@ Tulpa 准备会话后会显示「等待 Agent」；外部 Agent 退出或停止�
 
 终端界面可管理本机数据、聊天记录、搜索、记忆、关注卡、材料、工作区和模型对话。
 QQ / 微信历史读取需要实际可读的数据源及有效密钥；OneBot 实时接入不会自动补齐全部历史。
-本机客户端路径、导入和取钥限制见 [Linux 原生数据说明](doc/LINUX_TERMINAL.md#原生-qq--微信数据)。
+本机客户端路径、导入和取钥限制见 [Linux 原生数据说明](doc/LINUX_TERMINAL.md#本机-qq--微信数据库)。
 
 需要原生读取器、OCR、Office 或本地语音时，可在「组件服务」按需安装，或一次安装全部：
 
@@ -99,6 +99,7 @@ sh setup-linux.sh --full
 
 ## 文档与维护
 
+- [专用聊天桥接](doc/MCP_CHAT_BRIDGE.md)：合并空闲轮询、按版本加载人设、草稿增量复核。
 - [Linux 使用说明](doc/LINUX_TERMINAL.md)：安装、启动、SL、MCP、原生数据、CLI。
 - [Agent 接入](doc/LINUX_AGENT_SETUP.md)：连接凭据、验证、群聊与排错。
 - [保留数据升级](doc/LINUX_UPGRADE.md)：同目录更新、备份与服务恢复。

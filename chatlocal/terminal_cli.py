@@ -40,6 +40,8 @@ def parser():
         sub = instances.add_parser(action); sub.add_argument('id')
         if action == 'rename': sub.add_argument('--name', required=True)
     commands.add_parser('status', help='查看本实例状态')
+    from .mcp_client_config import add_bridge_arguments as bridge_arguments
+    bridge_arguments(commands.add_parser('chat-bridge',help='专用 stdio MCP 聊天连接，合并空闲等待'))
     commands.add_parser('setup', help='交互配置已有 SnowLuma 服务')
     sl = commands.add_parser('sl', help='查看或检测 SL 连接').add_subparsers(dest='action', required=True)
     sl.add_parser('show')
@@ -295,6 +297,12 @@ def main(argv=None):
         if args.command == 'serve':
             from .terminal_server import run
             run(args.port, args.token_file)
+            return 0
+        if args.command == 'chat-bridge':
+            from .mcp_chat_bridge import run
+            try:run(args)
+            except ValueError:raise
+            except Exception:raise TerminalError('Tulpa 桥接连接失败，请检查后台及 MCP 凭据文件。') from None
             return 0
         client = TerminalClient(args.url, args.token_file)
         try:
