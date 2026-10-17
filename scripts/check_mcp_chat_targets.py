@@ -14,6 +14,7 @@ import sys
 import tempfile
 import threading
 import time
+from test_environment import system_environment
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
@@ -92,7 +93,7 @@ def main():
     events=Events();upstream=ThreadingHTTPServer(('127.0.0.1',0),TargetBot)
     threading.Thread(target=upstream.serve_forever,daemon=True).start()
     try:
-        with tempfile.TemporaryDirectory(prefix='tulpa-chat-targets-') as tmp,patch.dict('os.environ',{},clear=True):
+        with tempfile.TemporaryDirectory(prefix='tulpa-chat-targets-') as tmp,patch.dict('os.environ',system_environment(),clear=True):
             folder=Path(tmp);store=Store(folder/'chats.sqlite3')
             (folder/'.env').write_text(f'REPLY_ONEBOT_URL=http://127.0.0.1:{upstream.server_port}\nREPLY_ONEBOT_WS_URL=ws://127.0.0.1:{events.port}\nREPLY_ONEBOT_WS_TOKEN=event-fixture\n','utf-8')
             with patch('chatlocal.onebot.ROOT',folder),patch('chatlocal.message_sender.ROOT',folder):

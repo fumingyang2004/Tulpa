@@ -11,6 +11,7 @@ import sys
 import tempfile
 import threading
 import time
+from test_environment import system_environment
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
@@ -91,7 +92,7 @@ def main():
     events=Events();upstream=ThreadingHTTPServer(('127.0.0.1',0),StickerBot)
     threading.Thread(target=upstream.serve_forever,daemon=True).start()
     try:
-        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='chat-media-') as tmp,patch.dict('os.environ',{},clear=True):
+        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='chat-media-') as tmp,patch.dict('os.environ',system_environment(),clear=True):
             folder=Path(tmp);store=Store(folder/'chats.sqlite3')
             (folder/'.env').write_text(f'REPLY_ONEBOT_URL=http://127.0.0.1:{upstream.server_port}\nREPLY_ONEBOT_WS_URL=ws://127.0.0.1:{events.port}\nREPLY_ONEBOT_WS_TOKEN=event-fixture\n','utf-8')
             app=FastAPI();svc=install_mcp_routes(app,store);access=svc.access;tools=svc.tools
