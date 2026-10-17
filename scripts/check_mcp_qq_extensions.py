@@ -13,6 +13,7 @@ import sys
 import tempfile
 import threading
 import time
+from test_environment import system_environment
 from unittest.mock import patch
 import wave
 
@@ -110,7 +111,7 @@ def main():
     events=Events();upstream=ThreadingHTTPServer(('127.0.0.1',0),Bot)
     threading.Thread(target=upstream.serve_forever,daemon=True).start();checks=[]
     try:
-        with tempfile.TemporaryDirectory(prefix='tulpa-sl-extensions-') as tmp,patch.dict('os.environ',{},clear=True):
+        with tempfile.TemporaryDirectory(prefix='tulpa-sl-extensions-') as tmp,patch.dict('os.environ',system_environment(),clear=True):
             root=Path(tmp)
             (root/'.env').write_text(f'REPLY_ONEBOT_URL=http://127.0.0.1:{upstream.server_port}\nREPLY_ONEBOT_WS_URL=ws://127.0.0.1:{events.port}\nREPLY_ONEBOT_WS_TOKEN=event-fixture\n')
             with patch('chatlocal.onebot.ROOT',root),patch('chatlocal.message_sender.ROOT',root):

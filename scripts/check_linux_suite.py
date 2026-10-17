@@ -12,7 +12,7 @@ CHECKS=('reader_install','linux_distribution','linux_full','terminal_backend','t
         'watch_sync','watch_batches','tulpa','tulpa_api','reply_copilot','reply_agent','reply_history',
         'reply_quote','investigation','agent_budget','agent_failure',
         'qq_history','qq_replies','qq_labels','qq_storage','wechat_export','wechat_media_live','qq_media_live',
-        'mcp','mcp_chat','mcp_chat_turns','mcp_chat_prompts','mcp_language_learning','mcp_language_usage','mcp_reactions',
+        'mcp','mcp_picker','mcp_chat','mcp_chat_turns','mcp_chat_prompts','mcp_language_learning','mcp_language_usage','mcp_reactions',
         'snowluma_managed','snowluma_managed_transport','snowluma_setup','snowluma_docker','snowluma_docker_tui',
         'group_admin','client_accounts','data_controls','refresh_chat','reader_cache',
         'import_batches','chat_browser','overview','qq_account_diagnostics','identity','people',

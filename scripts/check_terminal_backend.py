@@ -52,7 +52,8 @@ class TerminalTests(unittest.TestCase):
         self.events = Events()
         self.sl = ThreadingHTTPServer(('127.0.0.1', 0), SL)
         self.thread = threading.Thread(target=self.sl.serve_forever, daemon=True); self.thread.start()
-        self.env = patch.dict(os.environ, {}, clear=True); self.env.start()
+        from test_environment import system_environment
+        self.env = patch.dict(os.environ, system_environment(), clear=True); self.env.start()
         self.roots = [patch('chatlocal.onebot.ROOT', self.root), patch('chatlocal.message_sender.ROOT', self.root)]
         for value in self.roots: value.start()
         self.store = Store(self.root/'data/chats.sqlite3')

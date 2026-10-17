@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT/'scripts'))
 import check_terminal_backend as backend
 from check_mcp import client as mcp_client
-from check_terminal_integration import management_http
+from test_http import management_http
 from chatlocal.mcp_access import MCPAccess, AccessDenied
 from chatlocal.mcp_qq import QQExtensions
 from chatlocal.onebot import Client, OneBotError
@@ -64,6 +64,7 @@ class GrantEditTests(unittest.TestCase):
                        'scope TEXT NOT NULL,epoch TEXT NOT NULL,accounts TEXT NOT NULL,created_at REAL NOT NULL,revoked INTEGER NOT NULL DEFAULT 0)')
             fields = ('id','name','token_hash','scope','epoch','accounts','created_at','revoked')
             db.execute('INSERT INTO grants VALUES(?,?,?,?,?,?,?,?)', tuple(original[k] for k in fields))
+        db.close()
         migrated = MCPAccess(self.fixture.store, path=legacy)
         migrated.configure(True,18777)
         self.assertEqual(migrated.authorize(self.g['token'], source=False)['revision'], 0)
@@ -190,7 +191,8 @@ class GrantEditTests(unittest.TestCase):
     def test_cli_and_native_route_keep_token(self):
         original_hash = self.row()['token_hash']
         with management_http(self.fixture.app) as url:
-            prefix = [str(ROOT/'tulpa'),'--json','--url',url,'--token-file',str(self.fixture.root/'data/terminal-admin.token'),
+            launcher = [sys.executable,'-m','chatlocal.terminal_cli'] if sys.platform=='win32' else [str(ROOT/'tulpa')]
+            prefix = launcher+['--json','--url',url,'--token-file',str(self.fixture.root/'data/terminal-admin.token'),
                       'connections','edit',self.g['id']]
             for flag, expected in (('--qq-profile',True),('--no-qq-profile',False)):
                 result = subprocess.run(prefix+[flag],cwd=ROOT,capture_output=True,text=True,timeout=20)

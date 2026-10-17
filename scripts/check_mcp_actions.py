@@ -8,6 +8,7 @@ import socket
 import sys
 import tempfile
 import threading
+from test_environment import system_environment
 from unittest.mock import patch
 
 ROOT=Path(sys.argv[sys.argv.index('--package')+1]).resolve() if '--package' in sys.argv else Path(__file__).resolve().parents[1]
@@ -61,7 +62,7 @@ async def protocol(url,token):
 def main():
     server=ThreadingHTTPServer(('127.0.0.1',0),Fixture);threading.Thread(target=server.serve_forever,daemon=True).start()
     try:
-        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='mcp-actions-') as tmp,patch.dict('os.environ',{},clear=True):
+        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='mcp-actions-') as tmp,patch.dict('os.environ',system_environment(),clear=True):
             folder=Path(tmp);store=Store(folder/'chats.sqlite3')
             file=folder/'fixture.json';file.write_text(json.dumps([dict(platform='qq',conversation_id=cid,conversation='Isolated test',conversation_type='group',sender_id='333',sender='Fixture',source_id=cid,content='Fixture data',timestamp='2026-10-01') for cid in ['111:group:222','111:group:444']]),'utf-8');store.import_file(file)
             # Token is optional on the server; no illegal empty Bearer header.

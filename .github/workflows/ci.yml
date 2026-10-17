@@ -71,7 +71,7 @@ jobs:
           $checks += @('check_mcp_language_learning.py','check_mcp_language_integration.py','check_mcp_auto_learning.py','check_mcp_expression_evidence.py','check_mcp_language_usage.py','check_mcp_jargon_matching.py')
           $checks += @('check_mcp_jargon_pipeline.py','check_mcp_multi_group_learning.py')
           $checks += @('check_mcp_grant_edit.py','check_mcp_image_import.py','check_mcp_qq_extensions.py')
-          $checks += @('check_snowluma_managed.py','check_snowluma_managed_transport.py')
+          $checks += @('check_snowluma_managed.py','check_snowluma_managed_transport.py','check_mcp_picker.py')
           foreach ($check in $checks) {
             python "scripts/$check"
             if ($LASTEXITCODE -ne 0) { throw "$check failed" }

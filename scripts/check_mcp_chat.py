@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import time
+from test_environment import system_environment
 from unittest.mock import patch
 from websockets.sync.server import serve
 from websockets.exceptions import ConnectionClosed
@@ -169,7 +170,7 @@ def main():
     upstream=ThreadingHTTPServer(('127.0.0.1',0),OneBot)
     threading.Thread(target=upstream.serve_forever,daemon=True).start()
     try:
-        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='mcp-chat-') as tmp,patch.dict('os.environ',{},clear=True):
+        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp',prefix='mcp-chat-') as tmp,patch.dict('os.environ',system_environment(),clear=True):
             folder=Path(tmp);store=Store(folder/'chats.sqlite3');serial=0
             persona_dir=folder/'personas';persona_dir.mkdir()
             for name in ('little_whale.md','little_whale.source.json','behavior.md'):
